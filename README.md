@@ -73,10 +73,12 @@
 ```bash
 npm install
 npm run dev
+```
 
 默认开发地址：
 
 http://localhost:5173
+
 docs 目录说明
 
 项目过程文档保存在 docs/ 目录中，包括：
