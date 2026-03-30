@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { products } from '../constants/mockData';
+import { useState, useEffect } from 'react';
+import { getAllProducts, filterProducts, addProduct, updateProduct, deleteProduct } from '../services/productService';
 
 // 状态标签组件
 function StatusBadge({ status }) {
@@ -17,30 +17,76 @@ function StatusBadge({ status }) {
 }
 
 function Products() {
+  const [allProducts, setAllProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
-  // 模拟筛选（实际不生效，仅UI占位）
+  // 分类选项
   const categories = ['all', '耗材', '试剂', '设备'];
+
+  // 初始化产品数据
+  useEffect(() => {
+    const products = getAllProducts();
+    setAllProducts(products);
+    setFilteredProducts(products);
+  }, []);
 
   // 分页计算
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const displayedProducts = products.slice(startIndex, endIndex);
-  const totalPages = Math.ceil(products.length / itemsPerPage);
+  const displayedProducts = filteredProducts.slice(startIndex, endIndex);
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
 
   const handleSearch = (e) => {
     e.preventDefault();
-    // 搜索逻辑占位
-    console.log('搜索:', searchTerm, '分类:', selectedCategory);
+    // 执行搜索和筛选
+    const filtered = filterProducts(allProducts, searchTerm, selectedCategory);
+    setFilteredProducts(filtered);
+    setCurrentPage(1); // 重置到第一页
   };
 
   const handleReset = () => {
     setSearchTerm('');
     setSelectedCategory('all');
+    setFilteredProducts(allProducts);
     setCurrentPage(1);
+  };
+
+  // 操作按钮事件处理（当前阶段为占位实现）
+  const handleAddProduct = () => {
+    console.log('[Products] 点击新增产品按钮');
+    // 后续可打开模态框表单
+    addProduct({
+      name: '新产品',
+      sku: `PRD-${Date.now().toString().slice(-6)}`,
+      category: '耗材',
+      currentStock: 0,
+      minStock: 10,
+      unit: '个',
+      location: '待分配',
+      status: '正常',
+      lastUpdated: new Date().toISOString().split('T')[0]
+    });
+    alert('新增产品功能开发中，请查看控制台日志');
+  };
+
+  const handleEditProduct = (productId) => {
+    console.log('[Products] 点击编辑产品:', productId);
+    // 后续可打开编辑模态框
+    updateProduct(productId, { name: '更新后的产品名称' });
+    alert(`编辑产品 ${productId} 功能开发中，请查看控制台日志`);
+  };
+
+  const handleDeleteProduct = (productId) => {
+    if (confirm('确定要删除这个产品吗？此操作不可撤销。')) {
+      console.log('[Products] 点击删除产品:', productId);
+      // 后续可实现实际删除逻辑
+      deleteProduct(productId);
+      alert(`删除产品 ${productId} 功能开发中，请查看控制台日志`);
+    }
   };
 
   return (
@@ -57,7 +103,10 @@ function Products() {
       <div className="bg-white border border-slate-200 rounded-lg p-4 mb-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           {/* 左侧：新增产品按钮 */}
-          <button className="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium">
+          <button
+            onClick={handleAddProduct}
+            className="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium"
+          >
             + 新增产品
           </button>
 
@@ -169,10 +218,16 @@ function Products() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
-                      <button className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors">
+                      <button
+                        onClick={() => handleEditProduct(product.id)}
+                        className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors"
+                      >
                         编辑
                       </button>
-                      <button className="px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors">
+                      <button
+                        onClick={() => handleDeleteProduct(product.id)}
+                        className="px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors"
+                      >
                         删除
                       </button>
                     </div>
@@ -186,7 +241,7 @@ function Products() {
         {/* 分页控制 */}
         <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between">
           <div className="text-sm text-slate-600">
-            显示第 {startIndex + 1} - {Math.min(endIndex, products.length)} 条，共 {products.length} 条记录
+            显示第 {startIndex + 1} - {Math.min(endIndex, filteredProducts.length)} 条，共 {filteredProducts.length} 条记录
           </div>
           <div className="flex items-center gap-2">
             <button

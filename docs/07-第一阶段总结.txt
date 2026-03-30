@@ -61,3 +61,5 @@ GitHub 仓库：lab-inventory-management-v2
 补充：
 README 已完成展示优化并同步到 GitHub。
 当前仓库首页已具备项目说明、页面预览与阶段成果展示能力。
+补充：
+GitHub 仓库 About 信息与 Topics 已完善，第一阶段成果展示页整理完成。
