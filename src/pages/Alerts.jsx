@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { stockAlerts } from '../constants/mockData';
+import { useState, useMemo } from 'react';
+import { getProductsWithCalculatedStatus } from '../services/productService';
 
 // 紧急程度标签组件
 function UrgencyBadge({ urgency }) {
@@ -49,22 +49,43 @@ function Alerts() {
   const [selectedUrgency, setSelectedUrgency] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
+  // 计算紧急程度（根据库存百分比）
+  const calculateUrgency = (product) => {
+    const ratio = product.currentStock / product.minStock;
+    if (ratio <= 0.2) return 'high';
+    if (ratio <= 0.5) return 'medium';
+    return 'low';
+  };
+
+  // 实时计算动态预警数据（基于最新产品数据）
+  const dynamicAlerts = useMemo(() => {
+    const products = getProductsWithCalculatedStatus();
+
+    // 筛选低库存产品并转换为预警数据结构
+    return products
+      .filter(product => product.status === '低库存')
+      .map(product => ({
+        id: product.id,
+        productName: product.name,
+        currentStock: product.currentStock,
+        minStock: product.minStock,
+        category: product.category,
+        urgency: calculateUrgency(product)
+      }));
+  }, []); // 空依赖数组，因为 getProductsWithCalculatedStatus 总是返回最新数据
+
   // 统计计算
-  const totalAlerts = stockAlerts.length;
-  const highUrgencyCount = stockAlerts.filter(a => a.urgency === 'high').length;
-  const mediumUrgencyCount = stockAlerts.filter(a => a.urgency === 'medium').length;
-  const lowUrgencyCount = stockAlerts.filter(a => a.urgency === 'low').length;
+  const totalAlerts = dynamicAlerts.length;
+  const highUrgencyCount = dynamicAlerts.filter(a => a.urgency === 'high').length;
+  const mediumUrgencyCount = dynamicAlerts.filter(a => a.urgency === 'medium').length;
+  const lowUrgencyCount = dynamicAlerts.filter(a => a.urgency === 'low').length;
 
   // 筛选数据
-  const filteredAlerts = stockAlerts.filter(alert => {
+  const filteredAlerts = dynamicAlerts.filter(alert => {
     if (selectedUrgency !== 'all' && alert.urgency !== selectedUrgency) return false;
     if (selectedCategory !== 'all' && alert.category !== selectedCategory) return false;
     return true;
   });
-
-  // 分类选项
-  const urgencyOptions = ['all', 'high', 'medium', 'low'];
-  const categoryOptions = ['all', '耗材', '试剂', '设备'];
 
   const handleReset = () => {
     setSelectedUrgency('all');

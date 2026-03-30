@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAllProducts, filterProducts } from '../services/productService';
+import { getProductsWithCalculatedStatus, filterProducts, calculateProductStatus, updateProduct, addProduct, deleteProduct } from '../services/productService';
 
 // 状态标签组件
 function StatusBadge({ status }) {
@@ -34,19 +34,15 @@ function Products() {
     currentStock: 0,
     minStock: 0,
     unit: '个',
-    location: '',
-    status: '正常'
+    location: ''
   });
-
-  // 分类选项
-  const categories = ['all', '耗材', '试剂', '设备'];
 
   // 辅助函数：获取当前日期字符串
   const getToday = () => new Date().toISOString().split('T')[0];
 
   // 初始化产品数据
   useEffect(() => {
-    const products = getAllProducts();
+    const products = getProductsWithCalculatedStatus();
     setAllProducts(products);
     setFilteredProducts(products);
   }, []);
@@ -92,8 +88,7 @@ function Products() {
         currentStock: product.currentStock,
         minStock: product.minStock,
         unit: product.unit,
-        location: product.location,
-        status: product.status
+        location: product.location
       });
     } else {
       // 新增模式：重置表单
@@ -104,8 +99,7 @@ function Products() {
         currentStock: 0,
         minStock: 0,
         unit: '个',
-        location: '',
-        status: '正常'
+        location: ''
       });
     }
     setIsModalOpen(true);
@@ -133,18 +127,23 @@ function Products() {
 
     if (editingProduct) {
       // 更新现有产品
-      const updatedProduct = {
-        ...editingProduct,
+      const updates = {
         ...formData,
+        currentStock: Number(formData.currentStock) || 0,
+        minStock: Number(formData.minStock) || 0,
         lastUpdated: getToday()
       };
-      setAllProducts(allProducts.map(p =>
-        p.id === editingProduct.id ? updatedProduct : p
-      ));
+      const updatedProduct = updateProduct(editingProduct.id, updates);
+      if (updatedProduct) {
+        // 根据库存数量自动计算状态
+        updatedProduct.status = calculateProductStatus(updatedProduct);
+        setAllProducts(allProducts.map(p =>
+          p.id === editingProduct.id ? updatedProduct : p
+        ));
+      }
     } else {
       // 添加新产品
-      const newProduct = {
-        id: `prod-${Date.now()}`,
+      const newProductData = {
         sku: formData.sku.trim(),
         name: formData.name.trim(),
         category: formData.category,
@@ -152,9 +151,11 @@ function Products() {
         minStock: Number(formData.minStock) || 0,
         unit: formData.unit,
         location: formData.location.trim(),
-        status: formData.status,
         lastUpdated: getToday()
       };
+      const newProduct = addProduct(newProductData);
+      // 根据库存数量自动计算状态
+      newProduct.status = calculateProductStatus(newProduct);
       setAllProducts([...allProducts, newProduct]);
     }
 
@@ -185,7 +186,10 @@ function Products() {
   const handleDeleteProduct = (productId) => {
     const product = allProducts.find(p => p.id === productId);
     if (product && confirm(`确定要删除产品 "${product.name}"(${product.sku}) 吗？此操作不可撤销。`)) {
-      setAllProducts(allProducts.filter(p => p.id !== productId));
+      const success = deleteProduct(productId);
+      if (success) {
+        setAllProducts(allProducts.filter(p => p.id !== productId));
+      }
     }
   };
 
@@ -533,21 +537,6 @@ function Products() {
                   />
                 </div>
 
-                {/* 状态 */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                    状态
-                  </label>
-                  <select
-                    name="status"
-                    value={formData.status}
-                    onChange={handleFormChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
-                  >
-                    <option value="正常">正常</option>
-                    <option value="低库存">低库存</option>
-                  </select>
-                </div>
               </div>
 
               {/* 模态框底部按钮 */}

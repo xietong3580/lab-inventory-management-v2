@@ -1,4 +1,6 @@
-import { dashboardStats, recentTransactions, stockAlerts } from '../constants/mockData';
+import { useState, useEffect } from 'react';
+import { dashboardStats, recentTransactions } from '../constants/mockData';
+import { getProductsWithCalculatedStatus } from '../services/productService';
 
 // 统计卡片组件
 function StatCard({ title, value, change, changeType, description, iconColor }) {
@@ -65,6 +67,50 @@ function UrgencyBadge({ urgency }) {
 }
 
 function Dashboard() {
+  const [lowStockAlerts, setLowStockAlerts] = useState([]);
+  const [lowStockCount, setLowStockCount] = useState(0);
+
+  // 计算紧急程度（根据库存百分比）
+  const calculateUrgency = (product) => {
+    const ratio = product.currentStock / product.minStock;
+    if (ratio <= 0.2) return 'high';
+    if (ratio <= 0.5) return 'medium';
+    return 'low';
+  };
+
+  // 初始化产品和预警数据
+  useEffect(() => {
+    const products = getProductsWithCalculatedStatus();
+
+    // 筛选低库存产品并转换为预警数据结构
+    const lowStockProducts = products
+      .filter(product => product.status === '低库存')
+      .map(product => ({
+        id: product.id,
+        productName: product.name,
+        currentStock: product.currentStock,
+        minStock: product.minStock,
+        category: product.category,
+        urgency: calculateUrgency(product)
+      }));
+
+    setLowStockAlerts(lowStockProducts);
+    setLowStockCount(lowStockProducts.length);
+  }, []);
+
+  // 动态统计卡片数据
+  const dynamicDashboardStats = dashboardStats.map(stat => {
+    if (stat.id === 'low-stock-alerts') {
+      return {
+        ...stat,
+        value: lowStockCount.toString(),
+        change: '+0', // 简化处理，后续可计算变化
+        description: '当前低库存产品数量'
+      };
+    }
+    return stat;
+  });
+
   return (
     <div className="p-6">
       {/* 页面标题区 */}
@@ -77,7 +123,7 @@ function Dashboard() {
 
       {/* 统计卡片网格 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
-        {dashboardStats.map((stat) => (
+        {dynamicDashboardStats.map((stat) => (
           <StatCard key={stat.id} {...stat} />
         ))}
       </div>
@@ -123,11 +169,11 @@ function Dashboard() {
         <div className="bg-white border border-slate-200 rounded-lg">
           <div className="px-6 py-4 border-b border-slate-100">
             <h2 className="text-lg font-semibold text-slate-800">低库存预警</h2>
-            <p className="text-sm text-slate-500 mt-1">当前需关注的库存状态</p>
+            <p className="text-sm text-slate-500 mt-1">当前 {lowStockCount} 个产品库存不足</p>
           </div>
           <div className="p-6">
             <div className="space-y-4">
-              {stockAlerts.map((alert) => (
+              {lowStockAlerts.slice(0, 5).map((alert) => (
                 <div key={alert.id} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
                   <div>
                     <div className="font-medium text-slate-800">{alert.productName}</div>
@@ -148,7 +194,7 @@ function Dashboard() {
             </div>
             <div className="mt-6 pt-5 border-t border-slate-100">
               <button className="w-full py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 rounded-md transition-colors">
-                查看全部预警信息 →
+                查看全部{lowStockCount > 0 ? ` ${lowStockCount} 条` : ''}预警信息 →
               </button>
             </div>
           </div>

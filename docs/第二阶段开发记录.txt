@@ -239,3 +239,190 @@
 ### 本轮总结
 - 第二阶段第二轮已完成，产品管理页面已具备前端 mock 数据的新增、编辑、删除闭环能力。
 - 当前产品模块已从“静态展示页面”升级为“可真实演示操作流程的前端原型模块”。
+==================================
+### Git 提交记录
+- `640b07e` - `feat: add product search, filter, and action placeholders`
+- `efe6c2a` - `feat: implement product CRUD modal workflow`
+
+### Git 推送结果
+- 已成功 push 到 GitHub 远程仓库
+- 远程分支：`origin/main`
+============================================
+### 网络问题记录
+- 曾出现 `git push` 连接 GitHub 失败：
+  - `Failed to connect to github.com port 443`
+  - `Connection was reset`
+- 后续通过网络连通性确认与重试后恢复正常
+- 最终 push 成功
+======================================
+## V2 第二阶段 - 第三轮
+### 本轮目标
+- 根据 currentStock 和 minStock 自动计算库存状态
+- 让低库存产品在产品列表中自动体现预警状态
+- 编辑产品库存相关字段后，状态自动联动更新
+- 尝试让仪表盘中的预警数量与产品状态同步
+- 为后续出入库逻辑打基础
+
+### 计划改动文件
+- `src/pages/Products.jsx`
+- `src/pages/Dashboard.jsx`
+- `src/services/productService.js`（如需要）
+
+### 实际改动文件
+- 待补充
+
+### 本轮验证内容
+- [ ] currentStock <= minStock 时状态自动变为预警/低库存
+- [ ] currentStock > minStock 时状态自动恢复正常
+- [ ] 编辑库存字段后状态自动更新
+- [ ] 产品列表中的状态展示正确
+- [ ] 仪表盘预警数量联动正确
+- [ ] UI 风格保持一致
+
+### 问题记录
+- 待补充
+
+### 本轮总结
+- 待完成后补充
+===============================
+### 本轮实现方案
+- 将库存状态计算逻辑集中放入 productService.js
+- status 改为由 currentStock 和 minStock 自动推导
+- Products 页面负责展示与编辑库存字段
+- Dashboard 页面优先实现预警数量和预警列表联动
+==================================================
+## V2 第二阶段 - 第三轮
+### 本轮目标
+- 根据 currentStock 和 minStock 自动计算库存状态
+- 让低库存产品在产品列表中自动体现预警状态
+- 编辑产品库存相关字段后，状态自动联动更新
+- 尝试让仪表盘中的预警数量与产品状态同步
+- 为后续出入库逻辑打基础
+
+### 本轮实现方案
+- 将库存状态计算逻辑集中放入 productService.js
+- status 改为由 currentStock 和 minStock 自动推导
+- Products 页面负责展示与编辑库存字段
+- Dashboard 页面优先实现预警数量和预警列表联动
+
+### 计划改动文件
+- `src/pages/Products.jsx`
+- `src/pages/Dashboard.jsx`
+- `src/services/productService.js`
+
+### 实际改动文件
+- `src/pages/Products.jsx`
+- `src/pages/Dashboard.jsx`
+- `src/services/productService.js`
+
+### 本轮完成内容
+- 在 productService.js 中新增状态计算函数
+- 新增 getProductsWithCalculatedStatus() 保证产品状态与库存规则一致
+- 在 Products 页面中移除 status 手动选择逻辑
+- 新增/编辑产品时根据库存数量自动计算状态
+- 使用自动计算后的状态初始化产品数据
+- 在 Dashboard 页面中根据低库存产品动态生成预警数量和预警列表
+- 保持当前 UI 风格基本不变
+
+### 本轮验证内容
+- [ ] currentStock <= minStock 时状态自动变为低库存
+- [ ] currentStock > minStock 时状态自动恢复正常
+- [ ] 新增产品后状态自动计算正确
+- [ ] 编辑库存字段后状态自动更新
+- [ ] Products 页面状态标签展示正确
+- [ ] Dashboard 页面低库存预警数量正确
+- [ ] Dashboard 页面预警列表正确
+- [ ] UI 风格保持一致
+
+### 问题记录
+- 待测试后补充
+
+### 本轮总结
+- 待完成后补充
+=======================================
+- Products 页面中的库存状态联动正常
+- 但“低库存预警”页面刷新后仍显示旧的紧急状态
+- 已发现该页面可能仍使用独立静态 mock 预警数据，未完全基于当前产品库存重新计算
+- 第三轮还需补充修复：让低库存预警页面与产品数据源保持一致
+=================================================
+- [x] currentStock <= minStock 时状态自动变为低库存
+- [x] currentStock > minStock 时状态自动恢复正常
+- [x] 新增产品后状态自动计算正确
+- [x] 编辑库存字段后状态自动更新
+- [x] Products 页面状态标签展示正确
+- [ ] 低库存预警页面与产品库存变化完全同步
+=========================================
+### 第三轮补充修复
+- 发现问题：低库存预警页面未与产品数据源保持一致
+- 根因：Products 页面和 Alerts 页面使用了不同的数据副本
+- 修复方式：
+  - 在 productService.js 中维护统一的可变产品数据源
+  - Products 页面调用服务层增删改方法更新全局产品数据
+  - Alerts 页面改为基于最新产品数据实时计算预警列表和紧急程度
+
+  ========================================
+
+  ### 问题记录
+- Products 页面中的库存状态联动正常
+- 初始版本中，低库存预警页面仍显示旧的紧急状态
+- 根因是 Products 与 Alerts 未共享同一数据源
+- 已修复为统一数据源 + Alerts 实时计算预警
+
+=============================================
+
+## V2 第二阶段 - 第三轮
+### 本轮目标
+- 根据 currentStock 和 minStock 自动计算库存状态
+- 让低库存产品在产品列表中自动体现预警状态
+- 编辑产品库存相关字段后，状态自动联动更新
+- 让仪表盘和低库存预警页面与产品状态同步
+- 为后续出入库逻辑打基础
+
+### 本轮实现方案
+- 将库存状态计算逻辑集中放入 productService.js
+- status 改为由 currentStock 和 minStock 自动推导
+- Products 页面负责展示与编辑库存字段
+- Dashboard / Alerts 页面基于统一产品数据源动态生成预警信息
+
+### 计划改动文件
+- `src/pages/Products.jsx`
+- `src/pages/Dashboard.jsx`
+- `src/pages/Alerts.jsx`
+- `src/services/productService.js`
+
+### 实际改动文件
+- `src/pages/Products.jsx`
+- `src/pages/Dashboard.jsx`
+- `src/pages/Alerts.jsx`
+- `src/services/productService.js`
+
+### 本轮完成内容
+- 在 productService.js 中新增库存状态计算函数
+- 根据 currentStock <= minStock 自动计算产品状态
+- 新增/编辑产品时自动更新 status
+- 在 Products 页面中移除 status 手动选择逻辑
+- 统一产品数据源，避免 Products / Alerts / Dashboard 使用不同副本
+- 在 Dashboard 页面中动态生成预警数量和预警列表
+- 在 Alerts 页面中基于最新产品数据实时计算预警与紧急程度
+- 修复低库存预警页面与产品页不同步的问题
+- 保持当前 UI 风格基本不变
+
+### 本轮验证内容
+- [x] currentStock <= minStock 时状态自动变为低库存
+- [x] currentStock > minStock 时状态自动恢复正常
+- [x] 新增产品后状态自动计算正确
+- [x] 编辑库存字段后状态自动更新
+- [x] Products 页面状态标签展示正确
+- [x] Dashboard 页面预警数量联动正常
+- [x] Alerts 页面低库存、紧急等状态可正确展示
+- [x] 库存恢复正常后，预警状态可同步恢复
+- [x] 刷新后 Products / Alerts / Dashboard 数据保持一致
+- [x] UI 风格保持一致
+
+### 问题记录
+- 初始版本中，Products 与 Alerts 未共享同一数据源，导致低库存预警页面显示旧状态
+- 已修复为统一数据源 + Alerts 实时计算预警逻辑
+
+### 本轮总结
+- 第二阶段第三轮已完成，项目已具备基础库存状态联动与预警展示能力。
+- 当前系统已经从“可增删改前端原型”升级为“具备基础库存业务规则和多页面联动能力的系统原型”。
