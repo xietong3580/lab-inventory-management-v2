@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAllProducts, filterProducts, addProduct, updateProduct, deleteProduct } from '../services/productService';
+import { getAllProducts, filterProducts } from '../services/productService';
 
 // 状态标签组件
 function StatusBadge({ status }) {
@@ -24,8 +24,25 @@ function Products() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
+  // 模态框和表单相关状态
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null); // null 表示新增，非null表示编辑
+  const [formData, setFormData] = useState({
+    name: '',
+    sku: '',
+    category: '耗材',
+    currentStock: 0,
+    minStock: 0,
+    unit: '个',
+    location: '',
+    status: '正常'
+  });
+
   // 分类选项
   const categories = ['all', '耗材', '试剂', '设备'];
+
+  // 辅助函数：获取当前日期字符串
+  const getToday = () => new Date().toISOString().split('T')[0];
 
   // 初始化产品数据
   useEffect(() => {
@@ -33,6 +50,17 @@ function Products() {
     setAllProducts(products);
     setFilteredProducts(products);
   }, []);
+
+  // 当产品数据、搜索词或分类变化时，重新筛选
+  useEffect(() => {
+    const filtered = filterProducts(allProducts, searchTerm, selectedCategory);
+    setFilteredProducts(filtered);
+    // 如果筛选后当前页超出范围，重置到第一页
+    const totalPages = Math.ceil(filtered.length / itemsPerPage);
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [allProducts, searchTerm, selectedCategory]);
 
   // 分页计算
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -42,50 +70,122 @@ function Products() {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    // 执行搜索和筛选
-    const filtered = filterProducts(allProducts, searchTerm, selectedCategory);
-    setFilteredProducts(filtered);
-    setCurrentPage(1); // 重置到第一页
+    // 搜索按钮主要用于重置到第一页，筛选逻辑由useEffect自动处理
+    setCurrentPage(1);
   };
 
   const handleReset = () => {
     setSearchTerm('');
     setSelectedCategory('all');
-    setFilteredProducts(allProducts);
     setCurrentPage(1);
   };
 
-  // 操作按钮事件处理（当前阶段为占位实现）
+  // 打开模态框（新增或编辑）
+  const handleOpenModal = (product = null) => {
+    setEditingProduct(product);
+    if (product) {
+      // 编辑模式：回填现有数据
+      setFormData({
+        name: product.name,
+        sku: product.sku,
+        category: product.category,
+        currentStock: product.currentStock,
+        minStock: product.minStock,
+        unit: product.unit,
+        location: product.location,
+        status: product.status
+      });
+    } else {
+      // 新增模式：重置表单
+      setFormData({
+        name: '',
+        sku: '',
+        category: '耗材',
+        currentStock: 0,
+        minStock: 0,
+        unit: '个',
+        location: '',
+        status: '正常'
+      });
+    }
+    setIsModalOpen(true);
+  };
+
+  // 关闭模态框
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingProduct(null);
+  };
+
+  // 表单提交
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+
+    // 轻量必填校验
+    if (!formData.name.trim()) {
+      alert('产品名称不能为空');
+      return;
+    }
+    if (!formData.sku.trim()) {
+      alert('SKU不能为空');
+      return;
+    }
+
+    if (editingProduct) {
+      // 更新现有产品
+      const updatedProduct = {
+        ...editingProduct,
+        ...formData,
+        lastUpdated: getToday()
+      };
+      setAllProducts(allProducts.map(p =>
+        p.id === editingProduct.id ? updatedProduct : p
+      ));
+    } else {
+      // 添加新产品
+      const newProduct = {
+        id: `prod-${Date.now()}`,
+        sku: formData.sku.trim(),
+        name: formData.name.trim(),
+        category: formData.category,
+        currentStock: Number(formData.currentStock) || 0,
+        minStock: Number(formData.minStock) || 0,
+        unit: formData.unit,
+        location: formData.location.trim(),
+        status: formData.status,
+        lastUpdated: getToday()
+      };
+      setAllProducts([...allProducts, newProduct]);
+    }
+
+    handleCloseModal();
+  };
+
+  // 表单字段变化处理
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // 操作按钮事件处理
   const handleAddProduct = () => {
-    console.log('[Products] 点击新增产品按钮');
-    // 后续可打开模态框表单
-    addProduct({
-      name: '新产品',
-      sku: `PRD-${Date.now().toString().slice(-6)}`,
-      category: '耗材',
-      currentStock: 0,
-      minStock: 10,
-      unit: '个',
-      location: '待分配',
-      status: '正常',
-      lastUpdated: new Date().toISOString().split('T')[0]
-    });
-    alert('新增产品功能开发中，请查看控制台日志');
+    handleOpenModal(); // 新增模式
   };
 
   const handleEditProduct = (productId) => {
-    console.log('[Products] 点击编辑产品:', productId);
-    // 后续可打开编辑模态框
-    updateProduct(productId, { name: '更新后的产品名称' });
-    alert(`编辑产品 ${productId} 功能开发中，请查看控制台日志`);
+    const product = allProducts.find(p => p.id === productId);
+    if (product) {
+      handleOpenModal(product); // 编辑模式
+    }
   };
 
   const handleDeleteProduct = (productId) => {
-    if (confirm('确定要删除这个产品吗？此操作不可撤销。')) {
-      console.log('[Products] 点击删除产品:', productId);
-      // 后续可实现实际删除逻辑
-      deleteProduct(productId);
-      alert(`删除产品 ${productId} 功能开发中，请查看控制台日志`);
+    const product = allProducts.find(p => p.id === productId);
+    if (product && confirm(`确定要删除产品 "${product.name}"(${product.sku}) 吗？此操作不可撤销。`)) {
+      setAllProducts(allProducts.filter(p => p.id !== productId));
     }
   };
 
@@ -306,9 +406,170 @@ function Products() {
       {/* 底部提示 */}
       <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
         <div className="text-sm text-slate-600">
-          提示：点击“编辑”可修改产品信息，点击“删除”将移除该产品记录。低库存状态的产品会以橙色标识。
+          提示：点击"编辑"可修改产品信息，点击"删除"将移除该产品记录。低库存状态的产品会以橙色标识。
         </div>
       </div>
+
+      {/* 产品表单模态框 */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-slate-200">
+              <h2 className="text-xl font-semibold text-slate-800">
+                {editingProduct ? '编辑产品' : '新增产品'}
+              </h2>
+            </div>
+
+            <form onSubmit={handleFormSubmit}>
+              <div className="p-6 space-y-4">
+                {/* 产品名称 */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    产品名称 *
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleFormChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    placeholder="请输入产品名称"
+                  />
+                </div>
+
+                {/* SKU */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    SKU 编码 *
+                  </label>
+                  <input
+                    type="text"
+                    name="sku"
+                    value={formData.sku}
+                    onChange={handleFormChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    placeholder="如：PRD-2026001"
+                  />
+                </div>
+
+                {/* 分类和单位 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      分类
+                    </label>
+                    <select
+                      name="category"
+                      value={formData.category}
+                      onChange={handleFormChange}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+                    >
+                      <option value="耗材">耗材</option>
+                      <option value="试剂">试剂</option>
+                      <option value="设备">设备</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      单位
+                    </label>
+                    <select
+                      name="unit"
+                      value={formData.unit}
+                      onChange={handleFormChange}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+                    >
+                      <option value="个">个</option>
+                      <option value="盒">盒</option>
+                      <option value="瓶">瓶</option>
+                      <option value="包">包</option>
+                      <option value="套">套</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* 库存数量 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      当前库存
+                    </label>
+                    <input
+                      type="number"
+                      name="currentStock"
+                      value={formData.currentStock}
+                      onChange={handleFormChange}
+                      min="0"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      最低库存
+                    </label>
+                    <input
+                      type="number"
+                      name="minStock"
+                      value={formData.minStock}
+                      onChange={handleFormChange}
+                      min="0"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {/* 存储位置 */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    存储位置
+                  </label>
+                  <input
+                    type="text"
+                    name="location"
+                    value={formData.location}
+                    onChange={handleFormChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    placeholder="如：A区-1排-2层"
+                  />
+                </div>
+
+                {/* 状态 */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    状态
+                  </label>
+                  <select
+                    name="status"
+                    value={formData.status}
+                    onChange={handleFormChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+                  >
+                    <option value="正常">正常</option>
+                    <option value="低库存">低库存</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* 模态框底部按钮 */}
+              <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium"
+                >
+                  {editingProduct ? '更新产品' : '添加产品'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
