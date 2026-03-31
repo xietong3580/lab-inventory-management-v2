@@ -602,3 +602,100 @@
 ### 本轮总结
 - 第二阶段第四轮已完成，系统已具备基础出入库记录与库存联动能力。
 - 当前项目已从“库存展示 + 产品管理原型”进一步升级为“具备产品、库存、预警、出入库记录联动的业务系统原型”。
+===============================================
+### Git 提交记录
+- `640b07e` - `feat: add product search, filter, and action placeholders`
+- `efe6c2a` - `feat: implement product CRUD modal workflow`
+- `3f5c45f` - `feat: add inventory status and alert sync logic`
+- `84d87c4` - `feat: add transaction inventory sync workflow`
+=================================================
+### Git 状态说明
+- 第四轮功能已完成并本地提交
+- 本地 commit：`84d87c4` - `feat: add transaction inventory sync workflow`
+- 当前未成功 push 到 GitHub
+- 原因：`Test-NetConnection github.com -Port 443` 结果为 `TcpTestSucceeded : False`
+- 判断：当前为网络/代理链路问题，不是代码问题
+===============================================
+## 第二阶段阶段总结（当前已完成四轮）
+
+在 V2 第二阶段中，项目从“静态前端展示原型”逐步推进为“具备基础业务联动能力的库存管理系统原型”。
+
+### 第一轮：产品列表交互化
+完成了产品管理页面的基础交互增强：
+- 将产品列表改为服务层驱动
+- 实现搜索、分类筛选、分页联动
+- 为新增、编辑、删除按钮补充事件入口
+- 保持原有 UI 风格不变
+
+这一轮使产品页面从“静态展示”升级为“可交互原型”。
+
+### 第二轮：产品增删改前端闭环
+完成了产品模块的前端 mock 数据闭环：
+- 实现新增产品表单弹窗
+- 实现编辑产品表单回填与保存
+- 实现删除产品后的真实列表更新
+- 让搜索、筛选、分页在数据变化后继续正常工作
+
+这一轮使产品模块具备了完整的前端增删改操作能力。
+
+### 第三轮：库存状态与预警联动
+完成了库存状态自动计算与多页面联动：
+- 根据 `currentStock` 和 `minStock` 自动计算库存状态
+- 移除手动填写 `status` 的方式
+- 统一产品数据源
+- 让 Products / Dashboard / Alerts 页面保持一致
+- 修复低库存预警页面与产品状态不同步的问题
+
+这一轮使系统具备了基础库存业务规则和预警联动能力。
+
+### 第四轮：出入库记录与库存同步
+完成了交易记录驱动库存变化的业务闭环：
+- 在 Transactions 页面新增入库 / 出库记录表单
+- 入库自动增加产品库存
+- 出库自动减少产品库存
+- 增加库存不足拦截逻辑
+- 让 Products / Dashboard / Alerts 随交易变化自动联动
+- 让 Dashboard 的统计数据和最近出入库记录基于实时数据重新计算
+
+这一轮使系统从“库存展示 + 产品管理原型”进一步升级为“具备基础出入库与库存联动能力的业务系统原型”。
+
+### 当前项目阶段成果
+截至目前，项目已经具备以下核心能力：
+- 产品管理（新增、编辑、删除）
+- 产品搜索、筛选、分页
+- 库存状态自动计算
+- 低库存预警展示
+- 出入库记录管理
+- 出入库驱动库存变化
+- Dashboard / Alerts / Products / Transactions 多页面联动
+- 前端 mock 数据驱动的业务闭环
+
+### 当前阶段边界
+当前项目仍采用前端内存 mock 数据方案，因此：
+- 页面刷新后，新增记录和库存变化会恢复为初始 mock 数据
+- 当前未接入真实后端、数据库或持久化存储
+
+这属于当前阶段设计边界，不视为功能错误。
+
+### 下一步建议方向
+下一阶段可继续围绕以下方向展开：
+- 交易撤销与库存回滚
+- 库存历史记录与审计追踪
+- 本地持久化（localStorage / IndexedDB）
+- 更完整的筛选、统计与报表
+- 后端 API 与数据库接入
+==============================================
+### Git 提交记录
+- `640b07e` - `feat: add product search, filter, and action placeholders`
+- `efe6c2a` - `feat: implement product CRUD modal workflow`
+- `3f5c45f` - `feat: add inventory status and alert sync logic`
+- `84d87c4` - `feat: add transaction inventory sync workflow`
+
+### Git 推送结果
+- 第四轮已成功 push 到 GitHub 远程仓库
+- 远程分支：`origin/main`
+===========================================
+### 网络问题补充
+- 第四轮 push 初期曾因 GitHub 443 端口连接失败而中断
+- 后续 `Test-NetConnection github.com -Port 443` 恢复为 `TcpTestSucceeded : True`
+- 随后重新执行 `git push` 成功
