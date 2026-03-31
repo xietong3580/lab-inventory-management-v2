@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { dashboardStats, recentTransactions } from '../constants/mockData';
-import { getProductsWithCalculatedStatus } from '../services/productService';
+import { useMemo } from 'react';
+import { dashboardStats } from '../constants/mockData';
+import { getProductsWithCalculatedStatus, getAllProducts, getTransactions } from '../services/productService';
 
 // 统计卡片组件
 function StatCard({ title, value, change, changeType, description, iconColor }) {
@@ -67,9 +67,6 @@ function UrgencyBadge({ urgency }) {
 }
 
 function Dashboard() {
-  const [lowStockAlerts, setLowStockAlerts] = useState([]);
-  const [lowStockCount, setLowStockCount] = useState(0);
-
   // 计算紧急程度（根据库存百分比）
   const calculateUrgency = (product) => {
     const ratio = product.currentStock / product.minStock;
@@ -78,34 +75,88 @@ function Dashboard() {
     return 'low';
   };
 
-  // 初始化产品和预警数据
-  useEffect(() => {
+  // 实时计算统计数据（基于最新产品数据）
+  const dashboardData = useMemo(() => {
     const products = getProductsWithCalculatedStatus();
+    const allProducts = getAllProducts();
+    const allTransactions = getTransactions();
 
-    // 筛选低库存产品并转换为预警数据结构
-    const lowStockProducts = products
-      .filter(product => product.status === '低库存')
-      .map(product => ({
-        id: product.id,
-        productName: product.name,
-        currentStock: product.currentStock,
-        minStock: product.minStock,
-        category: product.category,
-        urgency: calculateUrgency(product)
-      }));
+    // 计算产品总数
+    const totalProducts = allProducts.length;
 
-    setLowStockAlerts(lowStockProducts);
-    setLowStockCount(lowStockProducts.length);
-  }, []);
+    // 计算库存总量
+    const totalInventory = allProducts.reduce((sum, product) => {
+      return sum + (Number(product.currentStock) || 0);
+    }, 0);
+
+    // 筛选低库存产品
+    const lowStockProducts = products.filter(product => product.status === '低库存');
+    const lowStockCount = lowStockProducts.length;
+
+    // 转换为预警数据结构
+    const lowStockAlerts = lowStockProducts.map(product => ({
+      id: product.id,
+      productName: product.name,
+      currentStock: product.currentStock,
+      minStock: product.minStock,
+      category: product.category,
+      urgency: calculateUrgency(product)
+    }));
+
+    // 计算今日出入库记录数量（基于当前日期）
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const todayTransactions = allTransactions.filter(txn =>
+      txn.date && txn.date.startsWith(today)
+    );
+    const todayTransactionsCount = todayTransactions.length;
+
+    // 获取最近5条交易记录（按日期倒序）
+    const recentTransactions = [...allTransactions]
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 5);
+
+    return {
+      totalProducts,
+      totalInventory,
+      lowStockCount,
+      lowStockAlerts,
+      todayTransactionsCount,
+      recentTransactions
+    };
+  }, []); // 空依赖数组，因为函数总是返回最新数据
 
   // 动态统计卡片数据
   const dynamicDashboardStats = dashboardStats.map(stat => {
-    if (stat.id === 'low-stock-alerts') {
+    const {
+      totalProducts,
+      totalInventory,
+      lowStockCount,
+      todayTransactionsCount
+    } = dashboardData;
+
+    if (stat.id === 'total-products') {
+      return {
+        ...stat,
+        value: totalProducts.toString(),
+        description: '系统中产品总数'
+      };
+    } else if (stat.id === 'total-inventory') {
+      return {
+        ...stat,
+        value: totalInventory.toLocaleString(),
+        description: '所有产品库存总量'
+      };
+    } else if (stat.id === 'low-stock-alerts') {
       return {
         ...stat,
         value: lowStockCount.toString(),
-        change: '+0', // 简化处理，后续可计算变化
         description: '当前低库存产品数量'
+      };
+    } else if (stat.id === 'today-transactions') {
+      return {
+        ...stat,
+        value: todayTransactionsCount.toString(),
+        description: '今日出入库记录数'
       };
     }
     return stat;
@@ -138,7 +189,7 @@ function Dashboard() {
           </div>
           <div className="p-6">
             <div className="space-y-4">
-              {recentTransactions.map((txn) => (
+              {dashboardData.recentTransactions.map((txn) => (
                 <div key={txn.id} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
                   <div>
                     <div className="font-medium text-slate-800">{txn.productName}</div>
@@ -169,11 +220,11 @@ function Dashboard() {
         <div className="bg-white border border-slate-200 rounded-lg">
           <div className="px-6 py-4 border-b border-slate-100">
             <h2 className="text-lg font-semibold text-slate-800">低库存预警</h2>
-            <p className="text-sm text-slate-500 mt-1">当前 {lowStockCount} 个产品库存不足</p>
+            <p className="text-sm text-slate-500 mt-1">当前 {dashboardData.lowStockCount} 个产品库存不足</p>
           </div>
           <div className="p-6">
             <div className="space-y-4">
-              {lowStockAlerts.slice(0, 5).map((alert) => (
+              {dashboardData.lowStockAlerts.slice(0, 5).map((alert) => (
                 <div key={alert.id} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
                   <div>
                     <div className="font-medium text-slate-800">{alert.productName}</div>
@@ -194,7 +245,7 @@ function Dashboard() {
             </div>
             <div className="mt-6 pt-5 border-t border-slate-100">
               <button className="w-full py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 rounded-md transition-colors">
-                查看全部{lowStockCount > 0 ? ` ${lowStockCount} 条` : ''}预警信息 →
+                查看全部{dashboardData.lowStockCount > 0 ? ` ${dashboardData.lowStockCount} 条` : ''}预警信息 →
               </button>
             </div>
           </div>

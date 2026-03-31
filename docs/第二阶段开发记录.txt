@@ -426,3 +426,179 @@
 ### 本轮总结
 - 第二阶段第三轮已完成，项目已具备基础库存状态联动与预警展示能力。
 - 当前系统已经从“可增删改前端原型”升级为“具备基础库存业务规则和多页面联动能力的系统原型”。
+==========================================================
+### Git 状态说明
+- 第三轮改动文件：
+  - `src/pages/Alerts.jsx`
+  - `src/pages/Dashboard.jsx`
+  - `src/pages/Products.jsx`
+  - `src/services/productService.js`
+  - `docs/第二阶段开发记录.txt`
+- 通过 `git status` 确认后再提交
+=======================================
+### Git 提交记录
+- `3f5c45f` - `feat: add inventory status and alert sync logic`
+
+### Git 推送结果
+- 已成功 push 到 GitHub 远程仓库
+- 远程分支：`origin/main`
+===========================================
+## V2 第二阶段 - 第四轮
+### 本轮目标
+- 在 Transactions 页面实现新增入库/出库记录
+- 通过出入库动作自动修改产品库存
+- 出入库后让 Products / Dashboard / Alerts 自动联动更新
+- 为后续库存历史与统计打基础
+
+### 计划改动文件
+- `src/pages/Transactions.jsx`
+- `src/services/productService.js`
+- `src/pages/Products.jsx`（如需要联动适配）
+- `src/pages/Dashboard.jsx`（如需要联动适配）
+- `src/pages/Alerts.jsx`（如需要联动适配）
+
+### 实际改动文件
+- 待补充
+
+### 本轮验证内容
+- [ ] 可新增入库记录
+- [ ] 可新增出库记录
+- [ ] 入库后产品库存增加
+- [ ] 出库后产品库存减少
+- [ ] 库存变动后状态自动联动更新
+- [ ] Dashboard / Alerts 数据同步更新
+- [ ] UI 风格保持一致
+
+### 问题记录
+- 待补充
+
+### 本轮总结
+- 待完成后补充
+==================================
+### 本轮实现方案
+- 在 productService.js 中统一管理交易记录
+- 交易通过 addTransaction 驱动库存变化
+- Transactions 页面只负责表单输入与记录展示
+- 入库 / 出库后由统一产品数据源驱动 Products / Dashboard / Alerts 联动
+==========================================
+## V2 第二阶段 - 第四轮
+### 本轮目标
+- 在 Transactions 页面实现新增入库/出库记录
+- 通过出入库动作自动修改产品库存
+- 出入库后让 Products / Dashboard / Alerts 自动联动更新
+- 为后续库存历史与统计打基础
+
+### 本轮实现方案
+- 在 productService.js 中统一管理交易记录
+- 交易通过 addTransaction 驱动库存变化
+- Transactions 页面只负责表单输入与记录展示
+- 入库 / 出库后由统一产品数据源驱动 Products / Dashboard / Alerts 联动
+
+### 计划改动文件
+- `src/pages/Transactions.jsx`
+- `src/services/productService.js`
+
+### 实际改动文件
+- `src/pages/Transactions.jsx`
+- `src/services/productService.js`
+
+### 本轮完成内容
+- 在 productService.js 中新增交易记录数组与交易管理函数
+- 新增 getTransactions() 与 addTransaction()
+- 实现入库增加库存、出库减少库存
+- 增加出库库存不足校验
+- 在 Transactions 页面新增“新增记录”按钮与交易表单模态框
+- 实现新增交易后列表刷新
+- 通过统一产品数据源让库存变化继续联动到其他页面
+
+### 本轮验证内容
+- [ ] 可新增入库记录
+- [ ] 可新增出库记录
+- [ ] 入库后产品库存增加
+- [ ] 出库后产品库存减少
+- [ ] 出库库存不足时会被拦截
+- [ ] 库存变动后状态自动联动更新
+- [ ] Dashboard / Alerts 数据同步更新
+- [ ] UI 风格保持一致
+
+### 问题记录
+- 待测试后补充
+
+### 本轮总结
+- 待完成后补充
+==================================
+### 问题记录
+- Transactions 页面可正常新增入库/出库记录
+- 库存不足校验正常
+- 刷新后新增记录和库存变化会恢复为初始 mock 数据（符合当前前端内存 mock 方案预期）
+- 当前发现 Dashboard 预警数量未随交易后的库存变化同步更新
+- 第四轮仍需补充修复：让 Dashboard 基于最新产品库存重新计算统计数据
+=========================================
+- [x] 可新增入库记录
+- [x] 可新增出库记录
+- [x] 出库库存不足时会被拦截
+- [x] 刷新后恢复初始数据（符合当前 mock 方案）
+- [ ] 入库后产品库存增加（需你最终确认）
+- [ ] 出库后产品库存减少（需你最终确认）
+- [ ] 库存变动后状态自动联动更新（需你最终确认）
+- [ ] Dashboard 数据同步更新
+========================================
+### 当前阶段说明
+- 本项目当前仍采用前端内存 mock 数据方案
+- 因此前端新增记录、库存变化、状态联动在页面刷新后会恢复为初始 mock 数据
+- 这是当前阶段设计边界，不视为功能错误
+=========================================
+## V2 第二阶段 - 第四轮
+### 本轮目标
+- 在 Transactions 页面实现新增入库/出库记录
+- 通过出入库动作自动修改产品库存
+- 出入库后让 Products / Dashboard / Alerts 自动联动更新
+- 为后续库存历史与统计打基础
+
+### 本轮实现方案
+- 在 productService.js 中统一管理交易记录
+- 交易通过 addTransaction 驱动库存变化
+- Transactions 页面只负责表单输入与记录展示
+- 入库 / 出库后由统一产品数据源驱动 Products / Dashboard / Alerts 联动
+
+### 计划改动文件
+- `src/pages/Transactions.jsx`
+- `src/services/productService.js`
+
+### 实际改动文件
+- `src/pages/Transactions.jsx`
+- `src/services/productService.js`
+- `src/pages/Dashboard.jsx`
+
+### 本轮完成内容
+- 在 productService.js 中新增交易记录数组与交易管理函数
+- 新增 getTransactions() 与 addTransaction()
+- 实现入库增加库存、出库减少库存
+- 增加出库库存不足校验
+- 在 Transactions 页面新增“新增记录”按钮与交易表单模态框
+- 实现新增交易后列表刷新
+- 让 Dashboard 改为基于统一产品数据源实时计算统计数据
+- 让最近出入库记录和低库存预警数量随交易变化自动联动
+- 保持当前 UI 风格基本不变
+
+### 本轮验证内容
+- [x] 可新增入库记录
+- [x] 可新增出库记录
+- [x] 入库后产品库存增加
+- [x] 出库后产品库存减少
+- [x] 出库库存不足时会被拦截
+- [x] 库存变动后状态自动联动更新
+- [x] Dashboard 数据同步更新
+- [x] Alerts 数据同步更新
+- [x] Products / Transactions / Dashboard / Alerts 保持一致
+- [x] 刷新后恢复初始数据（符合当前前端内存 mock 方案）
+- [x] UI 风格保持一致
+
+### 问题记录
+- 初始版本中，Dashboard 使用静态统计数据与静态最近记录，无法随交易实时更新
+- 已修复为基于统一产品数据源与交易记录实时计算
+- 当前项目仍采用前端内存 mock 数据方案，因此刷新页面后会恢复初始 mock 数据，这属于当前阶段预期行为
+
+### 本轮总结
+- 第二阶段第四轮已完成，系统已具备基础出入库记录与库存联动能力。
+- 当前项目已从“库存展示 + 产品管理原型”进一步升级为“具备产品、库存、预警、出入库记录联动的业务系统原型”。

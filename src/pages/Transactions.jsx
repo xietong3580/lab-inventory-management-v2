@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { transactionRecords } from '../constants/mockData';
+import { useState, useEffect } from 'react';
+import { getTransactions, addTransaction, getAllProducts } from '../services/productService';
 
 // 类型标签组件
 function TypeBadge({ type }) {
@@ -38,8 +38,29 @@ function Transactions() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  // 交易记录和产品数据
+  const [transactionRecords, setTransactionRecords] = useState([]);
+  const [products, setProducts] = useState([]);
+
+  // 模态框和表单相关状态
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    productId: '',
+    type: '入库',
+    quantity: 0,
+    operator: '',
+    notes: ''
+  });
+  const [formError, setFormError] = useState('');
+
   // 筛选选项
   const typeOptions = ['all', '入库', '出库'];
+
+  // 初始化数据
+  useEffect(() => {
+    setTransactionRecords(getTransactions());
+    setProducts(getAllProducts());
+  }, []);
 
   // 分页计算
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -64,6 +85,81 @@ function Transactions() {
     setDateRange((prev) => ({ ...prev, [field]: value }));
   };
 
+  // 打开新增记录模态框
+  const handleOpenModal = () => {
+    setFormData({
+      productId: '',
+      type: '入库',
+      quantity: 1,
+      operator: '',
+      notes: ''
+    });
+    setFormError('');
+    setIsModalOpen(true);
+  };
+
+  // 关闭新增记录模态框
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+  };
+
+  // 表单字段变化处理
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // 表单提交 - 新增交易记录
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    setFormError('');
+
+    // 基础校验
+    if (!formData.productId) {
+      setFormError('请选择产品');
+      return;
+    }
+    if (!formData.quantity || formData.quantity <= 0) {
+      setFormError('请输入有效的数量（大于0）');
+      return;
+    }
+    if (!formData.operator.trim()) {
+      setFormError('请输入操作人');
+      return;
+    }
+
+    try {
+      // 调用服务添加交易记录
+      const newTransaction = addTransaction({
+        productId: formData.productId,
+        type: formData.type,
+        quantity: Number(formData.quantity),
+        operator: formData.operator.trim(),
+        notes: formData.notes.trim()
+      });
+
+      // 刷新交易记录列表
+      setTransactionRecords(getTransactions());
+      // 刷新产品列表（其他页面会用到）
+      setProducts(getAllProducts());
+
+      // 关闭模态框并重置表单
+      handleCloseModal();
+    } catch (error) {
+      setFormError(error.message || '添加交易记录失败');
+      console.error('添加交易记录失败:', error);
+    }
+  };
+
+  // 获取产品选择选项
+  const productOptions = products.map(product => ({
+    value: product.id,
+    label: `${product.name} (${product.sku}) - 当前库存: ${product.currentStock} ${product.unit}`
+  }));
+
   return (
     <div className="p-6">
       {/* 页面标题区 */}
@@ -72,6 +168,22 @@ function Transactions() {
         <p className="text-slate-600 mt-1">
           查看和管理所有产品的入库与出库操作记录。
         </p>
+      </div>
+
+      {/* 操作栏：新增按钮 */}
+      <div className="bg-white border border-slate-200 rounded-lg p-4 mb-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* 左侧：新增记录按钮 */}
+          <button
+            onClick={handleOpenModal}
+            className="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium"
+          >
+            + 新增记录
+          </button>
+
+          {/* 右侧：占位，保持布局平衡 */}
+          <div></div>
+        </div>
       </div>
 
       {/* 筛选区域 */}
@@ -304,6 +416,130 @@ function Transactions() {
           提示：出入库记录用于追踪库存变动。状态为“处理中”的记录可能尚未完成库存更新。点击“详情”查看完整信息，“撤销”可取消未完成的记录。
         </div>
       </div>
+
+      {/* 新增交易记录模态框 */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-slate-200">
+              <h2 className="text-xl font-semibold text-slate-800">
+                新增出入库记录
+              </h2>
+            </div>
+
+            <form onSubmit={handleFormSubmit}>
+              <div className="p-6 space-y-4">
+                {/* 错误提示 */}
+                {formError && (
+                  <div className="p-3 bg-rose-50 border border-rose-100 rounded-md">
+                    <div className="text-sm text-rose-700">{formError}</div>
+                  </div>
+                )}
+
+                {/* 产品选择 */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    产品 *
+                  </label>
+                  <select
+                    name="productId"
+                    value={formData.productId}
+                    onChange={handleFormChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+                  >
+                    <option value="">请选择产品</option>
+                    {productOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 交易类型和数量 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      类型 *
+                    </label>
+                    <select
+                      name="type"
+                      value={formData.type}
+                      onChange={handleFormChange}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+                    >
+                      <option value="入库">入库</option>
+                      <option value="出库">出库</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      数量 *
+                    </label>
+                    <input
+                      type="number"
+                      name="quantity"
+                      value={formData.quantity}
+                      onChange={handleFormChange}
+                      min="1"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      placeholder="请输入数量"
+                    />
+                  </div>
+                </div>
+
+                {/* 操作人 */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    操作人 *
+                  </label>
+                  <input
+                    type="text"
+                    name="operator"
+                    value={formData.operator}
+                    onChange={handleFormChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    placeholder="请输入操作人姓名"
+                  />
+                </div>
+
+                {/* 备注 */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    备注
+                  </label>
+                  <textarea
+                    name="notes"
+                    value={formData.notes}
+                    onChange={handleFormChange}
+                    rows="3"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    placeholder="请输入备注信息（选填）"
+                  />
+                </div>
+
+              </div>
+
+              {/* 模态框底部按钮 */}
+              <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium"
+                >
+                  添加记录
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
