@@ -699,3 +699,127 @@
 - 第四轮 push 初期曾因 GitHub 443 端口连接失败而中断
 - 后续 `Test-NetConnection github.com -Port 443` 恢复为 `TcpTestSucceeded : True`
 - 随后重新执行 `git push` 成功
+==============================================
+## V2 第二阶段 - 第五轮
+### 本轮目标
+- 为当前系统增加 localStorage 本地持久化
+- 让刷新页面后产品、库存、交易记录和预警联动结果不丢失
+- 保持 Products / Transactions / Dashboard / Alerts 继续共用统一数据源
+- 在不大改风格的前提下，检查并维持整体 UI 的专业统一性
+
+### 计划改动文件
+- `src/services/productService.js`
+- （如需要）少量页面联动适配文件
+
+### 实际改动文件
+- 待补充
+
+### 本轮验证内容
+- [ ] 刷新后产品数据仍保留
+- [ ] 刷新后库存数量仍保留
+- [ ] 刷新后交易记录仍保留
+- [ ] 刷新后 Dashboard / Alerts 状态保持一致
+- [ ] 现有增删改与出入库逻辑未被破坏
+- [ ] UI 风格保持一致
+
+### 问题记录
+- 待补充
+
+### 本轮总结
+- 待完成后补充
+============================================
+### 本轮实现方案
+- 在 productService.js 中增加 localStorage 读写层
+- 优先从 localStorage 加载产品与交易数据，无本地数据时回退到 mockData
+- 所有关键修改操作自动持久化
+- 保持现有页面和业务联动逻辑不变
+===========================================
+## V2 第二阶段 - 第五轮
+### 本轮目标
+- 为当前系统增加 localStorage 本地持久化
+- 让刷新页面后产品、库存、交易记录和预警联动结果不丢失
+- 保持 Products / Transactions / Dashboard / Alerts 继续共用统一数据源
+- 在不大改风格的前提下，检查并维持整体 UI 的专业统一性
+
+### 本轮实现方案
+- 在 productService.js 中增加 localStorage 读写层
+- 优先从 localStorage 加载产品与交易数据，无本地数据时回退到 mockData
+- 所有关键修改操作自动持久化
+- 保持现有页面和业务联动逻辑不变
+
+### 计划改动文件
+- `src/services/productService.js`
+- `src/pages/Transactions.jsx`
+
+### 实际改动文件
+- `src/services/productService.js`
+- `src/pages/Transactions.jsx`
+
+### 本轮完成内容
+- 在 productService.js 中新增 localStorage 存储键与读写辅助函数
+- 实现产品与交易数据从 localStorage 加载
+- 在 addProduct / updateProduct / deleteProduct / addTransaction 等关键函数中自动保存数据
+- 增加 resetStorageData() 重置工具函数
+- localStorage 读写增加 try/catch，异常时回退到初始 mock 数据
+- 将 Transactions 页面“撤销”按钮改为禁用状态，避免未实现功能伪装为可用
+
+### 本轮验证内容
+- [ ] 刷新后产品数据仍保留
+- [ ] 刷新后库存数量仍保留
+- [ ] 刷新后交易记录仍保留
+- [ ] 刷新后 Dashboard / Alerts 状态保持一致
+- [ ] 增删改与出入库逻辑未被破坏
+- [ ] Transactions 页面 UI 保持专业一致
+
+### 问题记录
+- 待测试后补充
+
+### 本轮总结
+- 待完成后补充
+=========================================
+## V2 第二阶段 - 第五轮
+### 本轮目标
+- 为当前系统增加 localStorage 本地持久化
+- 让刷新页面后产品、库存、交易记录和预警联动结果不丢失
+- 保持 Products / Transactions / Dashboard / Alerts 继续共用统一数据源
+- 在不大改风格的前提下，检查并维持整体 UI 的专业统一性
+
+### 本轮实现方案
+- 在 productService.js 中增加 localStorage 读写层
+- 优先从 localStorage 加载产品与交易数据，无本地数据时回退到 mockData
+- 所有关键修改操作自动持久化
+- 保持现有页面和业务联动逻辑不变
+
+### 计划改动文件
+- `src/services/productService.js`
+- `src/pages/Transactions.jsx`
+
+### 实际改动文件
+- `src/services/productService.js`
+- `src/pages/Transactions.jsx`
+
+### 本轮完成内容
+- 在 productService.js 中新增 localStorage 存储键与读写函数
+- 实现产品数据与交易记录的本地持久化
+- 在 addProduct / updateProduct / deleteProduct / addTransaction 等关键操作中自动保存数据
+- 启动时优先从 localStorage 加载数据，无本地数据时回退到初始 mock 数据
+- 新增 resetStorageData() 开发工具函数
+- 对 Transactions 页面未实现的“撤销”按钮进行了禁用态专业化处理
+- 保持现有业务联动逻辑不变
+
+### 本轮验证内容
+- [x] 刷新后产品数据仍保留
+- [x] 刷新后库存数量仍保留
+- [x] 刷新后交易记录仍保留
+- [x] 刷新后 Dashboard / Alerts 状态保持一致
+- [x] 现有增删改与出入库逻辑未被破坏
+- [x] UI 风格保持一致
+
+### 问题记录
+- 当前采用 localStorage 持久化，适合单机 / 单浏览器使用
+- 多标签并发修改、复杂数据结构迁移、敏感数据安全等问题暂未纳入本轮处理
+- 当前属于企业级路线中的“本地持久化过渡阶段”，还未进入真实后端与数据库阶段
+
+### 本轮总结
+- 第二阶段第五轮已完成，系统已具备本地持久化能力。
+- 当前项目已从“前端 mock 联动原型”进一步升级为“刷新后数据可保留、可持续试跑的库存管理系统原型”。

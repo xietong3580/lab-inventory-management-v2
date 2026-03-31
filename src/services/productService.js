@@ -1,11 +1,55 @@
 // 产品数据服务 - 轻量实现，不引入复杂异步逻辑
 import { products as initialProducts, transactionRecords as initialTransactionRecords } from '../constants/mockData';
 
-// 可变的产品列表，初始为 mock 数据，支持运行时更新
-let products = [...initialProducts];
+// 本地存储键定义
+const STORAGE_KEYS = {
+  PRODUCTS: 'lab-inventory-v2-products',
+  TRANSACTIONS: 'lab-inventory-v2-transactions'
+};
 
-// 可变的交易记录列表，初始为 mock 数据，支持运行时更新
-let transactions = [...initialTransactionRecords];
+/**
+ * 从 localStorage 加载数据，如果不存在或解析失败则使用初始数据
+ * @param {string} key - 存储键
+ * @param {Array} initialData - 初始数据
+ * @returns {Array} 加载的数据数组
+ */
+const loadFromStorage = (key, initialData) => {
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        console.log(`[productService] 从 localStorage 加载 ${key}:`, parsed.length, '条记录');
+        return parsed;
+      }
+    }
+  } catch (error) {
+    console.error(`[productService] 加载 ${key} 失败:`, error);
+  }
+
+  console.log(`[productService] 使用初始 mock 数据: ${key}`);
+  return [...initialData];
+};
+
+/**
+ * 保存数据到 localStorage
+ * @param {string} key - 存储键
+ * @param {Array} data - 要保存的数据
+ */
+const saveToStorage = (key, data) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+    console.log(`[productService] 保存 ${key}:`, data.length, '条记录');
+  } catch (error) {
+    console.error(`[productService] 保存 ${key} 失败:`, error);
+  }
+};
+
+// 从 localStorage 或初始 mock 数据加载产品数据
+let products = loadFromStorage(STORAGE_KEYS.PRODUCTS, initialProducts);
+
+// 从 localStorage 或初始 mock 数据加载交易记录数据
+let transactions = loadFromStorage(STORAGE_KEYS.TRANSACTIONS, initialTransactionRecords);
 
 /**
  * 获取所有产品列表
@@ -65,6 +109,10 @@ export const addProduct = (productData) => {
   };
   products.push(newProduct);
   console.log('[productService] 产品已添加:', newProduct);
+
+  // 自动保存到 localStorage
+  saveToStorage(STORAGE_KEYS.PRODUCTS, products);
+
   return newProduct;
 };
 
@@ -84,6 +132,10 @@ export const updateProduct = (id, updates) => {
   const updatedProduct = { ...products[index], ...updates };
   products[index] = updatedProduct;
   console.log('[productService] 产品已更新:', updatedProduct);
+
+  // 自动保存到 localStorage
+  saveToStorage(STORAGE_KEYS.PRODUCTS, products);
+
   return updatedProduct;
 };
 
@@ -99,6 +151,8 @@ export const deleteProduct = (id) => {
   const deleted = initialLength > products.length;
   if (deleted) {
     console.log(`[productService] 产品已删除: ID ${id}`);
+    // 自动保存到 localStorage
+    saveToStorage(STORAGE_KEYS.PRODUCTS, products);
   } else {
     console.warn(`[productService] 未找到产品 ID: ${id}`);
   }
@@ -216,5 +270,40 @@ export const addTransaction = (transactionData) => {
   transactions.unshift(newTransaction); // 添加到数组开头，便于最新记录显示在前面
   console.log('[productService] 交易记录已添加:', newTransaction);
 
+  // 自动保存交易记录到 localStorage
+  saveToStorage(STORAGE_KEYS.TRANSACTIONS, transactions);
+
   return newTransaction;
+};
+
+/**
+ * 重置本地存储数据到初始 mock 数据
+ * @returns {Object} 重置结果
+ */
+export const resetStorageData = () => {
+  try {
+    // 重置内存数据到初始状态
+    products = [...initialProducts];
+    transactions = [...initialTransactionRecords];
+
+    // 保存到 localStorage
+    saveToStorage(STORAGE_KEYS.PRODUCTS, products);
+    saveToStorage(STORAGE_KEYS.TRANSACTIONS, transactions);
+
+    console.log('[productService] 本地存储数据已重置为初始 mock 数据');
+
+    return {
+      success: true,
+      message: '本地存储数据已重置为初始 mock 数据',
+      productsCount: products.length,
+      transactionsCount: transactions.length
+    };
+  } catch (error) {
+    console.error('[productService] 重置本地存储数据失败:', error);
+    return {
+      success: false,
+      message: `重置失败: ${error.message}`,
+      error: error
+    };
+  }
 };

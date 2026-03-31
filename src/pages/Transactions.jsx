@@ -133,7 +133,7 @@ function Transactions() {
 
     try {
       // 调用服务添加交易记录
-      const newTransaction = addTransaction({
+      addTransaction({
         productId: formData.productId,
         type: formData.type,
         quantity: Number(formData.quantity),
@@ -334,7 +334,11 @@ function Transactions() {
                       <button className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors">
                         详情
                       </button>
-                      <button className="px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors">
+                      <button
+                        className="px-3 py-1.5 text-sm bg-slate-100 text-slate-400 rounded cursor-not-allowed"
+                        title="撤销功能开发中"
+                        disabled
+                      >
                         撤销
                       </button>
                     </div>
