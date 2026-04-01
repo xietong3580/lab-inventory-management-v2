@@ -1,4 +1,50 @@
+import { useState } from 'react';
+import { resetStorageData } from '../services/productService';
+
 function Settings() {
+  // 重置相关状态
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetResult, setResetResult] = useState(null);
+  const [isResetting, setIsResetting] = useState(false);
+
+  // 打开重置确认对话框
+  const handleOpenResetConfirm = () => {
+    setShowResetConfirm(true);
+    setResetResult(null);
+  };
+
+  // 关闭重置确认对话框
+  const handleCloseResetConfirm = () => {
+    setShowResetConfirm(false);
+    setResetResult(null);
+  };
+
+  // 确认执行重置
+  const handleConfirmReset = () => {
+    setIsResetting(true);
+    setResetResult(null);
+
+    try {
+      // 执行重置操作
+      const result = resetStorageData();
+      setResetResult(result);
+
+      // 重置成功后刷新页面
+      if (result.success) {
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      }
+    } catch (error) {
+      setResetResult({
+        success: false,
+        message: error.message || '重置操作执行失败'
+      });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   return (
     <div className="p-6">
       {/* 页面标题区 */}
@@ -180,6 +226,18 @@ function Settings() {
                   查看日志
                 </button>
               </div>
+              <div className="pt-4 border-t border-slate-100">
+                <div className="font-medium text-slate-800 mb-2">开发调试</div>
+                <p className="text-sm text-slate-600 mb-3">
+                  重置本地测试数据。此操作将清空当前浏览器中的本地演示数据，恢复为初始测试状态。
+                </p>
+                <button
+                  onClick={handleOpenResetConfirm}
+                  className="px-4 py-2 bg-rose-50 text-rose-700 rounded-md hover:bg-rose-100 transition-colors font-medium"
+                >
+                  重置本地测试数据
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -217,6 +275,102 @@ function Settings() {
           </div>
         </div>
       </div>
+
+      {/* 重置确认对话框 */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="px-6 py-4 border-b border-slate-200">
+              <h2 className="text-xl font-semibold text-slate-800">
+                确认重置本地测试数据
+              </h2>
+            </div>
+            <div className="p-6">
+              {/* 警告信息 */}
+              <div className="mb-6">
+                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-md mb-4">
+                  <div className="flex items-start">
+                    <div className="shrink-0 mr-3 mt-0.5">
+                      <div className="w-5 h-5 rounded-full bg-rose-100 flex items-center justify-center">
+                        <span className="text-xs font-bold text-rose-600">!</span>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-rose-800 mb-1">
+                        此操作将清空当前浏览器中的本地演示数据
+                      </div>
+                      <div className="text-sm text-rose-700">
+                        系统会恢复为初始测试状态，请谨慎操作
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-sm text-slate-700 mb-4">
+                  <p className="font-medium text-slate-800 mb-2">操作影响：</p>
+                  <ul className="space-y-2 pl-5">
+                    <li className="flex items-start">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 mr-2"></span>
+                      <span>清空所有产品、交易记录、审计日志的本地存储</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 mr-2"></span>
+                      <span>恢复为初始 mock 测试数据</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-400 mt-1.5 mr-2"></span>
+                      <span>此操作仅影响当前浏览器本地数据，不影响真实业务系统</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 mr-2"></span>
+                      <span>重置成功后页面将自动刷新</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* 操作结果提示 */}
+              {resetResult && (
+                <div className={`mb-4 p-3.5 rounded-md border ${resetResult.success ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
+                  <div className="text-sm font-medium mb-1">
+                    {resetResult.success ? '✅ 重置操作已执行' : '❌ 重置操作失败'}
+                  </div>
+                  <div className={`text-sm ${resetResult.success ? 'text-emerald-700' : 'text-rose-700'}`}>
+                    {resetResult.message}
+                  </div>
+                </div>
+              )}
+
+              {/* 操作按钮 */}
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={handleCloseResetConfirm}
+                  disabled={isResetting}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmReset}
+                  disabled={isResetting}
+                  className="px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isResetting ? (
+                    <>
+                      <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      重置中...
+                    </>
+                  ) : (
+                    '确认重置'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 操作按钮 */}
       <div className="mt-8 p-6 bg-white border border-slate-200 rounded-lg">
