@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { dashboardStats } from '../constants/mockData';
-import { getProductsWithCalculatedStatus, getAllProducts, getTransactions } from '../services/productService';
+import { getProductsWithCalculatedStatus, getAllProducts, getTransactions, getAuditLogs } from '../services/productService';
 
 // 统计卡片组件
 function StatCard({ title, value, change, changeType, description, iconColor }) {
@@ -76,11 +76,56 @@ function Dashboard() {
     return 'low';
   };
 
+  // 操作类型中文映射
+  const actionTypeMap = {
+    PRODUCT_ADD: { label: '新增产品', color: 'bg-emerald-50 text-emerald-700' },
+    PRODUCT_UPDATE: { label: '编辑产品', color: 'bg-blue-50 text-blue-700' },
+    PRODUCT_DELETE: { label: '删除产品', color: 'bg-rose-50 text-rose-700' },
+    TRANSACTION_ADD: { label: '出入库', color: 'bg-slate-50 text-slate-700' },
+    TRANSACTION_REVERSE: { label: '撤销交易', color: 'bg-amber-50 text-amber-700' },
+    SYSTEM_RESET: { label: '系统重置', color: 'bg-violet-50 text-violet-700' }
+  };
+
+  // 格式化时间戳为 HH:MM 格式
+  const formatTime = (timestamp) => {
+    if (!timestamp) return '';
+    try {
+      const match = timestamp.match(/\s(\d{2}:\d{2})/);
+      return match ? match[1] : timestamp.substring(11, 16);
+    } catch {
+      return '';
+    }
+  };
+
+  // 生成审计日志摘要
+  const generateAuditSummary = (log) => {
+    const { actionType, productName, operator } = log;
+    const actionLabel = actionTypeMap[actionType]?.label || actionType;
+
+    switch (actionType) {
+      case 'PRODUCT_ADD':
+        return `新增产品「${productName || '未知产品'}」`;
+      case 'PRODUCT_UPDATE':
+        return `编辑产品「${productName || '未知产品'}」`;
+      case 'PRODUCT_DELETE':
+        return `删除产品「${productName || '未知产品'}」`;
+      case 'TRANSACTION_ADD':
+        return `新增出入库记录「${productName || '未知产品'}」`;
+      case 'TRANSACTION_REVERSE':
+        return `撤销交易「${productName || '未知产品'}」相关记录`;
+      case 'SYSTEM_RESET':
+        return `系统数据已重置`;
+      default:
+        return `${actionLabel}操作`;
+    }
+  };
+
   // 实时计算统计数据（基于最新产品数据）
   const dashboardData = useMemo(() => {
     const products = getProductsWithCalculatedStatus();
     const allProducts = getAllProducts();
     const allTransactions = getTransactions();
+    const allAuditLogs = getAuditLogs();
 
     // 计算产品总数
     const totalProducts = allProducts.length;
@@ -116,15 +161,19 @@ function Dashboard() {
       .sort((a, b) => new Date(b.date) - new Date(a.date))
       .slice(0, 5);
 
+    // 获取最近5条审计日志（已按时间倒序排列）
+    const recentAuditLogs = allAuditLogs.slice(0, 5);
+
     return {
       totalProducts,
       totalInventory,
       lowStockCount,
       lowStockAlerts,
       todayTransactionsCount,
-      recentTransactions
+      recentTransactions,
+      recentAuditLogs
     };
-  }, []); // 空依赖数组，因为函数总是返回最新数据
+  }); // 移除依赖数组，确保数据实时更新
 
   // 动态统计卡片数据
   const dynamicDashboardStats = dashboardStats.map(stat => {
@@ -250,6 +299,58 @@ function Dashboard() {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* 最近操作记录 */}
+      <div className="mt-8 bg-white border border-slate-200 rounded-lg">
+        <div className="px-6 py-4 border-b border-slate-100">
+          <h2 className="text-lg font-semibold text-slate-800">最近操作记录</h2>
+          <p className="text-sm text-slate-500 mt-1">系统最近 5 条操作记录</p>
+        </div>
+        <div className="p-6">
+          {dashboardData.recentAuditLogs.length > 0 ? (
+            <div className="space-y-4">
+              {dashboardData.recentAuditLogs.map((log) => {
+                const actionConfig = actionTypeMap[log.actionType] || { label: log.actionType, color: 'bg-slate-50 text-slate-700' };
+                const timeText = formatTime(log.timestamp);
+                const summaryText = generateAuditSummary(log);
+
+                return (
+                  <div key={log.id} className="flex items-start justify-between py-3 border-b border-slate-100 last:border-0">
+                    <div className="flex items-start gap-4 flex-1 min-w-0">
+                      {/* 时间列 */}
+                      <div className="shrink-0 w-16 text-sm font-medium text-slate-700">
+                        {timeText}
+                      </div>
+                      {/* 操作类型标签 */}
+                      <div className="shrink-0">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${actionConfig.color}`}>
+                          {actionConfig.label}
+                        </span>
+                      </div>
+                      {/* 主要内容 */}
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-slate-800 truncate">
+                          {log.productName || '-'}
+                        </div>
+                        <div className="text-sm text-slate-500 mt-1">
+                          {summaryText}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="py-8 text-center">
+              <div className="text-slate-400 mb-2">暂无操作记录</div>
+              <div className="text-sm text-slate-500">
+                执行新增产品、编辑产品、出入库等操作后，这里会显示最近记录
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
