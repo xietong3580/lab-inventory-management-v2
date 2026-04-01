@@ -4,7 +4,8 @@ import { products as initialProducts, transactionRecords as initialTransactionRe
 // 本地存储键定义
 const STORAGE_KEYS = {
   PRODUCTS: 'lab-inventory-v2-products',
-  TRANSACTIONS: 'lab-inventory-v2-transactions'
+  TRANSACTIONS: 'lab-inventory-v2-transactions',
+  AUDIT_LOGS: 'lab-inventory-v2-audit-logs'
 };
 
 /**
@@ -50,6 +51,9 @@ let products = loadFromStorage(STORAGE_KEYS.PRODUCTS, initialProducts);
 
 // 从 localStorage 或初始 mock 数据加载交易记录数据
 let transactions = loadFromStorage(STORAGE_KEYS.TRANSACTIONS, initialTransactionRecords);
+
+// 从 localStorage 或初始空数组加载审计日志数据
+let auditLogs = loadFromStorage(STORAGE_KEYS.AUDIT_LOGS, []);
 
 /**
  * 获取所有产品列表
@@ -113,6 +117,25 @@ export const addProduct = (productData) => {
   // 自动保存到 localStorage
   saveToStorage(STORAGE_KEYS.PRODUCTS, products);
 
+  // 记录审计日志
+  logAuditAction(
+    'PRODUCT_ADD',
+    newProduct.name,
+    newProduct.id,
+    '系统管理员',
+    {
+      newProduct: {
+        name: newProduct.name,
+        sku: newProduct.sku,
+        category: newProduct.category,
+        currentStock: newProduct.currentStock,
+        minStock: newProduct.minStock,
+        unit: newProduct.unit,
+        location: newProduct.location || ''
+      }
+    }
+  );
+
   return newProduct;
 };
 
@@ -129,12 +152,59 @@ export const updateProduct = (id, updates) => {
     console.warn(`[productService] 未找到产品 ID: ${id}`);
     return null;
   }
-  const updatedProduct = { ...products[index], ...updates };
+
+  // 保存更新前的产品状态（用于审计日志）
+  const oldProduct = { ...products[index] };
+
+  const updatedProduct = { ...oldProduct, ...updates };
   products[index] = updatedProduct;
   console.log('[productService] 产品已更新:', updatedProduct);
 
   // 自动保存到 localStorage
   saveToStorage(STORAGE_KEYS.PRODUCTS, products);
+
+  // 记录审计日志
+  // 计算变化的字段
+  const changedFields = {};
+  Object.keys(updates).forEach(key => {
+    if (JSON.stringify(oldProduct[key]) !== JSON.stringify(updatedProduct[key])) {
+      changedFields[key] = {
+        old: oldProduct[key],
+        new: updatedProduct[key]
+      };
+    }
+  });
+
+  logAuditAction(
+    'PRODUCT_UPDATE',
+    updatedProduct.name,
+    updatedProduct.id,
+    '系统管理员',
+    {
+      oldProduct: {
+        name: oldProduct.name,
+        sku: oldProduct.sku,
+        category: oldProduct.category,
+        currentStock: oldProduct.currentStock,
+        minStock: oldProduct.minStock,
+        unit: oldProduct.unit,
+        location: oldProduct.location || ''
+      },
+      newProduct: {
+        name: updatedProduct.name,
+        sku: updatedProduct.sku,
+        category: updatedProduct.category,
+        currentStock: updatedProduct.currentStock,
+        minStock: updatedProduct.minStock,
+        unit: updatedProduct.unit,
+        location: updatedProduct.location || ''
+      },
+      changedFields,
+      updateSummary: Object.keys(changedFields).length > 0
+        ? `更新了 ${Object.keys(changedFields).length} 个字段: ${Object.keys(changedFields).join(', ')}`
+        : '无实质性字段变化'
+    }
+  );
 
   return updatedProduct;
 };
@@ -146,16 +216,45 @@ export const updateProduct = (id, updates) => {
  */
 export const deleteProduct = (id) => {
   console.log('[productService] 删除产品:', id);
+
+  // 查找要删除的产品（用于审计日志）
+  const productToDelete = products.find(product => product.id === id);
+
   const initialLength = products.length;
   products = products.filter(product => product.id !== id);
   const deleted = initialLength > products.length;
+
   if (deleted) {
     console.log(`[productService] 产品已删除: ID ${id}`);
     // 自动保存到 localStorage
     saveToStorage(STORAGE_KEYS.PRODUCTS, products);
+
+    // 记录审计日志
+    if (productToDelete) {
+      logAuditAction(
+        'PRODUCT_DELETE',
+        productToDelete.name,
+        productToDelete.id,
+        '系统管理员',
+        {
+          deletedProduct: {
+            name: productToDelete.name,
+            sku: productToDelete.sku,
+            category: productToDelete.category,
+            currentStock: productToDelete.currentStock,
+            minStock: productToDelete.minStock,
+            unit: productToDelete.unit,
+            location: productToDelete.location || '',
+            lastUpdated: productToDelete.lastUpdated || ''
+          },
+          deletionTime: getCurrentDateTimeWithSeconds()
+        }
+      );
+    }
   } else {
     console.warn(`[productService] 未找到产品 ID: ${id}`);
   }
+
   return deleted;
 };
 
@@ -192,6 +291,15 @@ export const getTransactions = () => {
 };
 
 /**
+ * 获取所有审计日志记录
+ * @returns {Array} 审计日志数组（按时间倒序排列，最新在前）
+ */
+export const getAuditLogs = () => {
+  // 返回副本并按时间倒序排列（最新日志在前）
+  return [...auditLogs].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+};
+
+/**
  * 获取当前日期时间字符串（格式：YYYY-MM-DD HH:MM）
  * @returns {string} 格式化日期时间
  */
@@ -203,6 +311,49 @@ const getCurrentDateTime = () => {
   const hours = String(now.getHours()).padStart(2, '0');
   const minutes = String(now.getMinutes()).padStart(2, '0');
   return `${year}-${month}-${day} ${hours}:${minutes}`;
+};
+
+/**
+ * 获取当前日期时间字符串（格式：YYYY-MM-DD HH:MM:SS）
+ * @returns {string} 包含秒数的格式化日期时间
+ */
+const getCurrentDateTimeWithSeconds = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+};
+
+/**
+ * 记录审计日志
+ * @param {string} actionType - 操作类型
+ * @param {string} productName - 产品名称（如适用）
+ * @param {string} productId - 产品ID（如适用）
+ * @param {string} operator - 操作人
+ * @param {Object} details - 操作详情
+ */
+const logAuditAction = (actionType, productName, productId, operator, details) => {
+  const logEntry = {
+    id: `log-${Date.now()}`,
+    actionType,
+    productName: productName || '',
+    productId: productId || '',
+    operator: operator || '系统管理员',
+    timestamp: getCurrentDateTimeWithSeconds(),
+    details
+  };
+
+  console.log('[productService] 记录审计日志:', logEntry);
+
+  // 添加到日志数组开头（最新在前）
+  auditLogs.unshift(logEntry);
+
+  // 自动保存到 localStorage
+  saveToStorage(STORAGE_KEYS.AUDIT_LOGS, auditLogs);
 };
 
 /**
@@ -272,6 +423,32 @@ export const addTransaction = (transactionData) => {
 
   // 自动保存交易记录到 localStorage
   saveToStorage(STORAGE_KEYS.TRANSACTIONS, transactions);
+
+  // 记录审计日志
+  logAuditAction(
+    'TRANSACTION_ADD',
+    product.name,
+    product.id,
+    operator,
+    {
+      transaction: {
+        id: newTransaction.id,
+        type: newTransaction.type,
+        quantity: newTransaction.quantity,
+        unit: newTransaction.unit,
+        date: newTransaction.date,
+        status: newTransaction.status,
+        notes: newTransaction.notes || ''
+      },
+      stockChange: {
+        oldStock: product.currentStock,
+        newStock: updatedProduct.currentStock,
+        delta: stockDelta,
+        direction: stockDelta > 0 ? '增加' : '减少'
+      },
+      summary: `${type} ${quantity} ${product.unit}，库存从 ${product.currentStock} 变更为 ${updatedProduct.currentStock} ${product.unit}`
+    }
+  );
 
   return newTransaction;
 };
@@ -352,6 +529,39 @@ export const reverseTransaction = (transactionId, reversedBy = '系统') => {
   // 8. 保存更新后的交易记录到 localStorage
   saveToStorage(STORAGE_KEYS.TRANSACTIONS, transactions);
 
+  // 9. 记录审计日志
+  logAuditAction(
+    'TRANSACTION_REVERSE',
+    product.name,
+    product.id,
+    reversedBy,
+    {
+      transaction: {
+        id: transaction.id,
+        originalType: transaction.type,
+        quantity: transaction.quantity,
+        unit: transaction.unit,
+        originalDate: transaction.date,
+        originalOperator: transaction.operator,
+        originalStatus: transaction.status,
+        notes: transaction.notes || ''
+      },
+      reversalInfo: {
+        reversedAt: updatedTransaction.reversedAt,
+        reversedBy: updatedTransaction.reversedBy,
+        newStatus: updatedTransaction.status
+      },
+      stockRollback: {
+        oldStock: product.currentStock,
+        newStock: updatedProduct.currentStock,
+        delta: stockDelta,
+        direction: stockDelta > 0 ? '增加' : '减少',
+        rollbackType: transaction.type === '入库' ? '撤销入库，库存减少' : '撤销出库，库存增加'
+      },
+      summary: `撤销${transaction.type}交易 ${transaction.quantity} ${product.unit}，库存从 ${product.currentStock} 回滚为 ${updatedProduct.currentStock} ${product.unit}`
+    }
+  );
+
   return updatedTransaction;
 };
 
@@ -373,10 +583,26 @@ export const resetStorageData = () => {
     // 重置内存数据到初始状态
     products = [...initialProducts];
     transactions = [...initialTransactionRecords];
+    auditLogs = [];
 
     // 保存到 localStorage
     saveToStorage(STORAGE_KEYS.PRODUCTS, products);
     saveToStorage(STORAGE_KEYS.TRANSACTIONS, transactions);
+    saveToStorage(STORAGE_KEYS.AUDIT_LOGS, auditLogs);
+
+    // 记录系统重置审计日志
+    logAuditAction(
+      'SYSTEM_RESET',
+      '',
+      '',
+      '系统管理员',
+      {
+        resetTime: getCurrentDateTimeWithSeconds(),
+        initialProductsCount: products.length,
+        initialTransactionsCount: transactions.length,
+        summary: '系统数据已重置为初始 mock 数据'
+      }
+    );
 
     console.log('[productService] 本地存储数据已重置为初始 mock 数据');
 
@@ -384,7 +610,8 @@ export const resetStorageData = () => {
       success: true,
       message: '本地存储数据已重置为初始 mock 数据',
       productsCount: products.length,
-      transactionsCount: transactions.length
+      transactionsCount: transactions.length,
+      auditLogsCount: auditLogs.length
     };
   } catch (error) {
     console.error('[productService] 重置本地存储数据失败:', error);
