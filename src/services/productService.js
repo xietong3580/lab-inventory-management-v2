@@ -277,6 +277,94 @@ export const addTransaction = (transactionData) => {
 };
 
 /**
+ * 撤销交易记录并回滚库存
+ * @param {string} transactionId - 交易记录 ID
+ * @param {string} [reversedBy] - 撤销操作人，默认 '系统'
+ * @returns {Object} 更新后的交易记录
+ * @throws {Error} 如果交易不存在、已撤销、或库存回滚失败
+ */
+export const reverseTransaction = (transactionId, reversedBy = '系统') => {
+  console.log('[productService] 撤销交易记录:', transactionId, '操作人:', reversedBy);
+
+  // 1. 查找交易记录
+  const transactionIndex = transactions.findIndex(t => t.id === transactionId);
+  if (transactionIndex === -1) {
+    throw new Error(`未找到交易记录 (ID: ${transactionId})，可能已被删除或ID不正确`);
+  }
+
+  const transaction = transactions[transactionIndex];
+
+  // 2. 验证交易状态
+  if (transaction.status !== 'completed') {
+    if (transaction.status === 'reversed') {
+      throw new Error(`此交易记录状态已是"已撤销"，不能重复撤销 (ID: ${transactionId})`);
+    }
+    throw new Error(`只能撤销状态为"已完成"的交易记录。当前状态: ${transaction.status} (ID: ${transactionId})`);
+  }
+
+  // 3. 查找对应产品
+  const product = getProductByName(transaction.productName);
+  if (!product) {
+    throw new Error(
+      `无法找到对应产品：交易记录中的产品"${transaction.productName}"不存在。\n` +
+      `可能原因：产品已被删除，或产品名称不匹配。\n` +
+      `请检查产品管理页面确认产品状态。`
+    );
+  }
+
+  // 4. 计算回滚库存量
+  // 原类型为'入库' → 撤销时库存减少 quantity
+  // 原类型为'出库' → 撤销时库存增加 quantity
+  const stockDelta = transaction.type === '入库' ? -transaction.quantity : transaction.quantity;
+  const newStock = product.currentStock + stockDelta;
+
+  // 5. 安全校验：撤销入库时，确保当前库存足够扣减（不能为负）
+  if (newStock < 0) {
+    throw new Error(
+      `库存安全规则不允许撤销：撤销此${transaction.type}操作会导致库存不足。\n` +
+      `当前库存: ${product.currentStock} ${product.unit}，撤销后将减少 ${transaction.quantity} ${product.unit}，\n` +
+      `库存将变为 ${newStock} ${product.unit}（不能为负数）。\n` +
+      `请先调整库存或联系管理员。`
+    );
+  }
+
+  // 6. 更新产品库存
+  const updatedProduct = updateProduct(product.id, {
+    currentStock: newStock,
+    lastUpdated: getCurrentDateTime().split(' ')[0] // 只取日期部分
+  });
+
+  if (!updatedProduct) {
+    throw new Error('更新产品库存失败，撤销操作中止');
+  }
+
+  // 7. 更新交易记录状态
+  const updatedTransaction = {
+    ...transaction,
+    status: 'reversed',
+    reversedAt: getCurrentDateTime(),
+    reversedBy
+  };
+
+  transactions[transactionIndex] = updatedTransaction;
+  console.log('[productService] 交易记录已撤销:', updatedTransaction);
+
+  // 8. 保存更新后的交易记录到 localStorage
+  saveToStorage(STORAGE_KEYS.TRANSACTIONS, transactions);
+
+  return updatedTransaction;
+};
+
+/**
+ * 根据产品名称查找产品（用于撤销交易时匹配产品）
+ * @param {string} productName - 产品名称
+ * @returns {Object|null} 产品对象或 null
+ */
+const getProductByName = (productName) => {
+  return products.find(product => product.name === productName) || null;
+};
+
+/**
  * 重置本地存储数据到初始 mock 数据
  * @returns {Object} 重置结果
  */

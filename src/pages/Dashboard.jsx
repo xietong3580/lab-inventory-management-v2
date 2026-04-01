@@ -40,6 +40,7 @@ function StatusBadge({ status }) {
   const config = {
     completed: { text: '已完成', bg: 'bg-emerald-50', textColor: 'text-emerald-700' },
     pending: { text: '处理中', bg: 'bg-amber-50', textColor: 'text-amber-700' },
+    reversed: { text: '已撤销', bg: 'bg-slate-100', textColor: 'text-slate-500' },
   };
   const { text, bg, textColor } = config[status] || config.pending;
 

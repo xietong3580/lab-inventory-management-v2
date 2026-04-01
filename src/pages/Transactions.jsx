@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getTransactions, addTransaction, getAllProducts } from '../services/productService';
+import { getTransactions, addTransaction, getAllProducts, reverseTransaction } from '../services/productService';
 
 // 类型标签组件
 function TypeBadge({ type }) {
@@ -21,8 +21,12 @@ function StatusBadge({ status }) {
   const config = {
     completed: { text: '已完成', bg: 'bg-emerald-50', textColor: 'text-emerald-700' },
     pending: { text: '处理中', bg: 'bg-amber-50', textColor: 'text-amber-700' },
+    reversed: { text: '已撤销', bg: 'bg-slate-100', textColor: 'text-slate-500' },
   };
-  const { text, bg, textColor } = config[status] || config.pending;
+
+  // 确保状态值被正确trimmed和标准化
+  const normalizedStatus = (status || '').trim();
+  const { text, bg, textColor } = config[normalizedStatus] || config.pending;
 
   return (
     <span className={`px-2 py-1 rounded text-xs font-medium ${bg} ${textColor}`}>
@@ -52,6 +56,8 @@ function Transactions() {
     notes: ''
   });
   const [formError, setFormError] = useState('');
+  const [reversingTransactionId, setReversingTransactionId] = useState(null);
+  const [reversalError, setReversalError] = useState('');
 
   // 筛选选项
   const typeOptions = ['all', '入库', '出库'];
@@ -151,6 +157,40 @@ function Transactions() {
     } catch (error) {
       setFormError(error.message || '添加交易记录失败');
       console.error('添加交易记录失败:', error);
+    }
+  };
+
+  // 点击撤销按钮
+  const handleReverseClick = (transactionId) => {
+    setReversingTransactionId(transactionId);
+    setReversalError('');
+  };
+
+  // 取消撤销操作
+  const handleCancelReverse = () => {
+    setReversingTransactionId(null);
+    setReversalError('');
+  };
+
+  // 确认撤销交易记录
+  const handleConfirmReverse = () => {
+    if (!reversingTransactionId) return;
+
+    try {
+      setReversalError('');
+      // 调用撤销函数（同步）
+      reverseTransaction(reversingTransactionId, '当前用户');
+
+      // 刷新交易记录列表
+      setTransactionRecords(getTransactions());
+      // 刷新产品列表（其他页面会用到）
+      setProducts(getAllProducts());
+
+      // 关闭确认对话框
+      setReversingTransactionId(null);
+    } catch (error) {
+      setReversalError(error.message || '撤销交易记录失败');
+      console.error('撤销交易记录失败:', error);
     }
   };
 
@@ -334,13 +374,31 @@ function Transactions() {
                       <button className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors">
                         详情
                       </button>
-                      <button
-                        className="px-3 py-1.5 text-sm bg-slate-100 text-slate-400 rounded cursor-not-allowed"
-                        title="撤销功能开发中"
-                        disabled
-                      >
-                        撤销
-                      </button>
+                      {record.status === 'completed' ? (
+                        <button
+                          onClick={() => handleReverseClick(record.id)}
+                          className="px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors"
+                          title="撤销此交易记录并回滚库存"
+                        >
+                          撤销
+                        </button>
+                      ) : record.status === 'reversed' ? (
+                        <button
+                          className="px-3 py-1.5 text-sm bg-slate-100 text-slate-400 rounded cursor-not-allowed"
+                          title="此记录已撤销"
+                          disabled
+                        >
+                          已撤销
+                        </button>
+                      ) : (
+                        <button
+                          className="px-3 py-1.5 text-sm bg-slate-100 text-slate-400 rounded cursor-not-allowed"
+                          title="只能撤销已完成状态的记录"
+                          disabled
+                        >
+                          撤销
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -541,6 +599,81 @@ function Transactions() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 撤销确认对话框 */}
+      {reversingTransactionId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="px-6 py-4 border-b border-slate-200">
+              <h2 className="text-xl font-semibold text-slate-800">
+                确认撤销交易记录
+              </h2>
+            </div>
+
+            <div className="p-6">
+              {/* 错误提示 */}
+              {reversalError && (
+                <div className="mb-4 p-3.5 bg-rose-50 border border-rose-300 rounded-md">
+                  <div className="flex items-start">
+                    <div className="shrink-0 mr-3 mt-0.5">
+                      <div className="w-5 h-5 rounded-full bg-rose-100 flex items-center justify-center">
+                        <span className="text-xs font-bold text-rose-600">!</span>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-rose-800 mb-1">无法撤销此交易</div>
+                      <div className="text-sm text-rose-700">{reversalError}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="text-slate-700 mb-6">
+                <p className="font-medium text-slate-800 mb-3">您确定要撤销此交易记录吗？</p>
+                <div className="bg-slate-50 border border-slate-200 rounded-md p-4 mb-4">
+                  <div className="text-sm font-medium text-slate-700 mb-2">此操作将执行以下业务规则：</div>
+                  <ul className="text-sm space-y-2">
+                    <li className="flex items-start">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 mr-2"></span>
+                      <span><span className="font-medium">库存回滚：</span>根据交易类型调整产品库存</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 mr-2"></span>
+                      <span><span className="font-medium">状态更新：</span>交易记录状态将改为"已撤销"</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 mr-2"></span>
+                      <span><span className="font-medium">业务验证：</span>系统将检查库存安全规则（库存不能为负数）</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 mr-2"></span>
+                      <span><span className="font-medium">不可逆：</span>撤销后无法恢复，请谨慎操作</span>
+                    </li>
+                  </ul>
+                </div>
+                <p className="text-sm text-slate-600">如果遇到库存不足等情况，系统会显示明确的业务规则提示。</p>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={handleCancelReverse}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmReverse}
+                  className="px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-700 transition-colors font-medium"
+                >
+                  确认撤销
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
