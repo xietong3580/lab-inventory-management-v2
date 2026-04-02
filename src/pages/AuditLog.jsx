@@ -1,21 +1,45 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getAuditLogs } from '../services/productService';
 import {
   formatAuditTime,
   generateAuditSummary,
   getDisplayOperator,
-  getActionConfig
+  getActionConfig,
+  actionTypeMap
 } from '../utils/auditLogHelpers';
 
 function AuditLog() {
   // 审计日志数据状态
   const [auditLogs, setAuditLogs] = useState([]);
+  // 筛选状态
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [selectedActionType, setSelectedActionType] = useState('');
 
   // 加载审计日志数据
   useEffect(() => {
     const logs = getAuditLogs(); // 已按时间倒序排列
     setAuditLogs(logs);
   }, []);
+
+  // 筛选后的日志
+  const filteredLogs = useMemo(() => {
+    let filtered = [...auditLogs];
+
+    // 1. 按操作类型筛选
+    if (selectedActionType) {
+      filtered = filtered.filter(log => log.actionType === selectedActionType);
+    }
+
+    // 2. 按产品名称关键词搜索（仅匹配 productName 字段）
+    if (searchKeyword.trim()) {
+      const keyword = searchKeyword.trim().toLowerCase();
+      filtered = filtered.filter(log =>
+        log.productName && log.productName.toLowerCase().includes(keyword)
+      );
+    }
+
+    return filtered;
+  }, [auditLogs, searchKeyword, selectedActionType]);
 
   return (
     <div className="p-6">
@@ -27,17 +51,106 @@ function AuditLog() {
         </p>
       </div>
 
+      {/* 筛选工具栏 */}
+      <div className="mb-6 bg-white border border-slate-200 rounded-lg p-4">
+        <div className="flex flex-wrap items-center gap-4">
+          {/* 产品名称搜索框 */}
+          <div className="flex-1 min-w-[200px]">
+            <label htmlFor="product-search" className="block text-sm font-medium text-slate-700 mb-1">
+              产品名称搜索
+            </label>
+            <input
+              id="product-search"
+              type="text"
+              placeholder="输入产品名称关键词..."
+              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+            />
+          </div>
+
+          {/* 操作类型筛选下拉框 */}
+          <div className="min-w-[180px]">
+            <label htmlFor="action-type-filter" className="block text-sm font-medium text-slate-700 mb-1">
+              操作类型
+            </label>
+            <select
+              id="action-type-filter"
+              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              value={selectedActionType}
+              onChange={(e) => setSelectedActionType(e.target.value)}
+            >
+              <option value="">全部操作</option>
+              {Object.entries(actionTypeMap).map(([key, config]) => (
+                <option key={key} value={key}>
+                  {config.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 清空筛选按钮（仅在存在筛选条件时显示） */}
+          {(searchKeyword || selectedActionType) && (
+            <div className="self-end">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
+                onClick={() => {
+                  setSearchKeyword('');
+                  setSelectedActionType('');
+                }}
+              >
+                清空筛选
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* 日志列表卡片 */}
       <div className="bg-white border border-slate-200 rounded-lg">
         <div className="px-6 py-4 border-b border-slate-100">
           <h2 className="text-lg font-semibold text-slate-800">操作日志</h2>
           <p className="text-sm text-slate-500 mt-1">
-            共 {auditLogs.length} 条记录
+            共 {filteredLogs.length} 条记录{filteredLogs.length !== auditLogs.length && `（总计 ${auditLogs.length} 条）`}
           </p>
         </div>
 
         <div className="p-6">
-          {auditLogs.length > 0 ? (
+          {auditLogs.length === 0 ? (
+            // 系统暂无日志
+            <div className="py-12 text-center">
+              <div className="text-slate-400 mb-2">暂无操作记录</div>
+              <div className="text-sm text-slate-500 max-w-md mx-auto">
+                执行新增产品、编辑产品、出入库等操作后，这里会显示详细的操作日志记录。
+              </div>
+            </div>
+          ) : filteredLogs.length === 0 ? (
+            // 筛选无结果
+            <div className="py-12 text-center">
+              <div className="text-slate-400 mb-2">未找到匹配的日志记录</div>
+              <div className="text-sm text-slate-500 max-w-md mx-auto mb-4">
+                当前筛选条件下未找到匹配的操作日志。请尝试：
+              </div>
+              <div className="text-sm text-slate-600 max-w-md mx-auto space-y-1">
+                <p>• 调整产品名称关键词</p>
+                <p>• 选择不同的操作类型</p>
+                <p>• 清空筛选条件以查看全部记录</p>
+              </div>
+              {(searchKeyword || selectedActionType) && (
+                <button
+                  type="button"
+                  className="mt-6 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
+                  onClick={() => {
+                    setSearchKeyword('');
+                    setSelectedActionType('');
+                  }}
+                >
+                  清空筛选
+                </button>
+              )}
+            </div>
+          ) : (
             <>
               {/* 表头行 */}
               <div className="grid grid-cols-12 gap-4 mb-4 pb-3 border-b border-slate-200">
@@ -50,7 +163,7 @@ function AuditLog() {
 
               {/* 日志行列表 */}
               <div className="space-y-4">
-                {auditLogs.map((log) => {
+                {filteredLogs.map((log) => {
                   const actionConfig = getActionConfig(log.actionType);
                   const displayTime = formatAuditTime(log.timestamp, 'full');
                   const displayOperator = getDisplayOperator(log.operator);
@@ -100,14 +213,6 @@ function AuditLog() {
                 })}
               </div>
             </>
-          ) : (
-            // 空状态提示
-            <div className="py-12 text-center">
-              <div className="text-slate-400 mb-2">暂无操作记录</div>
-              <div className="text-sm text-slate-500 max-w-md mx-auto">
-                执行新增产品、编辑产品、出入库等操作后，这里会显示详细的操作日志记录。
-              </div>
-            </div>
           )}
         </div>
       </div>
