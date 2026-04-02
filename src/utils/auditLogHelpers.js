@@ -43,21 +43,21 @@ export const formatAuditTime = (timestamp, format = 'full') => {
  * @param {string} log.productName - 产品名称
  * @returns {string} 摘要文本
  */
-export const generateAuditSummary = (log) => {
+export const generateAuditSummary = (log, compact = false) => {
   const { actionType, productName } = log;
   const actionLabel = actionTypeMap[actionType]?.label || actionType;
 
   switch (actionType) {
     case 'PRODUCT_ADD':
-      return `新增产品「${productName || '未知产品'}」`;
+      return compact ? `新增产品` : `新增产品「${productName || '未知产品'}」`;
     case 'PRODUCT_UPDATE':
-      return `编辑产品「${productName || '未知产品'}」`;
+      return compact ? `编辑产品` : `编辑产品「${productName || '未知产品'}」`;
     case 'PRODUCT_DELETE':
-      return `删除产品「${productName || '未知产品'}」`;
+      return compact ? `删除产品` : `删除产品「${productName || '未知产品'}」`;
     case 'TRANSACTION_ADD':
-      return `新增出入库记录「${productName || '未知产品'}」`;
+      return compact ? `新增出入库记录` : `新增出入库记录「${productName || '未知产品'}」`;
     case 'TRANSACTION_REVERSE':
-      return `撤销交易「${productName || '未知产品'}」相关记录`;
+      return compact ? `撤销交易` : `撤销交易「${productName || '未知产品'}」相关记录`;
     case 'SYSTEM_RESET':
       return `系统数据已重置`;
     default:

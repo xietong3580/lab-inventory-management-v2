@@ -53,11 +53,11 @@ function AuditLog() {
 
       {/* 筛选工具栏 */}
       <div className="mb-6 bg-white border border-slate-200 rounded-lg p-4">
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           {/* 产品名称搜索框 */}
           <div className="flex-1 min-w-[200px]">
             <label htmlFor="product-search" className="block text-sm font-medium text-slate-700 mb-1">
-              产品名称搜索
+              产品名称
             </label>
             <input
               id="product-search"
@@ -112,7 +112,7 @@ function AuditLog() {
         <div className="px-6 py-4 border-b border-slate-100">
           <h2 className="text-lg font-semibold text-slate-800">操作日志</h2>
           <p className="text-sm text-slate-500 mt-1">
-            共 {filteredLogs.length} 条记录{filteredLogs.length !== auditLogs.length && `（总计 ${auditLogs.length} 条）`}
+            筛选结果：{filteredLogs.length} 条{filteredLogs.length !== auditLogs.length && `（共 ${auditLogs.length} 条）`}
           </p>
         </div>
 
@@ -120,7 +120,7 @@ function AuditLog() {
           {auditLogs.length === 0 ? (
             // 系统暂无日志
             <div className="py-12 text-center">
-              <div className="text-slate-400 mb-2">暂无操作记录</div>
+              <div className="text-slate-500 mb-2">暂无操作记录</div>
               <div className="text-sm text-slate-500 max-w-md mx-auto">
                 执行新增产品、编辑产品、出入库等操作后，这里会显示详细的操作日志记录。
               </div>
@@ -128,7 +128,7 @@ function AuditLog() {
           ) : filteredLogs.length === 0 ? (
             // 筛选无结果
             <div className="py-12 text-center">
-              <div className="text-slate-400 mb-2">未找到匹配的日志记录</div>
+              <div className="text-slate-500 mb-2">未找到匹配的日志记录</div>
               <div className="text-sm text-slate-500 max-w-md mx-auto mb-4">
                 当前筛选条件下未找到匹配的操作日志。请尝试：
               </div>

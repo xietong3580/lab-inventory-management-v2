@@ -277,7 +277,7 @@ function Dashboard() {
               {dashboardData.recentAuditLogs.map((log) => {
                 const actionConfig = getActionConfig(log.actionType);
                 const timeText = formatAuditTime(log.timestamp, 'time');
-                const summaryText = generateAuditSummary(log);
+                const summaryText = generateAuditSummary(log, true);
 
                 return (
                   <div key={log.id} className="flex items-start justify-between py-3 border-b border-slate-100 last:border-0">

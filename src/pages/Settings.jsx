@@ -233,7 +233,7 @@ function Settings() {
                 </p>
                 <button
                   onClick={handleOpenResetConfirm}
-                  className="px-4 py-2 bg-rose-50 text-rose-700 rounded-md hover:bg-rose-100 transition-colors font-medium"
+                  className="px-4 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded-md hover:bg-rose-100 transition-colors font-medium"
                 >
                   重置本地测试数据
                 </button>
@@ -310,15 +310,15 @@ function Settings() {
                   <p className="font-medium text-slate-800 mb-2">操作影响：</p>
                   <ul className="space-y-2 pl-5">
                     <li className="flex items-start">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 mr-2"></span>
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-500 mt-1.5 mr-2"></span>
                       <span>清空所有产品、交易记录、审计日志的本地存储</span>
                     </li>
                     <li className="flex items-start">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 mr-2"></span>
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-500 mt-1.5 mr-2"></span>
                       <span>恢复为初始 mock 测试数据</span>
                     </li>
                     <li className="flex items-start">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-400 mt-1.5 mr-2"></span>
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 mr-2"></span>
                       <span>此操作仅影响当前浏览器本地数据，不影响真实业务系统</span>
                     </li>
                     <li className="flex items-start">
@@ -335,7 +335,7 @@ function Settings() {
                   <div className="text-sm font-medium mb-1">
                     {resetResult.success ? '✅ 重置操作已执行' : '❌ 重置操作失败'}
                   </div>
-                  <div className={`text-sm ${resetResult.success ? 'text-emerald-700' : 'text-rose-700'}`}>
+                  <div className={`text-sm font-medium ${resetResult.success ? 'text-emerald-700' : 'text-rose-700'}`}>
                     {resetResult.message}
                   </div>
                 </div>
