@@ -11,6 +11,7 @@ function Sidebar() {
     { id: 'transactions', label: '出入库记录', path: '/transactions' },
     { id: 'alerts', label: '低库存预警', path: '/alerts' },
     { id: 'users', label: '用户管理', path: '/users' },
+    { id: 'audit-log', label: '操作日志', path: '/audit-log' },
     { id: 'settings', label: '系统设置', path: '/settings' },
   ];
 

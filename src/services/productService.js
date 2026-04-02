@@ -122,7 +122,7 @@ export const addProduct = (productData) => {
     'PRODUCT_ADD',
     newProduct.name,
     newProduct.id,
-    '系统管理员',
+    '',
     {
       newProduct: {
         name: newProduct.name,
@@ -179,7 +179,7 @@ export const updateProduct = (id, updates) => {
     'PRODUCT_UPDATE',
     updatedProduct.name,
     updatedProduct.id,
-    '系统管理员',
+    '',
     {
       oldProduct: {
         name: oldProduct.name,
@@ -235,7 +235,7 @@ export const deleteProduct = (id) => {
         'PRODUCT_DELETE',
         productToDelete.name,
         productToDelete.id,
-        '系统管理员',
+        '',
         {
           deletedProduct: {
             name: productToDelete.name,
@@ -342,7 +342,7 @@ const logAuditAction = (actionType, productName, productId, operator, details) =
     actionType,
     productName: productName || '',
     productId: productId || '',
-    operator: operator || '系统管理员',
+    operator: operator || '',
     timestamp: getCurrentDateTimeWithSeconds(),
     details
   };
@@ -595,7 +595,7 @@ export const resetStorageData = () => {
       'SYSTEM_RESET',
       '',
       '',
-      '系统管理员',
+      '',
       {
         resetTime: getCurrentDateTimeWithSeconds(),
         initialProductsCount: products.length,

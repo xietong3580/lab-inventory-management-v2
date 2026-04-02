@@ -1,6 +1,12 @@
 import { useMemo } from 'react';
 import { dashboardStats } from '../constants/mockData';
 import { getProductsWithCalculatedStatus, getAllProducts, getTransactions, getAuditLogs } from '../services/productService';
+import {
+  formatAuditTime,
+  generateAuditSummary,
+  getDisplayOperator,
+  getActionConfig
+} from '../utils/auditLogHelpers';
 
 // 统计卡片组件
 function StatCard({ title, value, change, changeType, description, iconColor }) {
@@ -76,49 +82,6 @@ function Dashboard() {
     return 'low';
   };
 
-  // 操作类型中文映射
-  const actionTypeMap = {
-    PRODUCT_ADD: { label: '新增产品', color: 'bg-emerald-50 text-emerald-700' },
-    PRODUCT_UPDATE: { label: '编辑产品', color: 'bg-blue-50 text-blue-700' },
-    PRODUCT_DELETE: { label: '删除产品', color: 'bg-rose-50 text-rose-700' },
-    TRANSACTION_ADD: { label: '出入库', color: 'bg-slate-50 text-slate-700' },
-    TRANSACTION_REVERSE: { label: '撤销交易', color: 'bg-amber-50 text-amber-700' },
-    SYSTEM_RESET: { label: '系统重置', color: 'bg-violet-50 text-violet-700' }
-  };
-
-  // 格式化时间戳为 HH:MM 格式
-  const formatTime = (timestamp) => {
-    if (!timestamp) return '';
-    try {
-      const match = timestamp.match(/\s(\d{2}:\d{2})/);
-      return match ? match[1] : timestamp.substring(11, 16);
-    } catch {
-      return '';
-    }
-  };
-
-  // 生成审计日志摘要
-  const generateAuditSummary = (log) => {
-    const { actionType, productName, operator } = log;
-    const actionLabel = actionTypeMap[actionType]?.label || actionType;
-
-    switch (actionType) {
-      case 'PRODUCT_ADD':
-        return `新增产品「${productName || '未知产品'}」`;
-      case 'PRODUCT_UPDATE':
-        return `编辑产品「${productName || '未知产品'}」`;
-      case 'PRODUCT_DELETE':
-        return `删除产品「${productName || '未知产品'}」`;
-      case 'TRANSACTION_ADD':
-        return `新增出入库记录「${productName || '未知产品'}」`;
-      case 'TRANSACTION_REVERSE':
-        return `撤销交易「${productName || '未知产品'}」相关记录`;
-      case 'SYSTEM_RESET':
-        return `系统数据已重置`;
-      default:
-        return `${actionLabel}操作`;
-    }
-  };
 
   // 实时计算统计数据（基于最新产品数据）
   const dashboardData = useMemo(() => {
@@ -312,8 +275,8 @@ function Dashboard() {
           {dashboardData.recentAuditLogs.length > 0 ? (
             <div className="space-y-4">
               {dashboardData.recentAuditLogs.map((log) => {
-                const actionConfig = actionTypeMap[log.actionType] || { label: log.actionType, color: 'bg-slate-50 text-slate-700' };
-                const timeText = formatTime(log.timestamp);
+                const actionConfig = getActionConfig(log.actionType);
+                const timeText = formatAuditTime(log.timestamp, 'time');
                 const summaryText = generateAuditSummary(log);
 
                 return (

@@ -6,6 +6,7 @@ import Products from './pages/Products';
 import Transactions from './pages/Transactions';
 import Alerts from './pages/Alerts';
 import Users from './pages/Users';
+import AuditLog from './pages/AuditLog';
 import Settings from './pages/Settings';
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
           <Route path="transactions" element={<Transactions />} />
           <Route path="alerts" element={<Alerts />} />
           <Route path="users" element={<Users />} />
+          <Route path="audit-log" element={<AuditLog />} />
           <Route path="settings" element={<Settings />} />
         </Route>
 
