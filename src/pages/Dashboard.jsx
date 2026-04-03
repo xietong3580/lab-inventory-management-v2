@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { dashboardStats } from '../constants/mockData';
 import { getProductsWithCalculatedStatus, getAllProducts, getTransactions, getAuditLogs } from '../services/productService';
 import {
@@ -197,6 +197,9 @@ function AuditLogStatsChart({ stats, maxCount }) {
 }
 
 function Dashboard() {
+  // 时间范围筛选状态
+  const [timeRange, setTimeRange] = useState('7days'); // '7days', '30days', 'all'
+
   // 计算紧急程度（根据库存百分比）
   const calculateUrgency = (product) => {
     const ratio = product.currentStock / product.minStock;
@@ -208,6 +211,9 @@ function Dashboard() {
 
   // 实时计算统计数据（基于最新产品数据）
   const dashboardData = useMemo(() => {
+    // 根据时间范围确定天数，'all' 表示全部历史数据
+    const days = timeRange === '7days' ? 7 : timeRange === '30days' ? 30 : null; // null 表示全部数据
+
     const products = getProductsWithCalculatedStatus();
     const allProducts = getAllProducts();
     const allTransactions = getTransactions();
@@ -236,7 +242,7 @@ function Dashboard() {
       urgency: calculateUrgency(product)
     }));
 
-    // 获取最近7天的日期范围
+    // 获取最近N天的日期范围
     const getRecentDates = (days = 7) => {
       const dates = [];
       for (let i = days - 1; i >= 0; i--) {
@@ -246,25 +252,64 @@ function Dashboard() {
       }
       return dates;
     };
-    const recent7Days = getRecentDates(7);
 
-    // 计算近7日交易记录数量
-    const recent7DaysTransactions = allTransactions.filter(txn =>
-      txn.date && recent7Days.includes(txn.date)
-    );
-    const recent7DaysTransactionsCount = recent7DaysTransactions.length;
+    // 从日期时间字符串中提取日期部分（YYYY-MM-DD）
+    const extractDatePart = (dateTimeStr) => {
+      if (!dateTimeStr) return '';
+      // 格式可能是 "2026-03-29 14:30" 或 "2026-03-29"
+      return dateTimeStr.split(' ')[0];
+    };
 
-    // 计算近7日审计日志数量
-    const recent7DaysAuditLogs = allAuditLogs.filter(log => {
+    // 根据时间范围获取要统计的日期列表
+    let dateRange = [];
+    if (days !== null) {
+      // 有限时间范围：最近N天
+      dateRange = getRecentDates(days);
+    } else {
+      // 全部数据：从所有交易记录中提取唯一日期
+      const allDatesSet = new Set();
+      allTransactions.forEach(txn => {
+        if (txn.date) {
+          const datePart = extractDatePart(txn.date);
+          if (datePart) {
+            allDatesSet.add(datePart);
+          }
+        }
+      });
+      // 从审计日志中也提取日期
+      allAuditLogs.forEach(log => {
+        if (log.timestamp) {
+          const logDate = new Date(log.timestamp).toISOString().split('T')[0];
+          allDatesSet.add(logDate);
+        }
+      });
+      // 转换为数组并按日期排序（升序）
+      dateRange = Array.from(allDatesSet).sort();
+    }
+
+    // 计算选定时间范围内的交易记录数量
+    const recentDaysTransactions = allTransactions.filter(txn => {
+      if (!txn.date) return false;
+      const datePart = extractDatePart(txn.date);
+      return dateRange.includes(datePart);
+    });
+    const recentDaysTransactionsCount = recentDaysTransactions.length;
+
+    // 计算选定时间范围内的审计日志数量
+    const recentDaysAuditLogs = allAuditLogs.filter(log => {
       if (!log.timestamp) return false;
       const logDate = new Date(log.timestamp).toISOString().split('T')[0];
-      return recent7Days.includes(logDate);
+      return dateRange.includes(logDate);
     });
-    const recent7DaysAuditLogsCount = recent7DaysAuditLogs.length;
+    const recentDaysAuditLogsCount = recentDaysAuditLogs.length;
 
-    // 计算交易趋势数据（近7天入库/出库数量）
-    const transactionTrendData = recent7Days.map(date => {
-      const dayTransactions = allTransactions.filter(txn => txn.date === date);
+    // 计算交易趋势数据（按日期统计入库/出库数量）
+    const transactionTrendData = dateRange.map(date => {
+      const dayTransactions = allTransactions.filter(txn => {
+        if (!txn.date) return false;
+        const datePart = extractDatePart(txn.date);
+        return datePart === date;
+      });
       const inCount = dayTransactions.filter(txn => txn.type === '入库').reduce((sum, txn) => sum + (Number(txn.quantity) || 0), 0);
       const outCount = dayTransactions.filter(txn => txn.type === '出库').reduce((sum, txn) => sum + (Number(txn.quantity) || 0), 0);
 
@@ -300,8 +345,8 @@ function Dashboard() {
       'SYSTEM_RESET': { label: '系统重置', count: 0, color: 'bg-violet-50 text-violet-700' }
     };
 
-    // 统计所有审计日志类型
-    allAuditLogs.forEach(log => {
+    // 统计选定时间范围内的审计日志类型
+    recentDaysAuditLogs.forEach(log => {
       if (auditLogStats[log.actionType]) {
         auditLogStats[log.actionType].count++;
       }
@@ -315,13 +360,13 @@ function Dashboard() {
     const maxAuditLogCount = auditLogStatsArray.length > 0 ?
       Math.max(...auditLogStatsArray.map(item => item.count)) : 1;
 
-    // 获取最近5条交易记录（按日期倒序）
-    const recentTransactions = [...allTransactions]
+    // 获取选定时间范围内最近5条交易记录（按日期倒序）
+    const recentTransactions = [...recentDaysTransactions]
       .sort((a, b) => new Date(b.date) - new Date(a.date))
       .slice(0, 5);
 
-    // 获取最近5条审计日志（已按时间倒序排列）
-    const recentAuditLogs = allAuditLogs.slice(0, 5);
+    // 获取选定时间范围内最近5条审计日志（已按时间倒序排列）
+    const recentAuditLogs = recentDaysAuditLogs.slice(0, 5);
 
     return {
       totalProducts,
@@ -329,8 +374,8 @@ function Dashboard() {
       lowStockCount,
       normalStockCount,
       lowStockAlerts,
-      recent7DaysTransactionsCount,
-      recent7DaysAuditLogsCount,
+      recentDaysTransactionsCount,
+      recentDaysAuditLogsCount,
       transactionTrendData,
       lowStockPercentage,
       top3LowStockProducts,
@@ -339,7 +384,7 @@ function Dashboard() {
       recentTransactions,
       recentAuditLogs
     };
-  }); // 移除依赖数组，确保数据实时更新
+  }, [timeRange]); // 依赖时间范围
 
   // 动态统计卡片数据
   const dynamicDashboardStats = dashboardStats.map(stat => {
@@ -348,8 +393,8 @@ function Dashboard() {
       totalInventory,
       lowStockCount,
       normalStockCount,
-      recent7DaysTransactionsCount,
-      recent7DaysAuditLogsCount
+      recentDaysTransactionsCount,
+      recentDaysAuditLogsCount
     } = dashboardData;
 
     if (stat.id === 'total-products') {
@@ -371,16 +416,20 @@ function Dashboard() {
         description: '当前低库存产品数量'
       };
     } else if (stat.id === 'recent-transactions') {
+      const rangeText = timeRange === '7days' ? '近7日' : timeRange === '30days' ? '近30日' : '全部';
       return {
         ...stat,
-        value: recent7DaysTransactionsCount.toString(),
-        description: '近7日交易记录数'
+        title: `${rangeText}交易记录`,
+        value: recentDaysTransactionsCount.toString(),
+        description: `${rangeText}交易记录数`
       };
     } else if (stat.id === 'recent-audit-logs') {
+      const rangeText = timeRange === '7days' ? '近7日' : timeRange === '30days' ? '近30日' : '全部';
       return {
         ...stat,
-        value: recent7DaysAuditLogsCount.toString(),
-        description: '近7日审计记录数'
+        title: `${rangeText}审计记录`,
+        value: recentDaysAuditLogsCount.toString(),
+        description: `${rangeText}审计记录数`
       };
     }
     return stat;
@@ -394,6 +443,45 @@ function Dashboard() {
         <p className="text-slate-600 mt-1">
           欢迎回来，这里是库存管理系统的核心概览。
         </p>
+      </div>
+
+      {/* 时间范围筛选器 */}
+      <div className="mb-6">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-slate-500 mr-3">时间范围:</span>
+          <div className="inline-flex rounded-md border border-slate-200 bg-white shadow-sm">
+            <button
+              className={`px-4 py-2 text-sm font-medium rounded-l-md transition-colors ${
+                timeRange === '7days'
+                  ? 'bg-slate-800 text-white'
+                  : 'text-slate-700 hover:bg-slate-50'
+              }`}
+              onClick={() => setTimeRange('7days')}
+            >
+              近7天
+            </button>
+            <button
+              className={`px-4 py-2 text-sm font-medium border-l border-slate-200 transition-colors ${
+                timeRange === '30days'
+                  ? 'bg-slate-800 text-white'
+                  : 'text-slate-700 hover:bg-slate-50'
+              }`}
+              onClick={() => setTimeRange('30days')}
+            >
+              近30天
+            </button>
+            <button
+              className={`px-4 py-2 text-sm font-medium rounded-r-md border-l border-slate-200 transition-colors ${
+                timeRange === 'all'
+                  ? 'bg-slate-800 text-white'
+                  : 'text-slate-700 hover:bg-slate-50'
+              }`}
+              onClick={() => setTimeRange('all')}
+            >
+              全部
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* 统计卡片网格 */}
@@ -447,25 +535,51 @@ function Dashboard() {
             <p className="text-sm text-slate-500 mt-1">当前 {dashboardData.lowStockCount} 个产品库存不足</p>
           </div>
           <div className="p-6">
-            <div className="space-y-4">
-              {dashboardData.lowStockAlerts.slice(0, 5).map((alert) => (
-                <div key={alert.id} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
-                  <div>
-                    <div className="font-medium text-slate-800">{alert.productName}</div>
-                    <div className="text-sm text-slate-500 mt-1">
-                      {alert.category} · 当前库存 {alert.currentStock} / 最低 {alert.minStock}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {dashboardData.lowStockAlerts.slice(0, 6).map((alert) => {
+                const gap = alert.currentStock - alert.minStock;
+                const gapText = gap >= 0 ? `剩余 ${gap}` : `缺口 ${-gap}`;
+                const gapColorClass = gap >= 0 ? 'text-emerald-600' : 'text-rose-600';
+
+                return (
+                  <div key={alert.id} className="bg-slate-50 border border-slate-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="font-medium text-slate-800 truncate">{alert.productName}</div>
+                        <div className="text-sm text-slate-500 mt-1">{alert.category}</div>
+                      </div>
+                      <div className="ml-2">
+                        <UrgencyBadge urgency={alert.urgency} />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-sm text-slate-500 mb-1">当前库存</div>
+                        <div className="text-lg font-semibold text-slate-800">{alert.currentStock}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-slate-500 mb-1">最低库存</div>
+                        <div className="text-lg font-semibold text-slate-800">{alert.minStock}</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 pt-3 border-t border-slate-200">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-slate-500">库存状态</div>
+                        <div className={`text-sm font-semibold ${gapColorClass}`}>
+                          {gapText}
+                        </div>
+                      </div>
+                      <div className="mt-1">
+                        <div className="text-xs text-slate-500">
+                          占比: {Math.round((alert.currentStock / alert.minStock) * 100)}%
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-lg font-semibold text-rose-600">
-                      {Math.round((alert.currentStock / alert.minStock) * 100)}%
-                    </div>
-                    <div className="mt-2">
-                      <UrgencyBadge urgency={alert.urgency} />
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div className="mt-6 pt-5 border-t border-slate-100">
               <button className="w-full py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 rounded-md transition-colors">
@@ -481,8 +595,12 @@ function Dashboard() {
         {/* 近7日交易趋势 */}
         <div className="bg-white border border-slate-200 rounded-lg">
           <div className="px-6 py-4 border-b border-slate-100">
-            <h2 className="text-lg font-semibold text-slate-800">近7日交易趋势</h2>
-            <p className="text-sm text-slate-500 mt-1">入库与出库数量趋势</p>
+            <h2 className="text-lg font-semibold text-slate-800">
+              {timeRange === '7days' ? '近7日' : timeRange === '30days' ? '近30日' : '最近'}交易趋势
+            </h2>
+            <p className="text-sm text-slate-500 mt-1">
+              {timeRange === 'all' ? '所有交易记录的入库与出库数量趋势' : '入库与出库数量趋势'}
+            </p>
           </div>
           <div className="p-6">
             <TransactionTrendChart data={dashboardData.transactionTrendData} />
@@ -509,7 +627,9 @@ function Dashboard() {
       {/* 审计日志概览统计 */}
       <div className="mt-8 bg-white border border-slate-200 rounded-lg">
         <div className="px-6 py-4 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-slate-800">近7日审计记录统计</h2>
+          <h2 className="text-lg font-semibold text-slate-800">
+            {timeRange === '7days' ? '近7日' : timeRange === '30days' ? '近30日' : '全部'}审计记录统计
+          </h2>
           <p className="text-sm text-slate-500 mt-1">按操作类型统计数量</p>
         </div>
         <div className="p-6">
