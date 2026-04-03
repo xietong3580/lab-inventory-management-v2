@@ -387,6 +387,15 @@ function Dashboard() {
     // 获取选定时间范围内最近5条审计日志（已按时间倒序排列）
     const recentAuditLogs = recentDaysAuditLogs.slice(0, 5);
 
+    // 计算交易趋势汇总数据
+    const transactionSummary = {
+      totalInCount: transactionTrendData.reduce((sum, item) => sum + item.inCount, 0),
+      totalOutCount: transactionTrendData.reduce((sum, item) => sum + item.outCount, 0),
+      totalTransactionsCount: recentDaysTransactionsCount, // 交易记录总笔数
+      totalQuantityCount: transactionTrendData.reduce((sum, item) => sum + item.totalCount, 0), // 出入库总数量
+    };
+    transactionSummary.netChange = transactionSummary.totalInCount - transactionSummary.totalOutCount;
+
     return {
       totalProducts,
       totalInventory,
@@ -401,7 +410,8 @@ function Dashboard() {
       auditLogStatsArray,
       maxAuditLogCount,
       recentTransactions,
-      recentAuditLogs
+      recentAuditLogs,
+      transactionSummary
     };
   }, [timeRange]); // 依赖时间范围
 
@@ -623,6 +633,34 @@ function Dashboard() {
           </div>
           <div className="p-6">
             <TransactionTrendChart data={dashboardData.transactionTrendData} />
+
+            {/* 交易趋势汇总信息 */}
+            <div className="mt-6 pt-5 border-t border-slate-100">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="text-sm text-slate-500 mb-1">入库总量</div>
+                  <div className="text-lg font-semibold text-emerald-600">{dashboardData.transactionSummary.totalInCount}</div>
+                  <div className="text-xs text-slate-400">件</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-sm text-slate-500 mb-1">出库总量</div>
+                  <div className="text-lg font-semibold text-rose-600">{dashboardData.transactionSummary.totalOutCount}</div>
+                  <div className="text-xs text-slate-400">件</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-sm text-slate-500 mb-1">净变化</div>
+                  <div className={`text-lg font-semibold ${dashboardData.transactionSummary.netChange >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {dashboardData.transactionSummary.netChange >= 0 ? '+' : ''}{dashboardData.transactionSummary.netChange}
+                  </div>
+                  <div className="text-xs text-slate-400">入库 - 出库</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-sm text-slate-500 mb-1">交易总笔数</div>
+                  <div className="text-lg font-semibold text-slate-800">{dashboardData.transactionSummary.totalTransactionsCount}</div>
+                  <div className="text-xs text-slate-400">笔</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
