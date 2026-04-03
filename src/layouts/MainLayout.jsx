@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import Header from '../components/layout/Header';
 import Sidebar from '../components/layout/Sidebar';
+import BackToTopButton from '../components/common/BackToTopButton';
 
 function MainLayout() {
   return (
@@ -17,6 +18,9 @@ function MainLayout() {
           </div>
         </main>
       </div>
+
+      {/* 全局返回顶部按钮 */}
+      <BackToTopButton />
     </div>
   );
 }
