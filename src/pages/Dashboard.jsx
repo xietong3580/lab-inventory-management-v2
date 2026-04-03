@@ -173,22 +173,41 @@ function AuditLogStatsChart({ stats, maxCount }) {
     );
   }
 
+  // 计算非零统计项数量
+  const nonZeroStats = stats.filter(item => item.count > 0);
+  const hasMostlyZeros = nonZeroStats.length <= 1; // 0或1个非零项视为"大部分为0"
+
   const scale = maxCount > 0 ? 100 / maxCount : 0;
 
   return (
     <div className="space-y-4">
+      {/* 轻量提示：当大部分统计项为0时 */}
+      {hasMostlyZeros && (
+        <div className="mb-3 p-3 bg-slate-50 border border-slate-200 rounded">
+          <div className="text-sm text-slate-600">
+            当前时间范围内操作记录较少，各类型统计值多为0。
+          </div>
+        </div>
+      )}
+
       {stats.map((item) => (
         <div key={item.type} className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="text-sm font-medium text-slate-700">{item.label}</div>
-            <div className="text-sm font-medium text-slate-800">{item.count}</div>
+            <div className={`text-sm font-medium ${item.count === 0 ? 'text-slate-400' : 'text-slate-800'}`}>
+              {item.count}
+            </div>
           </div>
           <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-            <div
-              className={`h-full ${item.color.split(' ')[0]}`}
-              style={{ width: `${item.count * scale}%` }}
-              title={`${item.label}: ${item.count}`}
-            />
+            {item.count > 0 ? (
+              <div
+                className={`h-full ${item.color.split(' ')[0]}`}
+                style={{ width: `${item.count * scale}%` }}
+                title={`${item.label}: ${item.count}`}
+              />
+            ) : (
+              <div className="h-full bg-slate-200 opacity-30" style={{ width: '100%' }} />
+            )}
           </div>
         </div>
       ))}
@@ -646,9 +665,9 @@ function Dashboard() {
           <h2 className="text-lg font-semibold text-slate-800">最近操作记录</h2>
           <p className="text-sm text-slate-500 mt-1">系统最近 5 条操作记录</p>
         </div>
-        <div className="p-6">
+        <div className={`p-6 ${dashboardData.recentAuditLogs.length <= 2 ? 'pb-4' : ''}`}>
           {dashboardData.recentAuditLogs.length > 0 ? (
-            <div className="space-y-4">
+            <div className={`${dashboardData.recentAuditLogs.length <= 2 ? 'space-y-3' : 'space-y-4'}`}>
               {dashboardData.recentAuditLogs.map((log) => {
                 const actionConfig = getActionConfig(log.actionType);
                 const timeText = formatAuditTime(log.timestamp, 'time');
