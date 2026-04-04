@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 
-function Sidebar() {
+function Sidebar({ closeSidebar }) {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -26,10 +26,12 @@ function Sidebar() {
 
   const handleMenuClick = (path) => {
     navigate(path);
+    // 小屏下点击菜单项后自动关闭侧边栏
+    closeSidebar();
   };
 
   return (
-    <aside className="w-64 border-r border-slate-200 bg-white min-h-[calc(100vh-4rem)] p-4">
+    <aside className="w-64 border-r border-slate-200 bg-white min-h-[calc(100vh-4rem)] p-4 overflow-y-auto">
       {/* 系统标识 */}
       <div className="mb-8 px-3 py-2">
         <div className="text-sm font-medium text-slate-500">库存管理系统</div>

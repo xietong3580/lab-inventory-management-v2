@@ -91,13 +91,13 @@ function Users() {
           <button className="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium">
             + 新增用户
           </button>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <input
               type="text"
               placeholder="搜索用户名或邮箱..."
-              className="px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+              className="px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent w-full sm:w-64"
             />
-            <button className="px-4 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors font-medium">
+            <button className="px-4 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors font-medium w-full sm:w-auto">
               搜索
             </button>
           </div>
@@ -107,25 +107,25 @@ function Users() {
       {/* 用户表格 */}
       <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
+          <table className="min-w-[800px] md:min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
                   用户名
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
                   邮箱
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
                   角色
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
                   状态
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
                   最后登录
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
                   操作
                 </th>
               </tr>
@@ -133,22 +133,22 @@ function Users() {
             <tbody className="divide-y divide-slate-200">
               {users.map((user) => (
                 <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-slate-800">{user.username}</div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
                     <div className="text-sm text-slate-700">{user.email}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
                     <RoleBadge role={user.role} />
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
                     <StatusBadge status={user.status} />
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
                     <div className="text-sm text-slate-700">{user.lastLogin}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <button className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors">
                         编辑
@@ -165,15 +165,15 @@ function Users() {
         </div>
 
         {/* 分页占位 */}
-        <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between">
-          <div className="text-sm text-slate-600">
+        <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0">
+          <div className="w-full md:w-auto text-sm text-slate-600">
             显示 5 条用户记录
           </div>
-          <div className="flex items-center gap-2">
+          <div className="w-full md:w-auto flex justify-center flex-wrap items-center gap-2 whitespace-nowrap sm:w-auto sm:mx-auto">
             <button className="px-3 py-1.5 rounded border border-slate-300 text-slate-700 text-sm hover:bg-slate-50">
               上一页
             </button>
-            <button className="w-8 h-8 rounded bg-slate-700 text-white text-sm">
+            <button className="px-3 py-1.5 rounded border text-sm bg-slate-700 text-white">
               1
             </button>
             <button className="px-3 py-1.5 rounded border border-slate-300 text-slate-700 text-sm hover:bg-slate-50">
@@ -184,7 +184,7 @@ function Users() {
       </div>
 
       {/* 底部提示 */}
-      <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+      <div className="mt-6 p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-lg">
         <div className="text-sm text-slate-600">
           提示：用户管理功能当前为占位界面。实际使用时，管理员可在此添加、编辑和停用用户账户，并分配相应角色权限。
         </div>

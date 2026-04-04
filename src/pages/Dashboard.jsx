@@ -11,17 +11,17 @@ import {
 // 统计卡片组件
 function StatCard({ title, value, description, iconColor }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-5 hover:shadow-sm transition-shadow">
+    <div className="bg-white border border-slate-200 rounded-lg p-3 md:p-5 hover:shadow-sm transition-shadow">
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <div className="text-sm text-slate-500 mb-1">{title}</div>
-          <div className="text-2xl font-semibold text-slate-800">{value}</div>
+          <div className="text-xs md:text-sm text-slate-500 mb-1">{title}</div>
+          <div className="text-xl md:text-2xl font-semibold text-slate-800">{value}</div>
           {description && (
-            <div className="mt-2 text-xs text-slate-500">{description}</div>
+            <div className="mt-1 md:mt-2 text-xs text-slate-500">{description}</div>
           )}
         </div>
-        <div className={`w-10 h-10 rounded-full ${iconColor} flex items-center justify-center ml-4`}>
-          <div className="w-5 h-5 bg-white/80 rounded"></div>
+        <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full ${iconColor} flex items-center justify-center ml-2 md:ml-4`}>
+          <div className="w-4 h-4 md:w-5 md:h-5 bg-white/80 rounded"></div>
         </div>
       </div>
     </div>
@@ -113,36 +113,36 @@ function TransactionTrendChart({ data }) {
 // 低库存概览增强组件
 function LowStockOverview({ lowStockCount, lowStockPercentage, top3Products, totalProducts }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 md:space-y-4">
       {/* 概览卡片 */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-slate-50 border border-slate-200 rounded p-4">
-          <div className="text-sm text-slate-500 mb-1">低库存数量</div>
-          <div className="text-2xl font-semibold text-slate-800">{lowStockCount}</div>
-          <div className="text-sm text-slate-500 mt-1">个产品</div>
+      <div className="grid grid-cols-2 gap-3 md:gap-4">
+        <div className="bg-slate-50 border border-slate-200 rounded p-3 md:p-4">
+          <div className="text-xs md:text-sm text-slate-500 mb-1">低库存数量</div>
+          <div className="text-xl md:text-2xl font-semibold text-slate-800">{lowStockCount}</div>
+          <div className="text-xs md:text-sm text-slate-500 mt-1">个产品</div>
         </div>
-        <div className="bg-slate-50 border border-slate-200 rounded p-4">
-          <div className="text-sm text-slate-500 mb-1">低库存占比</div>
-          <div className="text-2xl font-semibold text-slate-800">{lowStockPercentage}%</div>
-          <div className="text-sm text-slate-500 mt-1">占产品总数</div>
+        <div className="bg-slate-50 border border-slate-200 rounded p-3 md:p-4">
+          <div className="text-xs md:text-sm text-slate-500 mb-1">低库存占比</div>
+          <div className="text-xl md:text-2xl font-semibold text-slate-800">{lowStockPercentage}%</div>
+          <div className="text-xs md:text-sm text-slate-500 mt-1">占产品总数</div>
         </div>
       </div>
 
       {/* 最需关注的前3个产品 */}
       <div>
-        <div className="text-sm font-medium text-slate-700 mb-3">最需关注产品</div>
-        <div className="space-y-3">
+        <div className="text-sm font-medium text-slate-700 mb-2 md:mb-3">最需关注产品</div>
+        <div className="space-y-2 md:space-y-3">
           {top3Products.length > 0 ? (
             top3Products.map((product) => (
-              <div key={product.id} className="flex items-center justify-between p-3 border border-slate-200 rounded">
-                <div>
-                  <div className="font-medium text-slate-800">{product.productName}</div>
-                  <div className="text-sm text-slate-500 mt-1">
+              <div key={product.id} className="flex items-center justify-between p-2 md:p-3 border border-slate-200 rounded">
+                <div className="min-w-0 flex-1 pr-2">
+                  <div className="font-medium text-slate-800 truncate">{product.productName}</div>
+                  <div className="text-xs md:text-sm text-slate-500 mt-1">
                     当前库存 {product.currentStock} / 最低 {product.minStock}
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-lg font-semibold text-rose-600">
+                <div className="text-right shrink-0">
+                  <div className="text-base md:text-lg font-semibold text-rose-600">
                     {Math.round((product.currentStock / product.minStock) * 100)}%
                   </div>
                   <div className="mt-1">
@@ -152,7 +152,7 @@ function LowStockOverview({ lowStockCount, lowStockPercentage, top3Products, tot
               </div>
             ))
           ) : (
-            <div className="py-4 text-center text-slate-400">
+            <div className="py-3 md:py-4 text-center text-slate-400">
               当前无低库存产品
             </div>
           )}
@@ -465,22 +465,22 @@ function Dashboard() {
   });
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       {/* 页面标题区 */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-slate-800">仪表盘</h1>
-        <p className="text-slate-600 mt-1">
+      <div className="mb-4 md:mb-6">
+        <h1 className="text-xl md:text-2xl font-semibold text-slate-800">仪表盘</h1>
+        <p className="text-slate-600 mt-1 text-sm md:text-base">
           欢迎回来，这里是库存管理系统的核心概览。
         </p>
       </div>
 
       {/* 时间范围筛选器 */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-500 mr-3">时间范围:</span>
+      <div className="mb-4 md:mb-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-slate-500 mr-3 whitespace-nowrap">时间范围:</span>
           <div className="inline-flex rounded-md border border-slate-200 bg-white shadow-sm">
             <button
-              className={`px-4 py-2 text-sm font-medium rounded-l-md transition-colors ${
+              className={`px-3 py-1.5 md:px-4 md:py-2 text-sm font-medium rounded-l-md transition-colors ${
                 timeRange === '7days'
                   ? 'bg-slate-800 text-white'
                   : 'text-slate-700 hover:bg-slate-50'
@@ -490,7 +490,7 @@ function Dashboard() {
               近7天
             </button>
             <button
-              className={`px-4 py-2 text-sm font-medium border-l border-slate-200 transition-colors ${
+              className={`px-3 py-1.5 md:px-4 md:py-2 text-sm font-medium border-l border-slate-200 transition-colors ${
                 timeRange === '30days'
                   ? 'bg-slate-800 text-white'
                   : 'text-slate-700 hover:bg-slate-50'
@@ -500,7 +500,7 @@ function Dashboard() {
               近30天
             </button>
             <button
-              className={`px-4 py-2 text-sm font-medium rounded-r-md border-l border-slate-200 transition-colors ${
+              className={`px-3 py-1.5 md:px-4 md:py-2 text-sm font-medium rounded-r-md border-l border-slate-200 transition-colors ${
                 timeRange === 'all'
                   ? 'bg-slate-800 text-white'
                   : 'text-slate-700 hover:bg-slate-50'
@@ -514,43 +514,43 @@ function Dashboard() {
       </div>
 
       {/* 统计卡片网格 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-5 mb-4 md:mb-6">
         {dynamicDashboardStats.map((stat) => (
           <StatCard key={stat.id} {...stat} />
         ))}
       </div>
 
       {/* 两列布局：最近记录与预警概览 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* 最近出入库记录 */}
         <div className="bg-white border border-slate-200 rounded-lg">
-          <div className="px-6 py-4 border-b border-slate-100">
+          <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-100">
             <h2 className="text-lg font-semibold text-slate-800">最近出入库记录</h2>
             <p className="text-sm text-slate-500 mt-1">最近 5 条操作记录</p>
           </div>
-          <div className="p-6">
-            <div className="space-y-4">
+          <div className="p-4 md:p-6">
+            <div className="space-y-3 md:space-y-4">
               {dashboardData.recentTransactions.map((txn) => (
-                <div key={txn.id} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
-                  <div>
-                    <div className="font-medium text-slate-800">{txn.productName}</div>
-                    <div className="text-sm text-slate-500 mt-1">
+                <div key={txn.id} className="flex items-center justify-between py-2 md:py-3 border-b border-slate-100 last:border-0">
+                  <div className="min-w-0 flex-1 pr-2">
+                    <div className="font-medium text-slate-800 truncate">{txn.productName}</div>
+                    <div className="text-xs md:text-sm text-slate-500 mt-1 truncate">
                       {txn.date} · {txn.operator}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className={`font-medium ${txn.type === '入库' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  <div className="text-right shrink-0">
+                    <div className={`font-medium text-sm md:text-base ${txn.type === '入库' ? 'text-emerald-600' : 'text-rose-600'}`}>
                       {txn.type} {txn.quantity} 件
                     </div>
-                    <div className="mt-2">
+                    <div className="mt-1 md:mt-2">
                       <StatusBadge status={txn.status} />
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="mt-6 pt-5 border-t border-slate-100">
-              <button className="w-full py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 rounded-md transition-colors">
+            <div className="mt-4 md:mt-6 pt-4 md:pt-5 border-t border-slate-100">
+              <button className="w-full py-2 md:py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 rounded-md transition-colors">
                 查看全部出入库记录 →
               </button>
             </div>
@@ -559,44 +559,44 @@ function Dashboard() {
 
         {/* 低库存预警概览 */}
         <div className="bg-white border border-slate-200 rounded-lg">
-          <div className="px-6 py-4 border-b border-slate-100">
+          <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-100">
             <h2 className="text-lg font-semibold text-slate-800">低库存预警</h2>
             <p className="text-sm text-slate-500 mt-1">当前 {dashboardData.lowStockCount} 个产品库存不足</p>
           </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="p-4 md:p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
               {dashboardData.lowStockAlerts.slice(0, 6).map((alert) => {
                 const gap = alert.currentStock - alert.minStock;
                 const gapText = gap >= 0 ? `剩余 ${gap}` : `缺口 ${-gap}`;
                 const gapColorClass = gap >= 0 ? 'text-emerald-600' : 'text-rose-600';
 
                 return (
-                  <div key={alert.id} className="bg-slate-50 border border-slate-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
+                  <div key={alert.id} className="bg-slate-50 border border-slate-200 rounded-lg p-3 md:p-4 hover:shadow-sm transition-shadow">
+                    <div className="flex items-start justify-between mb-2 md:mb-3">
+                      <div className="flex-1 min-w-0">
                         <div className="font-medium text-slate-800 truncate">{alert.productName}</div>
-                        <div className="text-sm text-slate-500 mt-1">{alert.category}</div>
+                        <div className="text-xs md:text-sm text-slate-500 mt-1 truncate">{alert.category}</div>
                       </div>
-                      <div className="ml-2">
+                      <div className="ml-2 shrink-0">
                         <UrgencyBadge urgency={alert.urgency} />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-2 md:gap-3">
                       <div>
-                        <div className="text-sm text-slate-500 mb-1">当前库存</div>
-                        <div className="text-lg font-semibold text-slate-800">{alert.currentStock}</div>
+                        <div className="text-xs md:text-sm text-slate-500 mb-1">当前库存</div>
+                        <div className="text-base md:text-lg font-semibold text-slate-800">{alert.currentStock}</div>
                       </div>
                       <div>
-                        <div className="text-sm text-slate-500 mb-1">最低库存</div>
-                        <div className="text-lg font-semibold text-slate-800">{alert.minStock}</div>
+                        <div className="text-xs md:text-sm text-slate-500 mb-1">最低库存</div>
+                        <div className="text-base md:text-lg font-semibold text-slate-800">{alert.minStock}</div>
                       </div>
                     </div>
 
-                    <div className="mt-3 pt-3 border-t border-slate-200">
+                    <div className="mt-2 md:mt-3 pt-2 md:pt-3 border-t border-slate-200">
                       <div className="flex items-center justify-between">
-                        <div className="text-sm text-slate-500">库存状态</div>
-                        <div className={`text-sm font-semibold ${gapColorClass}`}>
+                        <div className="text-xs md:text-sm text-slate-500">库存状态</div>
+                        <div className={`text-xs md:text-sm font-semibold ${gapColorClass}`}>
                           {gapText}
                         </div>
                       </div>
@@ -610,8 +610,8 @@ function Dashboard() {
                 );
               })}
             </div>
-            <div className="mt-6 pt-5 border-t border-slate-100">
-              <button className="w-full py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 rounded-md transition-colors">
+            <div className="mt-4 md:mt-6 pt-4 md:pt-5 border-t border-slate-100">
+              <button className="w-full py-2 md:py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 rounded-md transition-colors">
                 查看全部{dashboardData.lowStockCount > 0 ? ` ${dashboardData.lowStockCount} 条` : ''}预警信息 →
               </button>
             </div>
@@ -620,10 +620,10 @@ function Dashboard() {
       </div>
 
       {/* 第二组两列布局：交易趋势与低库存概览增强 */}
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="mt-6 md:mt-8 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* 近7日交易趋势 */}
         <div className="bg-white border border-slate-200 rounded-lg">
-          <div className="px-6 py-4 border-b border-slate-100">
+          <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-100">
             <h2 className="text-lg font-semibold text-slate-800">
               {timeRange === '7days' ? '近7日' : timeRange === '30days' ? '近30日' : '最近'}交易趋势
             </h2>
@@ -631,32 +631,32 @@ function Dashboard() {
               {timeRange === 'all' ? '所有交易记录的入库与出库数量趋势' : '入库与出库数量趋势'}
             </p>
           </div>
-          <div className="p-6">
+          <div className="p-4 md:p-6">
             <TransactionTrendChart data={dashboardData.transactionTrendData} />
 
             {/* 交易趋势汇总信息 */}
-            <div className="mt-6 pt-5 border-t border-slate-100">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="mt-4 md:mt-6 pt-4 md:pt-5 border-t border-slate-100">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
                 <div className="text-center">
-                  <div className="text-sm text-slate-500 mb-1">入库总量</div>
-                  <div className="text-lg font-semibold text-emerald-600">{dashboardData.transactionSummary.totalInCount}</div>
+                  <div className="text-xs md:text-sm text-slate-500 mb-1">入库总量</div>
+                  <div className="text-base md:text-lg font-semibold text-emerald-600">{dashboardData.transactionSummary.totalInCount}</div>
                   <div className="text-xs text-slate-400">件</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-sm text-slate-500 mb-1">出库总量</div>
-                  <div className="text-lg font-semibold text-rose-600">{dashboardData.transactionSummary.totalOutCount}</div>
+                  <div className="text-xs md:text-sm text-slate-500 mb-1">出库总量</div>
+                  <div className="text-base md:text-lg font-semibold text-rose-600">{dashboardData.transactionSummary.totalOutCount}</div>
                   <div className="text-xs text-slate-400">件</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-sm text-slate-500 mb-1">净变化</div>
-                  <div className={`text-lg font-semibold ${dashboardData.transactionSummary.netChange >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  <div className="text-xs md:text-sm text-slate-500 mb-1">净变化</div>
+                  <div className={`text-base md:text-lg font-semibold ${dashboardData.transactionSummary.netChange >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                     {dashboardData.transactionSummary.netChange >= 0 ? '+' : ''}{dashboardData.transactionSummary.netChange}
                   </div>
                   <div className="text-xs text-slate-400">入库 - 出库</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-sm text-slate-500 mb-1">交易总笔数</div>
-                  <div className="text-lg font-semibold text-slate-800">{dashboardData.transactionSummary.totalTransactionsCount}</div>
+                  <div className="text-xs md:text-sm text-slate-500 mb-1">交易总笔数</div>
+                  <div className="text-base md:text-lg font-semibold text-slate-800">{dashboardData.transactionSummary.totalTransactionsCount}</div>
                   <div className="text-xs text-slate-400">笔</div>
                 </div>
               </div>
@@ -666,11 +666,11 @@ function Dashboard() {
 
         {/* 低库存概览增强 */}
         <div className="bg-white border border-slate-200 rounded-lg">
-          <div className="px-6 py-4 border-b border-slate-100">
+          <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-100">
             <h2 className="text-lg font-semibold text-slate-800">低库存概览</h2>
             <p className="text-sm text-slate-500 mt-1">低库存数量、占比与最需关注产品</p>
           </div>
-          <div className="p-6">
+          <div className="p-4 md:p-6">
             <LowStockOverview
               lowStockCount={dashboardData.lowStockCount}
               lowStockPercentage={dashboardData.lowStockPercentage}
@@ -682,14 +682,14 @@ function Dashboard() {
       </div>
 
       {/* 审计日志概览统计 */}
-      <div className="mt-8 bg-white border border-slate-200 rounded-lg">
-        <div className="px-6 py-4 border-b border-slate-100">
+      <div className="mt-6 md:mt-8 bg-white border border-slate-200 rounded-lg">
+        <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-100">
           <h2 className="text-lg font-semibold text-slate-800">
             {timeRange === '7days' ? '近7日' : timeRange === '30days' ? '近30日' : '全部'}审计记录统计
           </h2>
           <p className="text-sm text-slate-500 mt-1">按操作类型统计数量</p>
         </div>
-        <div className="p-6">
+        <div className="p-4 md:p-6">
           <AuditLogStatsChart
             stats={dashboardData.auditLogStatsArray}
             maxCount={dashboardData.maxAuditLogCount}
@@ -698,38 +698,38 @@ function Dashboard() {
       </div>
 
       {/* 最近操作记录 */}
-      <div className="mt-8 bg-white border border-slate-200 rounded-lg">
-        <div className="px-6 py-4 border-b border-slate-100">
+      <div className="mt-6 md:mt-8 bg-white border border-slate-200 rounded-lg">
+        <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-100">
           <h2 className="text-lg font-semibold text-slate-800">最近操作记录</h2>
           <p className="text-sm text-slate-500 mt-1">系统最近 5 条操作记录</p>
         </div>
-        <div className={`p-6 ${dashboardData.recentAuditLogs.length <= 2 ? 'pb-4' : ''}`}>
+        <div className={`p-4 md:p-6 ${dashboardData.recentAuditLogs.length <= 2 ? 'pb-4' : ''}`}>
           {dashboardData.recentAuditLogs.length > 0 ? (
-            <div className={`${dashboardData.recentAuditLogs.length <= 2 ? 'space-y-3' : 'space-y-4'}`}>
+            <div className={`${dashboardData.recentAuditLogs.length <= 2 ? 'space-y-2' : 'space-y-3'}`}>
               {dashboardData.recentAuditLogs.map((log) => {
                 const actionConfig = getActionConfig(log.actionType);
                 const timeText = formatAuditTime(log.timestamp, 'time');
                 const summaryText = generateAuditSummary(log, true);
 
                 return (
-                  <div key={log.id} className="flex items-start justify-between py-3 border-b border-slate-100 last:border-0">
-                    <div className="flex items-start gap-4 flex-1 min-w-0">
+                  <div key={log.id} className="flex items-start justify-between py-2 md:py-3 border-b border-slate-100 last:border-0">
+                    <div className="flex items-start gap-2 md:gap-4 flex-1 min-w-0">
                       {/* 时间列 */}
-                      <div className="shrink-0 w-16 text-sm font-medium text-slate-700">
+                      <div className="shrink-0 w-12 md:w-16 text-xs md:text-sm font-medium text-slate-700">
                         {timeText}
                       </div>
                       {/* 操作类型标签 */}
                       <div className="shrink-0">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${actionConfig.color}`}>
+                        <span className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded text-xs font-medium ${actionConfig.color}`}>
                           {actionConfig.label}
                         </span>
                       </div>
                       {/* 主要内容 */}
                       <div className="min-w-0 flex-1">
-                        <div className="font-medium text-slate-800 truncate">
+                        <div className="font-medium text-slate-800 truncate text-sm md:text-base">
                           {log.productName || '-'}
                         </div>
-                        <div className="text-sm text-slate-500 mt-1">
+                        <div className="text-xs md:text-sm text-slate-500 mt-1">
                           {summaryText}
                         </div>
                       </div>
@@ -739,9 +739,9 @@ function Dashboard() {
               })}
             </div>
           ) : (
-            <div className="py-8 text-center">
+            <div className="py-4 md:py-8 text-center">
               <div className="text-slate-400 mb-2">暂无操作记录</div>
-              <div className="text-sm text-slate-500">
+              <div className="text-xs md:text-sm text-slate-500">
                 执行新增产品、编辑产品、出入库等操作后，这里会显示最近记录
               </div>
             </div>
@@ -750,8 +750,8 @@ function Dashboard() {
       </div>
 
       {/* 底部提示 */}
-      <div className="mt-8 p-4 bg-slate-50 border border-slate-200 rounded-lg">
-        <div className="text-sm text-slate-600">
+      <div className="mt-6 md:mt-8 p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-lg">
+        <div className="text-xs md:text-sm text-slate-600">
           提示：本系统为独立新版库存管理系统，不影响现有旧版系统。所有数据均为演示用途。
         </div>
       </div>
