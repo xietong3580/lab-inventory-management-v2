@@ -1,4 +1,10 @@
+import { useState } from 'react';
+
 function Users() {
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   // 模拟用户数据
   const users = [
     {
@@ -42,6 +48,12 @@ function Users() {
       lastLogin: '2026-03-29 11:10',
     },
   ];
+
+  // 分页计算
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const displayedUsers = users.slice(startIndex, endIndex);
+  const totalPages = Math.ceil(users.length / itemsPerPage);
 
   // 角色标签组件
   function RoleBadge({ role }) {
@@ -131,7 +143,7 @@ function Users() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {users.map((user) => (
+              {displayedUsers.map((user) => (
                 <tr key={user.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-slate-800">{user.username}</div>
@@ -164,19 +176,65 @@ function Users() {
           </table>
         </div>
 
-        {/* 分页占位 */}
-        <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0">
-          <div className="w-full md:w-auto text-sm text-slate-600">
-            显示 5 条用户记录
+        {/* 分页控制 */}
+        <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex flex-col md:flex-row items-center md:items-center justify-center md:justify-between gap-4 md:gap-0">
+          <div className="w-full md:w-auto text-sm text-slate-600 text-center md:text-left">
+            显示第 {startIndex + 1} - {Math.min(endIndex, users.length)} 条，共 {users.length} 条记录
           </div>
-          <div className="w-full md:w-auto flex justify-center flex-wrap items-center gap-2 whitespace-nowrap sm:w-auto sm:mx-auto">
-            <button className="px-3 py-1.5 rounded border border-slate-300 text-slate-700 text-sm hover:bg-slate-50">
+          <div className="w-full md:w-auto flex justify-center flex-wrap items-center gap-2 whitespace-nowrap">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className={`px-3 py-1.5 rounded border text-sm ${
+                currentPage === 1
+                  ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
               上一页
             </button>
-            <button className="px-3 py-1.5 rounded border text-sm bg-slate-700 text-white">
-              1
-            </button>
-            <button className="px-3 py-1.5 rounded border border-slate-300 text-slate-700 text-sm hover:bg-slate-50">
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const pageNum = i + 1;
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`px-3 py-1.5 rounded border text-sm ${
+                      currentPage === pageNum
+                        ? 'bg-slate-700 text-white'
+                        : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+              {totalPages > 5 && (
+                <>
+                  <span className="text-slate-400">...</span>
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    className={`px-3 py-1.5 rounded border text-sm ${
+                      currentPage === totalPages
+                        ? 'bg-slate-700 text-white'
+                        : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {totalPages}
+                  </button>
+                </>
+              )}
+            </div>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className={`px-3 py-1.5 rounded border text-sm ${
+                currentPage === totalPages
+                  ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
               下一页
             </button>
           </div>

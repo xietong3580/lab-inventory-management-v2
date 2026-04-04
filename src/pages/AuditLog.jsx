@@ -14,6 +14,9 @@ function AuditLog() {
   // 筛选状态
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedActionType, setSelectedActionType] = useState('');
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // 加载审计日志数据
   useEffect(() => {
@@ -40,6 +43,17 @@ function AuditLog() {
 
     return filtered;
   }, [auditLogs, searchKeyword, selectedActionType]);
+
+  // 当筛选条件变化时重置分页
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchKeyword, selectedActionType]);
+
+  // 分页计算
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const displayedLogs = filteredLogs.slice(startIndex, endIndex);
+  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
 
   return (
     <div className="p-6">
@@ -150,8 +164,9 @@ function AuditLog() {
                 </button>
               )}
             </div>
-          ) : (
-            <>
+          ) : (<>
+            <div className="hidden md:block">
+              {/* 桌面端表格视图 (md及以上) */}
               {/* 表头行 */}
               <div className="grid grid-cols-12 gap-4 mb-4 pb-3 border-b border-slate-200">
                 <div className="col-span-2 text-sm font-medium text-slate-700">时间</div>
@@ -163,7 +178,7 @@ function AuditLog() {
 
               {/* 日志行列表 */}
               <div className="space-y-4">
-                {filteredLogs.map((log) => {
+                {displayedLogs.map((log) => {
                   const actionConfig = getActionConfig(log.actionType);
                   const displayTime = formatAuditTime(log.timestamp, 'full');
                   const displayOperator = getDisplayOperator(log.operator);
@@ -212,8 +227,123 @@ function AuditLog() {
                   );
                 })}
               </div>
-            </>
-          )}
+            </div>
+
+            <div className="block md:hidden space-y-4">
+              {/* 移动端卡片视图 (md以下) */}
+              {displayedLogs.map((log) => {
+                const actionConfig = getActionConfig(log.actionType);
+                const displayTime = formatAuditTime(log.timestamp, 'full');
+                const displayOperator = getDisplayOperator(log.operator);
+                const summaryText = generateAuditSummary(log);
+
+                return (
+                  <div
+                    key={log.id}
+                    className="bg-white border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors"
+                  >
+                    {/* 卡片顶部：时间和操作类型 */}
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="text-sm font-medium text-slate-800">
+                        {displayTime}
+                      </div>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${actionConfig.color}`}>
+                        {actionConfig.label}
+                      </span>
+                    </div>
+
+                    {/* 卡片内容：产品、操作人、摘要 */}
+                    <div className="space-y-2">
+                      <div className="flex items-center">
+                        <div className="text-sm font-medium text-slate-700 w-16">产品：</div>
+                        <div className="text-sm text-slate-800 flex-1 truncate">
+                          {log.productName || '-'}
+                        </div>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="text-sm font-medium text-slate-700 w-16">操作人：</div>
+                        <div className="text-sm text-slate-800 flex-1">
+                          {displayOperator}
+                        </div>
+                      </div>
+                      <div className="flex items-start">
+                        <div className="text-sm font-medium text-slate-700 w-16">摘要：</div>
+                        <div className="text-sm text-slate-600 flex-1">
+                          {summaryText}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 分页控制 */}
+            {filteredLogs.length > 0 && (
+              <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex flex-col md:flex-row items-center md:items-center justify-center md:justify-between gap-4 md:gap-0 mt-4">
+                <div className="w-full md:w-auto text-sm text-slate-600 text-center md:text-left">
+                  显示第 {startIndex + 1} - {Math.min(endIndex, filteredLogs.length)} 条，共 {filteredLogs.length} 条记录
+                </div>
+                <div className="w-full md:w-auto flex justify-center flex-wrap items-center gap-2 whitespace-nowrap">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className={`px-3 py-1.5 rounded border text-sm ${
+                      currentPage === 1
+                        ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                        : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    上一页
+                  </button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      const pageNum = i + 1;
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`px-3 py-1.5 rounded border text-sm ${
+                            currentPage === pageNum
+                              ? 'bg-slate-700 text-white'
+                              : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                    {totalPages > 5 && (
+                      <>
+                        <span className="text-slate-400">...</span>
+                        <button
+                          onClick={() => setCurrentPage(totalPages)}
+                          className={`px-3 py-1.5 rounded border text-sm ${
+                            currentPage === totalPages
+                              ? 'bg-slate-700 text-white'
+                              : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          {totalPages}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className={`px-3 py-1.5 rounded border text-sm ${
+                      currentPage === totalPages
+                        ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                        : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    下一页
+                  </button>
+                </div>
+              </div>
+            )}
+          </>)}
         </div>
       </div>
 

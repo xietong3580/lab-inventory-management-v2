@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { getProductsWithCalculatedStatus } from '../services/productService';
 
 // 紧急程度标签组件
@@ -48,6 +48,8 @@ function StockRatioBar({ current, min }) {
 function Alerts() {
   const [selectedUrgency, setSelectedUrgency] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
 
   // 计算紧急程度（根据库存百分比）
   const calculateUrgency = (product) => {
@@ -86,6 +88,17 @@ function Alerts() {
     if (selectedCategory !== 'all' && alert.category !== selectedCategory) return false;
     return true;
   });
+
+  // 当筛选条件变化时重置分页
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedUrgency, selectedCategory]);
+
+  // 分页计算
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const displayedAlerts = filteredAlerts.slice(startIndex, endIndex);
+  const totalPages = Math.ceil(filteredAlerts.length / itemsPerPage);
 
   const handleReset = () => {
     setSelectedUrgency('all');
@@ -198,7 +211,7 @@ function Alerts() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {filteredAlerts.map((alert) => (
+              {displayedAlerts.map((alert) => (
                 <tr key={alert.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-slate-800">{alert.productName}</div>
@@ -233,6 +246,72 @@ function Alerts() {
             </tbody>
           </table>
         </div>
+
+        {/* 分页控制 */}
+        {filteredAlerts.length > 0 && (
+          <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex flex-col md:flex-row items-center md:items-center justify-center md:justify-between gap-4 md:gap-0">
+            <div className="w-full md:w-auto text-sm text-slate-600 text-center md:text-left">
+              显示第 {startIndex + 1} - {Math.min(endIndex, filteredAlerts.length)} 条，共 {filteredAlerts.length} 条记录
+            </div>
+            <div className="w-full md:w-auto flex justify-center flex-wrap items-center gap-2 whitespace-nowrap">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className={`px-3 py-1.5 rounded border text-sm ${
+                  currentPage === 1
+                    ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                    : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                上一页
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const pageNum = i + 1;
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`px-3 py-1.5 rounded border text-sm ${
+                        currentPage === pageNum
+                          ? 'bg-slate-700 text-white'
+                          : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                {totalPages > 5 && (
+                  <>
+                    <span className="text-slate-400">...</span>
+                    <button
+                      onClick={() => setCurrentPage(totalPages)}
+                      className={`px-3 py-1.5 rounded border text-sm ${
+                        currentPage === totalPages
+                          ? 'bg-slate-700 text-white'
+                          : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {totalPages}
+                    </button>
+                  </>
+                )}
+              </div>
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-1.5 rounded border text-sm ${
+                  currentPage === totalPages
+                    ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                    : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                下一页
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* 当筛选后无数据时显示 */}
         {filteredAlerts.length === 0 && (

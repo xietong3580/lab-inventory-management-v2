@@ -408,11 +408,11 @@ function Transactions() {
         </div>
 
         {/* 分页控制 */}
-        <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0">
-          <div className="w-full md:w-auto text-sm text-slate-600">
+        <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex flex-col md:flex-row items-center md:items-center justify-center md:justify-between gap-4 md:gap-0">
+          <div className="w-full md:w-auto text-sm text-slate-600 text-center md:text-left">
             显示第 {startIndex + 1} - {Math.min(endIndex, transactionRecords.length)} 条，共 {transactionRecords.length} 条记录
           </div>
-          <div className="w-full md:w-auto flex justify-center flex-wrap items-center gap-2 whitespace-nowrap sm:w-auto sm:mx-auto">
+          <div className="w-full md:w-auto flex justify-center flex-wrap items-center gap-2 whitespace-nowrap">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
