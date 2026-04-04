@@ -46,7 +46,7 @@ function Settings() {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       {/* 页面标题区 */}
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-800">系统设置</h1>
@@ -63,7 +63,7 @@ function Settings() {
             <h2 className="text-lg font-semibold text-slate-800">库存预警阈值</h2>
             <p className="text-sm text-slate-500 mt-1">设置库存预警的触发条件</p>
           </div>
-          <div className="p-6 space-y-5">
+          <div className="p-4 md:p-6 space-y-5">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 紧急预警阈值
@@ -105,7 +105,7 @@ function Settings() {
             <h2 className="text-lg font-semibold text-slate-800">通知设置</h2>
             <p className="text-sm text-slate-500 mt-1">配置系统通知选项</p>
           </div>
-          <div className="p-6 space-y-4">
+          <div className="p-4 md:p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium text-slate-800">低库存预警通知</div>
@@ -145,7 +145,7 @@ function Settings() {
             <h2 className="text-lg font-semibold text-slate-800">品牌信息</h2>
             <p className="text-sm text-slate-500 mt-1">配置系统显示的品牌标识和信息</p>
           </div>
-          <div className="p-6">
+          <div className="p-4 md:p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -210,7 +210,7 @@ function Settings() {
             <h2 className="text-lg font-semibold text-slate-800">系统维护</h2>
             <p className="text-sm text-slate-500 mt-1">系统维护和操作选项</p>
           </div>
-          <div className="p-6">
+          <div className="p-4 md:p-6">
             <div className="space-y-4">
               <div>
                 <div className="font-medium text-slate-800 mb-2">数据备份</div>
@@ -248,7 +248,7 @@ function Settings() {
             <h2 className="text-lg font-semibold text-slate-800">关于系统</h2>
             <p className="text-sm text-slate-500 mt-1">系统版本和信息</p>
           </div>
-          <div className="p-6">
+          <div className="p-4 md:p-6">
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-sm text-slate-600">系统版本</span>
@@ -285,7 +285,7 @@ function Settings() {
                 确认重置本地测试数据
               </h2>
             </div>
-            <div className="p-6">
+            <div className="p-4 md:p-6">
               {/* 警告信息 */}
               <div className="mb-6">
                 <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-md mb-4">
@@ -373,7 +373,7 @@ function Settings() {
       )}
 
       {/* 操作按钮 */}
-      <div className="mt-8 p-6 bg-white border border-slate-200 rounded-lg">
+      <div className="mt-8 p-4 md:p-6 bg-white border border-slate-200 rounded-lg">
         <div className="flex justify-end gap-4">
           <button className="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium">
             恢复默认

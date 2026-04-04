@@ -11,11 +11,11 @@ import {
 // 统计卡片组件
 function StatCard({ title, value, description, iconColor }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-3 md:p-5 hover:shadow-sm transition-shadow">
+    <div className="bg-white border border-slate-200 rounded-lg p-2 sm:p-3 md:p-5 hover:shadow-sm transition-shadow">
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <div className="text-xs md:text-sm text-slate-500 mb-1">{title}</div>
-          <div className="text-xl md:text-2xl font-semibold text-slate-800">{value}</div>
+          <div className="text-xs sm:text-sm md:text-sm text-slate-500 mb-1">{title}</div>
+          <div className="text-lg sm:text-xl md:text-2xl font-semibold text-slate-800">{value}</div>
           {description && (
             <div className="mt-1 md:mt-2 text-xs text-slate-500">{description}</div>
           )}
@@ -468,8 +468,8 @@ function Dashboard() {
     <div className="p-4 md:p-6">
       {/* 页面标题区 */}
       <div className="mb-4 md:mb-6">
-        <h1 className="text-xl md:text-2xl font-semibold text-slate-800">仪表盘</h1>
-        <p className="text-slate-600 mt-1 text-sm md:text-base">
+        <h1 className="text-lg md:text-xl lg:text-2xl font-semibold text-slate-800">仪表盘</h1>
+        <p className="text-slate-600 mt-1 text-xs sm:text-sm md:text-base">
           欢迎回来，这里是库存管理系统的核心概览。
         </p>
       </div>
@@ -477,10 +477,10 @@ function Dashboard() {
       {/* 时间范围筛选器 */}
       <div className="mb-4 md:mb-6">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-slate-500 mr-3 whitespace-nowrap">时间范围:</span>
+          <span className="text-xs sm:text-sm text-slate-500 mr-3 whitespace-nowrap">时间范围:</span>
           <div className="inline-flex rounded-md border border-slate-200 bg-white shadow-sm">
             <button
-              className={`px-3 py-1.5 md:px-4 md:py-2 text-sm font-medium rounded-l-md transition-colors ${
+              className={`px-2 py-2 text-xs sm:text-sm md:px-3 md:py-2 md:text-sm font-medium rounded-l-md transition-colors ${
                 timeRange === '7days'
                   ? 'bg-slate-800 text-white'
                   : 'text-slate-700 hover:bg-slate-50'
@@ -490,7 +490,7 @@ function Dashboard() {
               近7天
             </button>
             <button
-              className={`px-3 py-1.5 md:px-4 md:py-2 text-sm font-medium border-l border-slate-200 transition-colors ${
+              className={`px-2 py-2 text-xs sm:text-sm md:px-3 md:py-2 md:text-sm font-medium border-l border-slate-200 transition-colors ${
                 timeRange === '30days'
                   ? 'bg-slate-800 text-white'
                   : 'text-slate-700 hover:bg-slate-50'
@@ -500,7 +500,7 @@ function Dashboard() {
               近30天
             </button>
             <button
-              className={`px-3 py-1.5 md:px-4 md:py-2 text-sm font-medium rounded-r-md border-l border-slate-200 transition-colors ${
+              className={`px-2 py-2 text-xs sm:text-sm md:px-3 md:py-2 md:text-sm font-medium rounded-r-md border-l border-slate-200 transition-colors ${
                 timeRange === 'all'
                   ? 'bg-slate-800 text-white'
                   : 'text-slate-700 hover:bg-slate-50'
