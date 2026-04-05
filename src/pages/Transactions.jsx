@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { getTransactions, addTransaction, getAllProducts, reverseTransaction } from '../services/productService';
+import { exportTransactionsToCSV } from '../utils/exportHelpers';
 
 // 类型标签组件
 function TypeBadge({ type }) {
@@ -180,6 +181,14 @@ function Transactions() {
     setCurrentPage(1);
   };
 
+  const handleExport = () => {
+    if (filteredRecords.length === 0) {
+      alert('没有可导出的数据，请先调整筛选条件或等待数据加载。');
+      return;
+    }
+    exportTransactionsToCSV(filteredRecords, products, 'transactions-export');
+  };
+
   const handleDateChange = (field, value) => {
     setDateRange((prev) => ({ ...prev, [field]: value }));
   };
@@ -318,7 +327,7 @@ function Transactions() {
         </p>
       </div>
 
-      {/* 操作栏：新增按钮 */}
+      {/* 操作栏：新增和导出按钮 */}
       <div className="bg-white border border-slate-200 rounded-lg p-4 mb-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           {/* 左侧：新增记录按钮 */}
@@ -329,8 +338,13 @@ function Transactions() {
             + 新增记录
           </button>
 
-          {/* 右侧：占位，保持布局平衡 */}
-          <div></div>
+          {/* 右侧：导出当前筛选结果按钮 */}
+          <button
+            onClick={handleExport}
+            className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium"
+          >
+            导出 CSV
+          </button>
         </div>
       </div>
 
