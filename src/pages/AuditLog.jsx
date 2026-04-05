@@ -5,9 +5,9 @@ import {
   generateAuditSummary,
   getDisplayOperator,
   getActionConfig,
-  actionTypeMap,
-  filterLogsByTimeRange
+  actionTypeMap
 } from '../utils/auditLogHelpers';
+import { filterAuditLogs, hasActiveFilters } from '../utils/auditLogFilterHelpers';
 
 function AuditLog() {
   // 审计日志数据状态
@@ -16,9 +16,16 @@ function AuditLog() {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedActionType, setSelectedActionType] = useState('');
   const [selectedTimeRange, setSelectedTimeRange] = useState('all');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [operatorSearch, setOperatorSearch] = useState('');
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  // 处理日期范围变化
+  const handleDateChange = (field, value) => {
+    setDateRange((prev) => ({ ...prev, [field]: value }));
+  };
 
   // 加载审计日志数据
   useEffect(() => {
@@ -28,31 +35,20 @@ function AuditLog() {
 
   // 筛选后的日志
   const filteredLogs = useMemo(() => {
-    let filtered = [...auditLogs];
-
-    // 1. 按时间范围筛选
-    filtered = filterLogsByTimeRange(filtered, selectedTimeRange);
-
-    // 2. 按操作类型筛选
-    if (selectedActionType) {
-      filtered = filtered.filter(log => log.actionType === selectedActionType);
-    }
-
-    // 3. 按产品名称关键词搜索（仅匹配 productName 字段）
-    if (searchKeyword.trim()) {
-      const keyword = searchKeyword.trim().toLowerCase();
-      filtered = filtered.filter(log =>
-        log.productName && log.productName.toLowerCase().includes(keyword)
-      );
-    }
-
-    return filtered;
-  }, [auditLogs, searchKeyword, selectedActionType, selectedTimeRange]);
+    return filterAuditLogs(
+      auditLogs,
+      selectedTimeRange,
+      dateRange,
+      selectedActionType,
+      searchKeyword,
+      operatorSearch
+    );
+  }, [auditLogs, selectedTimeRange, dateRange, selectedActionType, searchKeyword, operatorSearch]);
 
   // 当筛选条件变化时重置分页
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchKeyword, selectedActionType, selectedTimeRange]);
+  }, [searchKeyword, selectedActionType, selectedTimeRange, dateRange, operatorSearch]);
 
   // 分页计算
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -72,86 +68,137 @@ function AuditLog() {
 
       {/* 筛选工具栏 */}
       <div className="mb-6 bg-white border border-slate-200 rounded-lg p-3">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* 产品名称搜索框 */}
-          <div className="flex-1 min-w-[200px]">
-            <label htmlFor="product-search" className="block text-sm font-medium text-slate-700 mb-1">
-              产品名称
-            </label>
-            <input
-              id="product-search"
-              type="text"
-              placeholder="输入产品名称关键词..."
-              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              value={searchKeyword}
-              onChange={(e) => setSearchKeyword(e.target.value)}
-            />
-          </div>
-
-          {/* 操作类型筛选下拉框 */}
-          <div className="min-w-[180px]">
-            <label htmlFor="action-type-filter" className="block text-sm font-medium text-slate-700 mb-1">
-              操作类型
-            </label>
-            <select
-              id="action-type-filter"
-              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              value={selectedActionType}
-              onChange={(e) => setSelectedActionType(e.target.value)}
-            >
-              <option value="">全部操作</option>
-              {Object.entries(actionTypeMap).map(([key, config]) => (
-                <option key={key} value={key}>
-                  {config.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* 时间范围筛选 */}
-          <div className="min-w-[200px]">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              时间范围
-            </label>
-            <div className="flex flex-wrap gap-1">
-              {[
-                { value: 'all', label: '全部' },
-                { value: 'today', label: '今日' },
-                { value: 'week', label: '近7天' },
-                { value: 'month', label: '近30天' }
-              ].map((range) => (
-                <button
-                  key={range.value}
-                  type="button"
-                  className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-                    selectedTimeRange === range.value
-                      ? 'bg-slate-700 text-white'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                  onClick={() => setSelectedTimeRange(range.value)}
-                >
-                  {range.label}
-                </button>
-              ))}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 产品名称搜索框 */}
+            <div>
+              <label htmlFor="product-search" className="block text-sm font-medium text-slate-700 mb-1.5">
+                产品名称
+              </label>
+              <input
+                id="product-search"
+                type="text"
+                placeholder="输入产品名称关键词..."
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+              />
             </div>
-          </div>
 
-          {/* 清空筛选按钮（仅在存在筛选条件时显示） */}
-          {(searchKeyword || selectedActionType || selectedTimeRange !== 'all') && (
-            <div className="self-end">
-              <button
-                type="button"
-                className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
-                onClick={() => {
-                  setSearchKeyword('');
-                  setSelectedActionType('');
-                  setSelectedTimeRange('all');
-                }}
+            {/* 操作类型筛选下拉框 */}
+            <div>
+              <label htmlFor="action-type-filter" className="block text-sm font-medium text-slate-700 mb-1.5">
+                操作类型
+              </label>
+              <select
+                id="action-type-filter"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+                value={selectedActionType}
+                onChange={(e) => setSelectedActionType(e.target.value)}
               >
-                清空筛选
-              </button>
+                <option value="">全部操作</option>
+                {Object.entries(actionTypeMap).map(([key, config]) => (
+                  <option key={key} value={key}>
+                    {config.label}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
+
+            {/* 操作人搜索框 */}
+            <div>
+              <label htmlFor="operator-search" className="block text-sm font-medium text-slate-700 mb-1.5">
+                操作人
+              </label>
+              <input
+                id="operator-search"
+                type="text"
+                placeholder="输入操作人关键词..."
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                value={operatorSearch}
+                onChange={(e) => setOperatorSearch(e.target.value)}
+              />
+            </div>
+
+            {/* 清空筛选按钮（仅在存在筛选条件时显示） */}
+            <div className="flex items-end">
+              {hasActiveFilters({ searchKeyword, selectedActionType, selectedTimeRange, dateRange, operatorSearch }) && (
+                <button
+                  type="button"
+                  className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 w-full"
+                  onClick={() => {
+                    setSearchKeyword('');
+                    setSelectedActionType('');
+                    setSelectedTimeRange('all');
+                    setDateRange({ start: '', end: '' });
+                    setOperatorSearch('');
+                  }}
+                >
+                  清空筛选
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 第二行：快捷时间范围 + 自定义日期范围 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 快捷时间范围筛选 */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                快捷时间范围
+              </label>
+              <div className="flex flex-wrap gap-1">
+                {[
+                  { value: 'all', label: '全部' },
+                  { value: 'today', label: '今日' },
+                  { value: 'week', label: '近7天' },
+                  { value: 'month', label: '近30天' }
+                ].map((range) => (
+                  <button
+                    key={range.value}
+                    type="button"
+                    className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                      selectedTimeRange === range.value
+                        ? 'bg-slate-700 text-white'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                    onClick={() => setSelectedTimeRange(range.value)}
+                  >
+                    {range.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 自定义开始日期 */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                开始日期
+              </label>
+              <input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => handleDateChange('start', e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* 自定义结束日期 */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                结束日期
+              </label>
+              <input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => handleDateChange('end', e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* 占位列，保持布局平衡 */}
+            <div></div>
+          </div>
         </div>
       </div>
 
@@ -182,16 +229,21 @@ function AuditLog() {
               </div>
               <div className="text-sm text-slate-600 max-w-md mx-auto space-y-1">
                 <p>• 调整产品名称关键词</p>
+                <p>• 调整操作人关键词</p>
                 <p>• 选择不同的操作类型</p>
+                <p>• 调整快捷时间范围或自定义日期</p>
                 <p>• 清空筛选条件以查看全部记录</p>
               </div>
-              {(searchKeyword || selectedActionType) && (
+              {hasActiveFilters({ searchKeyword, selectedActionType, selectedTimeRange, dateRange, operatorSearch }) && (
                 <button
                   type="button"
                   className="mt-6 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
                   onClick={() => {
                     setSearchKeyword('');
                     setSelectedActionType('');
+                    setSelectedTimeRange('all');
+                    setDateRange({ start: '', end: '' });
+                    setOperatorSearch('');
                   }}
                 >
                   清空筛选
