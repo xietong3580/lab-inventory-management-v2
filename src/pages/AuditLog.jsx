@@ -98,7 +98,12 @@ function AuditLog() {
         <div className="flex flex-col md:flex-row md:items-center justify-end gap-4">
           <button
             onClick={handleExport}
-            className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium"
+            disabled={filteredLogs.length === 0}
+            className={`px-4 py-2 border rounded-md transition-colors font-medium ${
+              filteredLogs.length === 0
+                ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+            }`}
           >
             导出 CSV
           </button>

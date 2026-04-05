@@ -114,7 +114,7 @@ function Products() {
 
   const handleExport = () => {
     if (filteredProducts.length === 0) {
-      alert('没有可导出的产品数据，请先调整筛选条件或等待数据加载。');
+      alert('没有可导出的数据，请先调整筛选条件或等待数据加载。');
       return;
     }
     exportProductsToCSV(filteredProducts, 'products-export');
@@ -277,7 +277,7 @@ function Products() {
 
       {/* 操作栏：新增按钮与筛选区域 */}
       <div className="bg-white border border-slate-200 rounded-lg p-4 mb-6">
-        {/* 第一行：新增按钮 + 搜索/分类/操作按钮 */}
+        {/* 第一行：新增按钮 + 导出按钮 */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           {/* 左侧：新增产品按钮 */}
           <button
@@ -287,63 +287,65 @@ function Products() {
             + 新增产品
           </button>
 
-          {/* 右侧：搜索与筛选 */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            {/* 搜索框 */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="搜索产品名称或 SKU..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full sm:w-64 px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
-              />
-            </div>
+          {/* 右侧：导出按钮 */}
+          <button
+            onClick={handleExport}
+            disabled={filteredProducts.length === 0}
+            className={`px-4 py-2 border rounded-md transition-colors font-medium ${
+              filteredProducts.length === 0
+                ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            导出 CSV
+          </button>
+        </div>
 
-            {/* 分类筛选 */}
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+        {/* 第二行：搜索与筛选 */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          {/* 搜索框 */}
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="搜索产品名称或 SKU..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full sm:w-64 px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+            />
+          </div>
+
+          {/* 分类筛选 */}
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+          >
+            <option value="all">全部分类</option>
+            <option value="耗材">耗材</option>
+            <option value="试剂">试剂</option>
+            <option value="设备">设备</option>
+          </select>
+
+          {/* 操作按钮 */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              onClick={handleSearch}
+              className="px-3 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors text-sm font-medium w-full sm:w-auto"
             >
-              <option value="all">全部分类</option>
-              <option value="耗材">耗材</option>
-              <option value="试剂">试剂</option>
-              <option value="设备">设备</option>
-            </select>
-
-            {/* 操作按钮 */}
-            <div className="flex flex-col sm:flex-row gap-2">
+              搜索
+            </button>
+            {activeFilters && (
               <button
-                onClick={handleSearch}
-                className="px-3 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors text-sm font-medium w-full sm:w-auto"
+                onClick={handleReset}
+                className="px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 transition-colors w-full sm:w-auto"
               >
-                搜索
+                清空筛选
               </button>
-              {activeFilters && (
-                <button
-                  onClick={handleReset}
-                  className="px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 transition-colors w-full sm:w-auto"
-                >
-                  清空筛选
-                </button>
-              )}
-              <button
-                onClick={handleExport}
-                disabled={filteredProducts.length === 0}
-                className={`px-3 py-2 text-sm font-medium rounded-md transition-colors w-full sm:w-auto ${
-                  filteredProducts.length === 0
-                    ? 'border border-slate-200 text-slate-400 cursor-not-allowed'
-                    : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
-                }`}
-              >
-                导出 CSV
-              </button>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* 第二行：高级筛选 */}
+        {/* 第三行：高级筛选 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
           {/* 库存状态筛选 */}
           <div>
