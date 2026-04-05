@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getTransactions, addTransaction, getAllProducts, reverseTransaction } from '../services/productService';
 
 // 类型标签组件
@@ -10,7 +10,7 @@ function TypeBadge({ type }) {
   const { text, bg, textColor } = config[type] || config.入库;
 
   return (
-    <span className={`px-2 py-1 rounded text-xs font-medium ${bg} ${textColor}`}>
+    <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${bg} ${textColor}`}>
       {text}
     </span>
   );
@@ -29,7 +29,7 @@ function StatusBadge({ status }) {
   const { text, bg, textColor } = config[normalizedStatus] || config.pending;
 
   return (
-    <span className={`px-2 py-1 rounded text-xs font-medium ${bg} ${textColor}`}>
+    <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${bg} ${textColor}`}>
       {text}
     </span>
   );
@@ -38,6 +38,7 @@ function StatusBadge({ status }) {
 function Transactions() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('all');
+  const [selectedTimeRange, setSelectedTimeRange] = useState('all');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -68,21 +69,105 @@ function Transactions() {
     setProducts(getAllProducts());
   }, []);
 
+  // 筛选交易记录
+  const filteredRecords = useMemo(() => {
+    let filtered = [...transactionRecords];
+
+    // 1. 按时间范围筛选
+    if (selectedTimeRange !== 'all') {
+      const now = new Date();
+      let startDate = new Date();
+
+      switch (selectedTimeRange) {
+        case 'today':
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case 'week':
+          startDate.setDate(now.getDate() - 7);
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case 'month':
+          startDate.setDate(now.getDate() - 30);
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        default:
+          break;
+      }
+
+      filtered = filtered.filter(record => {
+        if (!record.date) return false;
+        try {
+          const recordDate = new Date(record.date);
+          return recordDate >= startDate;
+        } catch {
+          return false;
+        }
+      });
+    }
+
+    // 2. 按类型筛选
+    if (selectedType !== 'all') {
+      filtered = filtered.filter(record => record.type === selectedType);
+    }
+
+    // 3. 按关键字搜索
+    if (searchTerm.trim()) {
+      const keyword = searchTerm.trim().toLowerCase();
+      filtered = filtered.filter(record =>
+        record.productName.toLowerCase().includes(keyword) ||
+        record.operator.toLowerCase().includes(keyword) ||
+        (record.notes && record.notes.toLowerCase().includes(keyword))
+      );
+    }
+
+    // 4. 按日期范围筛选（如果提供了具体日期）
+    if (dateRange.start) {
+      const start = new Date(dateRange.start);
+      start.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(record => {
+        if (!record.date) return false;
+        try {
+          const recordDate = new Date(record.date);
+          return recordDate >= start;
+        } catch {
+          return false;
+        }
+      });
+    }
+
+    if (dateRange.end) {
+      const end = new Date(dateRange.end);
+      end.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(record => {
+        if (!record.date) return false;
+        try {
+          const recordDate = new Date(record.date);
+          return recordDate <= end;
+        } catch {
+          return false;
+        }
+      });
+    }
+
+    return filtered;
+  }, [transactionRecords, selectedTimeRange, selectedType, searchTerm, dateRange]);
+
+  // 当筛选条件变化时重置分页
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedTimeRange, selectedType, searchTerm, dateRange]);
+
   // 分页计算
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const displayedRecords = transactionRecords.slice(startIndex, endIndex);
-  const totalPages = Math.ceil(transactionRecords.length / itemsPerPage);
+  const displayedRecords = filteredRecords.slice(startIndex, endIndex);
+  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    // 搜索逻辑占位
-    console.log('搜索:', searchTerm, '类型:', selectedType, '日期范围:', dateRange);
-  };
 
   const handleReset = () => {
     setSearchTerm('');
     setSelectedType('all');
+    setSelectedTimeRange('all');
     setDateRange({ start: '', end: '' });
     setCurrentPage(1);
   };
@@ -194,6 +279,21 @@ function Transactions() {
     }
   };
 
+  // 格式化交易时间（紧凑格式：MM-DD HH:MM）
+  const formatTransactionTime = (timestamp) => {
+    if (!timestamp) return '';
+    try {
+      // 格式: YYYY-MM-DD HH:MM
+      const month = timestamp.substring(5, 7);
+      const day = timestamp.substring(8, 10);
+      const hour = timestamp.substring(11, 13);
+      const minute = timestamp.substring(14, 16);
+      return `${month}-${day} ${hour}:${minute}`;
+    } catch {
+      return timestamp;
+    }
+  };
+
   // 获取产品选择选项
   const productOptions = products.map(product => ({
     value: product.id,
@@ -227,8 +327,8 @@ function Transactions() {
       </div>
 
       {/* 筛选区域 */}
-      <div className="bg-white border border-slate-200 rounded-lg p-4 mb-6">
-        <form onSubmit={handleSearch} className="space-y-4">
+      <div className="bg-white border border-slate-200 rounded-lg p-3 mb-6">
+        <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* 关键字搜索 */}
             <div>
@@ -240,7 +340,7 @@ function Transactions() {
                 placeholder="产品名称、操作人..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent text-sm"
               />
             </div>
 
@@ -252,7 +352,7 @@ function Transactions() {
               <select
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
-                className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white text-sm"
               >
                 {typeOptions.map((option) => (
                   <option key={option} value={option}>
@@ -262,214 +362,334 @@ function Transactions() {
               </select>
             </div>
 
-            {/* 开始日期 */}
+            {/* 时间范围筛选 */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                开始日期
+                时间范围
               </label>
-              <input
-                type="date"
-                value={dateRange.start}
-                onChange={(e) => handleDateChange('start', e.target.value)}
-                className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
-              />
+              <div className="flex flex-wrap gap-1">
+                {[
+                  { value: 'all', label: '全部' },
+                  { value: 'today', label: '今日' },
+                  { value: 'week', label: '近7天' },
+                  { value: 'month', label: '近30天' }
+                ].map((range) => (
+                  <button
+                    key={range.value}
+                    type="button"
+                    className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                      selectedTimeRange === range.value
+                        ? 'bg-slate-700 text-white'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                    onClick={() => setSelectedTimeRange(range.value)}
+                  >
+                    {range.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* 结束日期 */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                结束日期
-              </label>
-              <input
-                type="date"
-                value={dateRange.end}
-                onChange={(e) => handleDateChange('end', e.target.value)}
-                className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          {/* 操作按钮 */}
-          <div className="flex flex-col sm:flex-row justify-end gap-3">
-            <button
-              type="button"
-              onClick={handleReset}
-              className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium w-full sm:w-auto"
-            >
-              重置筛选
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium w-full sm:w-auto"
-            >
-              搜索记录
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* 记录表格 */}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        {/* 表格头部 */}
-        <div className="overflow-x-auto">
-          <table className="min-w-[1000px] md:min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  日期时间
-                </th>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  产品名称
-                </th>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  类型
-                </th>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  数量
-                </th>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  操作人
-                </th>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  状态
-                </th>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  备注
-                </th>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {displayedRecords.map((record) => (
-                <tr key={record.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-slate-800">{record.date}</div>
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4">
-                    <div className="text-sm font-medium text-slate-800">{record.productName}</div>
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                    <TypeBadge type={record.type} />
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-slate-800">
-                      {record.quantity} {record.unit}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                    <div className="text-sm text-slate-700">{record.operator}</div>
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                    <StatusBadge status={record.status} />
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4">
-                    <div className="text-sm text-slate-700 max-w-xs truncate" title={record.notes}>
-                      {record.notes || '-'}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <button className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors">
-                        详情
-                      </button>
-                      {record.status === 'completed' ? (
-                        <button
-                          onClick={() => handleReverseClick(record.id)}
-                          className="px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors"
-                          title="撤销此交易记录并回滚库存"
-                        >
-                          撤销
-                        </button>
-                      ) : record.status === 'reversed' ? (
-                        <button
-                          className="px-3 py-1.5 text-sm bg-slate-100 text-slate-400 rounded cursor-not-allowed"
-                          title="此记录已撤销"
-                          disabled
-                        >
-                          已撤销
-                        </button>
-                      ) : (
-                        <button
-                          className="px-3 py-1.5 text-sm bg-slate-100 text-slate-400 rounded cursor-not-allowed"
-                          title="只能撤销已完成状态的记录"
-                          disabled
-                        >
-                          撤销
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* 分页控制 */}
-        <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex flex-col md:flex-row items-center md:items-center justify-center md:justify-between gap-4 md:gap-0">
-          <div className="w-full md:w-auto text-sm text-slate-600 text-center md:text-left">
-            显示第 {startIndex + 1} - {Math.min(endIndex, transactionRecords.length)} 条，共 {transactionRecords.length} 条记录
-          </div>
-          <div className="w-full md:w-auto flex justify-center flex-wrap items-center gap-2 whitespace-nowrap">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className={`px-3 py-1.5 rounded border text-sm ${
-                currentPage === 1
-                  ? 'border-slate-200 text-slate-400 cursor-not-allowed'
-                  : 'border-slate-300 text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              上一页
-            </button>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const pageNum = i + 1;
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`px-3 py-1.5 rounded border text-sm ${
-                      currentPage === pageNum
-                        ? 'bg-slate-700 text-white'
-                        : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-              {totalPages > 5 && (
-                <>
-                  <span className="text-slate-400">...</span>
-                  <button
-                    onClick={() => setCurrentPage(totalPages)}
-                    className={`px-3 py-1.5 rounded border text-sm ${
-                      currentPage === totalPages
-                        ? 'bg-slate-700 text-white'
-                        : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    {totalPages}
-                  </button>
-                </>
+            {/* 清空筛选按钮（仅在存在筛选条件时显示） */}
+            <div className="flex items-end">
+              {(searchTerm || selectedType !== 'all' || selectedTimeRange !== 'all') && (
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 w-full"
+                >
+                  清空筛选
+                </button>
               )}
             </div>
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className={`px-3 py-1.5 rounded border text-sm ${
-                currentPage === totalPages
-                  ? 'border-slate-200 text-slate-400 cursor-not-allowed'
-                  : 'border-slate-300 text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              下一页
-            </button>
           </div>
         </div>
+      </div>
+
+      {/* 记录表格和卡片 */}
+      <div className="bg-white border border-slate-200 rounded-lg">
+        {transactionRecords.length === 0 ? (
+          // 系统暂无记录
+          <div className="py-12 text-center">
+            <div className="text-slate-500 mb-2">暂无出入库记录</div>
+            <div className="text-sm text-slate-500 max-w-md mx-auto">
+              点击"新增记录"按钮添加第一条出入库记录。
+            </div>
+          </div>
+        ) : filteredRecords.length === 0 ? (
+          // 筛选无结果
+          <div className="py-12 text-center">
+            <div className="text-slate-500 mb-2">未找到匹配的记录</div>
+            <div className="text-sm text-slate-500 max-w-md mx-auto mb-4">
+              当前筛选条件下未找到匹配的出入库记录。请尝试：
+            </div>
+            <div className="text-sm text-slate-600 max-w-md mx-auto space-y-1">
+              <p>• 调整搜索关键词</p>
+              <p>• 选择不同的记录类型</p>
+              <p>• 调整时间范围筛选条件</p>
+              <p>• 清空筛选条件以查看全部记录</p>
+            </div>
+            {(searchTerm || selectedType !== 'all' || selectedTimeRange !== 'all') && (
+              <button
+                type="button"
+                className="mt-6 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
+                onClick={handleReset}
+              >
+                清空筛选
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* 桌面端表格视图 (md及以上) */}
+            <div className="hidden md:block">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap w-24">
+                        时间
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                        产品
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap w-20">
+                        类型
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap w-24">
+                        数量
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap w-28">
+                        操作人
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap w-24">
+                        状态
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                        备注
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap w-32">
+                        操作
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {displayedRecords.map((record) => (
+                      <tr key={record.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-3 py-2 whitespace-nowrap w-24">
+                          <div className="text-sm font-medium text-slate-800" title={record.date}>
+                            {formatTransactionTime(record.date)}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="text-sm font-medium text-slate-800">{record.productName}</div>
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap w-20">
+                          <TypeBadge type={record.type} />
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap w-24">
+                          <div className="text-sm font-medium text-slate-800">
+                            {record.quantity} {record.unit}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap w-28">
+                          <div className="text-sm text-slate-700">{record.operator}</div>
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap w-24">
+                          <StatusBadge status={record.status} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="text-sm text-slate-700 max-w-xs truncate" title={record.notes}>
+                            {record.notes || '-'}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap w-32">
+                          <div className="flex items-center gap-2">
+                            <button className="px-2 py-1 text-xs bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors">
+                              详情
+                            </button>
+                            {record.status === 'completed' ? (
+                              <button
+                                onClick={() => handleReverseClick(record.id)}
+                                className="px-2 py-1 text-xs bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors"
+                                title="撤销此交易记录并回滚库存"
+                              >
+                                撤销
+                              </button>
+                            ) : record.status === 'reversed' ? (
+                              <button
+                                className="px-2 py-1 text-xs bg-slate-100 text-slate-400 rounded cursor-not-allowed"
+                                title="此记录已撤销"
+                                disabled
+                              >
+                                已撤销
+                              </button>
+                            ) : (
+                              <button
+                                className="px-2 py-1 text-xs bg-slate-100 text-slate-400 rounded cursor-not-allowed"
+                                title="只能撤销已完成状态的记录"
+                                disabled
+                              >
+                                撤销
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 移动端卡片视图 (md以下) */}
+            <div className="block md:hidden space-y-3 p-4">
+              {displayedRecords.map((record) => (
+                <div
+                  key={record.id}
+                  className="bg-white border border-slate-200 rounded-lg p-3 hover:bg-slate-50 transition-colors"
+                >
+                  {/* 卡片顶部：时间和类型 */}
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="text-sm font-medium text-slate-800" title={record.date}>
+                      {formatTransactionTime(record.date)}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <TypeBadge type={record.type} />
+                      <StatusBadge status={record.status} />
+                    </div>
+                  </div>
+
+                  {/* 卡片内容：产品、数量、操作人 */}
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <div className="text-sm font-medium text-slate-700 w-16">产品：</div>
+                      <div className="text-sm text-slate-800 flex-1 truncate">
+                        {record.productName}
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="text-sm font-medium text-slate-700 w-16">数量：</div>
+                      <div className="text-sm text-slate-800 flex-1">
+                        {record.quantity} {record.unit}
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="text-sm font-medium text-slate-700 w-16">操作人：</div>
+                      <div className="text-sm text-slate-800 flex-1">
+                        {record.operator}
+                      </div>
+                    </div>
+                    {record.notes && (
+                      <div className="flex items-start">
+                        <div className="text-sm font-medium text-slate-700 w-16">备注：</div>
+                        <div className="text-sm text-slate-600 flex-1">
+                          {record.notes}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 卡片底部：操作按钮 */}
+                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
+                    <button className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors flex-1">
+                      详情
+                    </button>
+                    {record.status === 'completed' ? (
+                      <button
+                        onClick={() => handleReverseClick(record.id)}
+                        className="px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors flex-1"
+                        title="撤销此交易记录并回滚库存"
+                      >
+                        撤销
+                      </button>
+                    ) : record.status === 'reversed' ? (
+                      <button
+                        className="px-3 py-1.5 text-sm bg-slate-100 text-slate-400 rounded cursor-not-allowed flex-1"
+                        title="此记录已撤销"
+                        disabled
+                      >
+                        已撤销
+                      </button>
+                    ) : (
+                      <button
+                        className="px-3 py-1.5 text-sm bg-slate-100 text-slate-400 rounded cursor-not-allowed flex-1"
+                        title="只能撤销已完成状态的记录"
+                        disabled
+                      >
+                        撤销
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 分页控制 */}
+            <div className="px-3 py-2 md:px-6 md:py-4 border-t border-slate-200 flex flex-col md:flex-row items-center md:items-center justify-center md:justify-between gap-4 md:gap-0">
+              <div className="w-full md:w-auto text-sm text-slate-600 text-center md:text-left">
+                显示第 {startIndex + 1} - {Math.min(endIndex, filteredRecords.length)} 条，共 {filteredRecords.length} 条记录
+              </div>
+              <div className="w-full md:w-auto flex justify-center flex-wrap items-center gap-2 whitespace-nowrap">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className={`px-3 py-1.5 rounded border text-sm ${
+                    currentPage === 1
+                      ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  上一页
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    const pageNum = i + 1;
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-3 py-1.5 rounded border text-sm ${
+                          currentPage === pageNum
+                            ? 'bg-slate-700 text-white'
+                            : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  {totalPages > 5 && (
+                    <>
+                      <span className="text-slate-400">...</span>
+                      <button
+                        onClick={() => setCurrentPage(totalPages)}
+                        className={`px-3 py-1.5 rounded border text-sm ${
+                          currentPage === totalPages
+                            ? 'bg-slate-700 text-white'
+                            : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {totalPages}
+                      </button>
+                    </>
+                  )}
+                </div>
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`px-3 py-1.5 rounded border text-sm ${
+                    currentPage === totalPages
+                      ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  下一页
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* 底部提示 */}
@@ -483,7 +703,7 @@ function Transactions() {
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-200">
+            <div className="px-3 py-2 md:px-6 md:py-4 border-b border-slate-200">
               <h2 className="text-xl font-semibold text-slate-800">
                 新增出入库记录
               </h2>
@@ -583,7 +803,7 @@ function Transactions() {
               </div>
 
               {/* 模态框底部按钮 */}
-              <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex justify-end gap-3">
+              <div className="px-3 py-2 md:px-6 md:py-4 border-t border-slate-200 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={handleCloseModal}
@@ -607,7 +827,7 @@ function Transactions() {
       {reversingTransactionId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
-            <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-200">
+            <div className="px-3 py-2 md:px-6 md:py-4 border-b border-slate-200">
               <h2 className="text-xl font-semibold text-slate-800">
                 确认撤销交易记录
               </h2>
