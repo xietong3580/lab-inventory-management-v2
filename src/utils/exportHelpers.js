@@ -157,6 +157,72 @@ export const exportAuditLogsToCSV = (records, fileName = 'audit-log-export') => 
 };
 
 /**
+ * 将产品列表导出为 CSV 格式
+ * @param {Array} products - 产品数组
+ * @param {string} fileName - 导出的文件名（不含扩展名）
+ */
+export const exportProductsToCSV = (products, fileName = 'products-export') => {
+  if (!products || products.length === 0) {
+    alert('没有可导出的产品数据，请先筛选或等待数据加载。');
+    return;
+  }
+
+  // 构建 CSV 标题行
+  const headers = [
+    '产品名称',
+    'SKU',
+    '分类',
+    '当前库存',
+    '最低库存',
+    '状态',
+    '单位',
+    '存储位置',
+    '最后更新'
+  ];
+
+  // 构建数据行
+  const rows = products.map(product => [
+    escapeCSV(product.name || ''),
+    escapeCSV(product.sku || ''),
+    escapeCSV(product.category || ''),
+    escapeCSV(product.currentStock || 0),
+    escapeCSV(product.minStock || 0),
+    escapeCSV(product.status === '低库存' ? '低库存' : '正常'),
+    escapeCSV(product.unit || ''),
+    escapeCSV(product.location || ''),
+    escapeCSV(product.lastUpdated || '')
+  ]);
+
+  // 将标题和数据合并为完整的 CSV 内容
+  const csvContent = [
+    headers.join(','),
+    ...rows.map(row => row.join(','))
+  ].join('\n');
+
+  // 创建 Blob 对象
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8' });
+
+  // 生成文件名（包含当前日期时间）
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const timeStr = `${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
+  const fullFileName = `${fileName}-${dateStr}-${timeStr}.csv`;
+
+  // 创建下载链接
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = fullFileName;
+
+  // 触发下载
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  // 清理 URL 对象
+  URL.revokeObjectURL(link.href);
+};
+
+/**
  * 获取当前日期时间字符串（用于文件名）
  * @returns {string} 格式化日期时间字符串
  */

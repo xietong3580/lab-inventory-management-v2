@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getProductsWithCalculatedStatus, calculateProductStatus, updateProduct, addProduct, deleteProduct, getProductInventoryLedger } from '../services/productService';
 import { getLedgerTypeConfig, formatLedgerTime } from '../utils/inventoryHistoryHelpers';
 import { filterProducts, hasActiveFilters } from '../utils/productFilterHelpers';
+import { exportProductsToCSV } from '../utils/exportHelpers';
 
 // 状态标签组件
 function StatusBadge({ status }) {
@@ -109,6 +110,14 @@ function Products() {
     setMinStock('');
     setMaxStock('');
     setCurrentPage(1);
+  };
+
+  const handleExport = () => {
+    if (filteredProducts.length === 0) {
+      alert('没有可导出的产品数据，请先调整筛选条件或等待数据加载。');
+      return;
+    }
+    exportProductsToCSV(filteredProducts, 'products-export');
   };
 
   // 打开模态框（新增或编辑）
@@ -319,6 +328,17 @@ function Products() {
                   清空筛选
                 </button>
               )}
+              <button
+                onClick={handleExport}
+                disabled={filteredProducts.length === 0}
+                className={`px-3 py-2 text-sm font-medium rounded-md transition-colors w-full sm:w-auto ${
+                  filteredProducts.length === 0
+                    ? 'border border-slate-200 text-slate-400 cursor-not-allowed'
+                    : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                导出 CSV
+              </button>
             </div>
           </div>
         </div>
