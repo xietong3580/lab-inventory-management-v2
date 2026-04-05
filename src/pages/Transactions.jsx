@@ -39,6 +39,7 @@ function Transactions() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('all');
   const [selectedTimeRange, setSelectedTimeRange] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -62,6 +63,7 @@ function Transactions() {
 
   // 筛选选项
   const typeOptions = ['all', '入库', '出库'];
+  const statusOptions = ['all', 'completed', 'reversed', 'pending'];
 
   // 初始化数据
   useEffect(() => {
@@ -73,7 +75,7 @@ function Transactions() {
   const filteredRecords = useMemo(() => {
     let filtered = [...transactionRecords];
 
-    // 1. 按时间范围筛选
+    // 1. 按时间范围筛选（快捷时间范围）
     if (selectedTimeRange !== 'all') {
       const now = new Date();
       let startDate = new Date();
@@ -105,22 +107,7 @@ function Transactions() {
       });
     }
 
-    // 2. 按类型筛选
-    if (selectedType !== 'all') {
-      filtered = filtered.filter(record => record.type === selectedType);
-    }
-
-    // 3. 按关键字搜索
-    if (searchTerm.trim()) {
-      const keyword = searchTerm.trim().toLowerCase();
-      filtered = filtered.filter(record =>
-        record.productName.toLowerCase().includes(keyword) ||
-        record.operator.toLowerCase().includes(keyword) ||
-        (record.notes && record.notes.toLowerCase().includes(keyword))
-      );
-    }
-
-    // 4. 按日期范围筛选（如果提供了具体日期）
+    // 2. 按自定义日期范围筛选（可与快捷时间范围叠加）
     if (dateRange.start) {
       const start = new Date(dateRange.start);
       start.setHours(0, 0, 0, 0);
@@ -149,13 +136,33 @@ function Transactions() {
       });
     }
 
+    // 3. 按类型筛选
+    if (selectedType !== 'all') {
+      filtered = filtered.filter(record => record.type === selectedType);
+    }
+
+    // 4. 按状态筛选
+    if (selectedStatus !== 'all') {
+      filtered = filtered.filter(record => record.status === selectedStatus);
+    }
+
+    // 5. 按关键字搜索
+    if (searchTerm.trim()) {
+      const keyword = searchTerm.trim().toLowerCase();
+      filtered = filtered.filter(record =>
+        record.productName.toLowerCase().includes(keyword) ||
+        record.operator.toLowerCase().includes(keyword) ||
+        (record.notes && record.notes.toLowerCase().includes(keyword))
+      );
+    }
+
     return filtered;
-  }, [transactionRecords, selectedTimeRange, selectedType, searchTerm, dateRange]);
+  }, [transactionRecords, selectedTimeRange, dateRange, selectedType, selectedStatus, searchTerm]);
 
   // 当筛选条件变化时重置分页
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedTimeRange, selectedType, searchTerm, dateRange]);
+  }, [selectedTimeRange, selectedType, selectedStatus, searchTerm, dateRange]);
 
   // 分页计算
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -168,6 +175,7 @@ function Transactions() {
     setSearchTerm('');
     setSelectedType('all');
     setSelectedTimeRange('all');
+    setSelectedStatus('all');
     setDateRange({ start: '', end: '' });
     setCurrentPage(1);
   };
@@ -362,10 +370,46 @@ function Transactions() {
               </select>
             </div>
 
-            {/* 时间范围筛选 */}
+            {/* 状态筛选 */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                时间范围
+                记录状态
+              </label>
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white text-sm"
+              >
+                {statusOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option === 'all' ? '全部状态' :
+                     option === 'completed' ? '已完成' :
+                     option === 'reversed' ? '已撤销' : '处理中'}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 清空筛选按钮（仅在存在筛选条件时显示） */}
+            <div className="flex items-end">
+              {(searchTerm || selectedType !== 'all' || selectedStatus !== 'all' || selectedTimeRange !== 'all' || dateRange.start || dateRange.end) && (
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 w-full"
+                >
+                  清空筛选
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 第二行：时间范围快捷筛选 + 自定义日期范围 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 时间范围快捷筛选 */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                快捷时间范围
               </label>
               <div className="flex flex-wrap gap-1">
                 {[
@@ -390,18 +434,34 @@ function Transactions() {
               </div>
             </div>
 
-            {/* 清空筛选按钮（仅在存在筛选条件时显示） */}
-            <div className="flex items-end">
-              {(searchTerm || selectedType !== 'all' || selectedTimeRange !== 'all') && (
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 w-full"
-                >
-                  清空筛选
-                </button>
-              )}
+            {/* 自定义开始日期 */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                开始日期
+              </label>
+              <input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => handleDateChange('start', e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent text-sm"
+              />
             </div>
+
+            {/* 自定义结束日期 */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                结束日期
+              </label>
+              <input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => handleDateChange('end', e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent text-sm"
+              />
+            </div>
+
+            {/* 占位列，保持布局平衡 */}
+            <div></div>
           </div>
         </div>
       </div>
@@ -426,10 +486,11 @@ function Transactions() {
             <div className="text-sm text-slate-600 max-w-md mx-auto space-y-1">
               <p>• 调整搜索关键词</p>
               <p>• 选择不同的记录类型</p>
-              <p>• 调整时间范围筛选条件</p>
+              <p>• 调整记录状态筛选</p>
+              <p>• 调整时间范围或自定义日期</p>
               <p>• 清空筛选条件以查看全部记录</p>
             </div>
-            {(searchTerm || selectedType !== 'all' || selectedTimeRange !== 'all') && (
+            {(searchTerm || selectedType !== 'all' || selectedStatus !== 'all' || selectedTimeRange !== 'all' || dateRange.start || dateRange.end) && (
               <button
                 type="button"
                 className="mt-6 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
