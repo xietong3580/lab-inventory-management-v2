@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getProductsWithCalculatedStatus, filterProducts, calculateProductStatus, updateProduct, addProduct, deleteProduct } from '../services/productService';
+import { getProductsWithCalculatedStatus, filterProducts, calculateProductStatus, updateProduct, addProduct, deleteProduct, getProductInventoryLedger } from '../services/productService';
+import { getLedgerTypeConfig, formatLedgerTime } from '../utils/inventoryHistoryHelpers';
 
 // 状态标签组件
 function StatusBadge({ status }) {
@@ -27,6 +28,12 @@ function Products() {
   // 模态框和表单相关状态
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null); // null 表示新增，非null表示编辑
+
+  // 台账弹窗相关状态
+  const [ledgerModalOpen, setLedgerModalOpen] = useState(false);
+  const [selectedProductForLedger, setSelectedProductForLedger] = useState(null);
+  const [ledgerData, setLedgerData] = useState([]);
+  const [isLoadingLedger, setIsLoadingLedger] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     sku: '',
@@ -193,6 +200,34 @@ function Products() {
     }
   };
 
+  // 打开台账弹窗
+  const handleOpenLedgerModal = (productId) => {
+    const product = allProducts.find(p => p.id === productId);
+    if (!product) return;
+
+    setSelectedProductForLedger(product);
+    setIsLoadingLedger(true);
+    setLedgerModalOpen(true);
+
+    try {
+      const ledger = getProductInventoryLedger(productId);
+      setLedgerData(ledger);
+    } catch (error) {
+      console.error('获取台账数据失败:', error);
+      setLedgerData([]);
+    } finally {
+      setIsLoadingLedger(false);
+    }
+  };
+
+  // 关闭台账弹窗
+  const handleCloseLedgerModal = () => {
+    setLedgerModalOpen(false);
+    setSelectedProductForLedger(null);
+    setLedgerData([]);
+    setIsLoadingLedger(false);
+  };
+
   return (
     <div className="p-6">
       {/* 页面标题区 */}
@@ -327,6 +362,12 @@ function Products() {
                         className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors"
                       >
                         编辑
+                      </button>
+                      <button
+                        onClick={() => handleOpenLedgerModal(product.id)}
+                        className="px-3 py-1.5 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors"
+                      >
+                        台账
                       </button>
                       <button
                         onClick={() => handleDeleteProduct(product.id)}
@@ -556,6 +597,186 @@ function Products() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 库存台账弹窗 */}
+      {ledgerModalOpen && selectedProductForLedger && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-200 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-800">
+                  库存台账 - {selectedProductForLedger.name}
+                </h2>
+                <p className="text-sm text-slate-600 mt-1">
+                  SKU: {selectedProductForLedger.sku} | 当前库存: {selectedProductForLedger.currentStock} {selectedProductForLedger.unit} | 最低库存: {selectedProductForLedger.minStock} {selectedProductForLedger.unit}
+                </p>
+              </div>
+              <button
+                onClick={handleCloseLedgerModal}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+
+            <div className="flex-grow overflow-auto p-4 md:p-6">
+              {isLoadingLedger ? (
+                <div className="flex justify-center items-center py-12">
+                  <div className="text-slate-500">加载台账数据中...</div>
+                </div>
+              ) : ledgerData.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-slate-400 mb-2">暂无库存变动记录</div>
+                  <div className="text-sm text-slate-500">该产品尚未有任何出入库或编辑操作</div>
+                </div>
+              ) : (
+                <>
+                  {/* 桌面端表格视图 */}
+                  <div className="hidden md:block">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-slate-200">
+                        <thead className="bg-slate-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                              时间
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                              类型
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                              变动数量
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                              变更前库存
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                              变更后库存
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                              操作人
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                              摘要说明
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200">
+                          {ledgerData.map((entry) => {
+                            const typeConfig = getLedgerTypeConfig(entry.type);
+                            return (
+                              <tr key={entry.id} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <div className="text-sm text-slate-700">{formatLedgerTime(entry.timestamp)}</div>
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <span className={`px-2 py-1 rounded text-xs font-medium border ${typeConfig.color}`}>
+                                    {typeConfig.label}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <div className={`text-sm font-medium ${entry.stockChange > 0 ? 'text-emerald-700' : entry.stockChange < 0 ? 'text-rose-700' : 'text-slate-700'}`}>
+                                    {entry.stockChange > 0 ? '+' : ''}{entry.stockChange} {entry.unit}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <div className="text-sm text-slate-700">
+                                    {entry.oldStock !== undefined ? `${entry.oldStock} ${entry.unit}` : '—'}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <div className="text-sm font-medium text-slate-800">
+                                    {entry.newStock !== undefined ? `${entry.newStock} ${entry.unit}` : '—'}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <div className="text-sm text-slate-700">{entry.operator || '系统'}</div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="text-sm text-slate-700 max-w-xs">{entry.notes || '-'}</div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* 移动端卡片视图 */}
+                  <div className="md:hidden space-y-3">
+                    {ledgerData.map((entry) => {
+                      const typeConfig = getLedgerTypeConfig(entry.type);
+                      return (
+                        <div key={entry.id} className="border border-slate-200 rounded-lg p-4 bg-white">
+                          <div className="flex justify-between items-start mb-3">
+                            <span className={`px-2 py-1 rounded text-xs font-medium border ${typeConfig.color}`}>
+                              {typeConfig.label}
+                            </span>
+                            <div className="text-sm text-slate-500">{formatLedgerTime(entry.timestamp)}</div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3 mb-3">
+                            <div>
+                              <div className="text-xs text-slate-500 mb-1">变动数量</div>
+                              <div className={`text-sm font-medium ${entry.stockChange > 0 ? 'text-emerald-700' : entry.stockChange < 0 ? 'text-rose-700' : 'text-slate-700'}`}>
+                                {entry.stockChange > 0 ? '+' : ''}{entry.stockChange} {entry.unit}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-slate-500 mb-1">操作人</div>
+                              <div className="text-sm text-slate-700">{entry.operator || '系统'}</div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3 mb-3">
+                            <div>
+                              <div className="text-xs text-slate-500 mb-1">变更前库存</div>
+                              <div className="text-sm text-slate-700">
+                                {entry.oldStock !== undefined ? `${entry.oldStock} ${entry.unit}` : '—'}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-slate-500 mb-1">变更后库存</div>
+                              <div className="text-sm font-medium text-slate-800">
+                                {entry.newStock !== undefined ? `${entry.newStock} ${entry.unit}` : '—'}
+                              </div>
+                            </div>
+                          </div>
+
+                          {entry.notes && (
+                            <div>
+                              <div className="text-xs text-slate-500 mb-1">摘要说明</div>
+                              <div className="text-sm text-slate-700">{entry.notes}</div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* 记录统计 */}
+                  <div className="mt-6 pt-4 border-t border-slate-200">
+                    <div className="text-sm text-slate-600">
+                      共 {ledgerData.length} 条记录，时间范围: {formatLedgerTime(ledgerData[ledgerData.length - 1]?.timestamp)} 至 {formatLedgerTime(ledgerData[0]?.timestamp)}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex justify-end">
+              <button
+                onClick={handleCloseLedgerModal}
+                className="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium"
+              >
+                关闭
+              </button>
+            </div>
           </div>
         </div>
       )}

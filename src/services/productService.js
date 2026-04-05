@@ -1,5 +1,6 @@
 // 产品数据服务 - 轻量实现，不引入复杂异步逻辑
 import { products as initialProducts, transactionRecords as initialTransactionRecords } from '../constants/mockData';
+import { getProductInventoryHistory } from '../utils/inventoryHistoryHelpers';
 
 // 本地存储键定义
 const STORAGE_KEYS = {
@@ -621,4 +622,36 @@ export const resetStorageData = () => {
       error: error
     };
   }
+};
+
+/**
+ * 获取产品的库存台账历史记录
+ * @param {string} productId - 产品ID
+ * @returns {Array} 该产品的库存台账历史记录（按时间倒序排列，最新在前）
+ */
+export const getProductInventoryLedger = (productId) => {
+  console.log('[productService] 获取产品库存台账历史:', productId);
+
+  // 1. 获取产品信息
+  const product = getProductById(productId);
+  if (!product) {
+    console.warn(`[productService] 未找到产品 ID: ${productId}`);
+    return [];
+  }
+
+  // 2. 获取所有交易记录和审计日志
+  const allTransactions = getTransactions();
+  const allAuditLogs = getAuditLogs();
+
+  // 3. 调用helper函数生成台账历史
+  const ledgerHistory = getProductInventoryHistory(
+    allTransactions,
+    allAuditLogs,
+    productId,
+    product.name,
+    product.currentStock
+  );
+
+  console.log(`[productService] 生成台账历史记录 ${ledgerHistory.length} 条`);
+  return ledgerHistory;
 };
