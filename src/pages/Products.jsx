@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { getProductsWithCalculatedStatus, filterProducts, calculateProductStatus, updateProduct, addProduct, deleteProduct, getProductInventoryLedger } from '../services/productService';
+import { getProductsWithCalculatedStatus, calculateProductStatus, updateProduct, addProduct, deleteProduct, getProductInventoryLedger } from '../services/productService';
 import { getLedgerTypeConfig, formatLedgerTime } from '../utils/inventoryHistoryHelpers';
+import { filterProducts, hasActiveFilters } from '../utils/productFilterHelpers';
 
 // 状态标签组件
 function StatusBadge({ status }) {
@@ -22,6 +23,9 @@ function Products() {
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [minStock, setMinStock] = useState('');
+  const [maxStock, setMaxStock] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
@@ -56,14 +60,26 @@ function Products() {
 
   // 当产品数据、搜索词或分类变化时，重新筛选
   useEffect(() => {
-    const filtered = filterProducts(allProducts, searchTerm, selectedCategory);
+    const filtered = filterProducts(
+      allProducts,
+      searchTerm,
+      selectedCategory,
+      selectedStatus,
+      minStock,
+      maxStock
+    );
     setFilteredProducts(filtered);
     // 如果筛选后当前页超出范围，重置到第一页
     const totalPages = Math.ceil(filtered.length / itemsPerPage);
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(1);
     }
-  }, [allProducts, searchTerm, selectedCategory]);
+  }, [allProducts, searchTerm, selectedCategory, selectedStatus, minStock, maxStock]);
+
+  // 当筛选条件变化时，重置到第一页（提供更及时的响应）
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedCategory, selectedStatus, minStock, maxStock]);
 
   // 分页计算
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -80,6 +96,9 @@ function Products() {
   const handleReset = () => {
     setSearchTerm('');
     setSelectedCategory('all');
+    setSelectedStatus('all');
+    setMinStock('');
+    setMaxStock('');
     setCurrentPage(1);
   };
 
@@ -240,7 +259,8 @@ function Products() {
 
       {/* 操作栏：新增按钮与筛选区域 */}
       <div className="bg-white border border-slate-200 rounded-lg p-4 mb-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* 第一行：新增按钮 + 搜索/分类/操作按钮 */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           {/* 左侧：新增产品按钮 */}
           <button
             onClick={handleAddProduct}
@@ -289,6 +309,68 @@ function Products() {
                 重置
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* 第二行：高级筛选 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+          {/* 库存状态筛选 */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              库存状态
+            </label>
+            <div className="flex gap-2">
+              {[
+                { value: 'all', label: '全部' },
+                { value: '正常', label: '正常' },
+                { value: '低库存', label: '低库存' }
+              ].map((status) => (
+                <button
+                  key={status.value}
+                  type="button"
+                  className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
+                    selectedStatus === status.value
+                      ? 'bg-slate-700 text-white'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                  onClick={() => setSelectedStatus(status.value)}
+                >
+                  {status.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 当前库存最小值 */}
+          <div>
+            <label htmlFor="min-stock" className="block text-sm font-medium text-slate-700 mb-1.5">
+              库存最小值
+            </label>
+            <input
+              id="min-stock"
+              type="number"
+              min="0"
+              placeholder="最小值"
+              value={minStock}
+              onChange={(e) => setMinStock(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* 当前库存最大值 */}
+          <div>
+            <label htmlFor="max-stock" className="block text-sm font-medium text-slate-700 mb-1.5">
+              库存最大值
+            </label>
+            <input
+              id="max-stock"
+              type="number"
+              min="0"
+              placeholder="最大值"
+              value={maxStock}
+              onChange={(e) => setMaxStock(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+            />
           </div>
         </div>
       </div>
