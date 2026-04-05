@@ -75,37 +75,122 @@ function TransactionTrendChart({ data }) {
   const maxCount = Math.max(...data.map(item => Math.max(item.inCount, item.outCount, item.totalCount)));
   const scale = maxCount > 0 ? 100 / maxCount : 0;
 
+  // 优化零值日期显示：折叠连续零值区间
+  const optimizedData = [];
+  let i = 0;
+  while (i < data.length) {
+    const current = data[i];
+    const hasTransactions = current.inCount > 0 || current.outCount > 0;
+
+    if (hasTransactions) {
+      // 有交易的日期，单独显示
+      optimizedData.push({
+        type: 'transaction',
+        ...current
+      });
+      i++;
+    } else {
+      // 连续零值日期，合并为一组
+      let zeroCount = 1;
+      while (i + zeroCount < data.length) {
+        const next = data[i + zeroCount];
+        if (next.inCount === 0 && next.outCount === 0) {
+          zeroCount++;
+        } else {
+          break;
+        }
+      }
+
+      if (zeroCount === 1) {
+        // 单个零值日期
+        optimizedData.push({
+          type: 'zero-single',
+          ...current
+        });
+      } else {
+        // 连续零值日期组
+        optimizedData.push({
+          type: 'zero-group',
+          startDate: current.displayDate,
+          endDate: data[i + zeroCount - 1].displayDate,
+          count: zeroCount,
+          date: current.date,
+          displayDate: `${current.displayDate}-${data[i + zeroCount - 1].displayDate}`
+        });
+      }
+      i += zeroCount;
+    }
+  }
+
   return (
-    <div className="space-y-4">
-      {data.map((item) => (
-        <div key={item.date} className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-medium text-slate-700">{item.displayDate}</div>
-            <div className="text-sm text-slate-500">
-              入库: <span className="font-medium text-emerald-600">{item.inCount}</span> ·
-              出库: <span className="font-medium text-rose-600">{item.outCount}</span>
+    <div className="space-y-3">
+      {optimizedData.map((item, index) => {
+        const isZero = item.type.startsWith('zero');
+
+        if (item.type === 'zero-group') {
+          // 连续零值日期组
+          return (
+            <div key={`zero-group-${index}`} className="space-y-1">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-slate-400">{item.displayDate}</div>
+                <div className="text-sm text-slate-400">
+                  连续{item.count}天无交易
+                </div>
+              </div>
+              <div className="h-4 rounded overflow-hidden bg-slate-100/50">
+                <div className="h-full w-full bg-slate-200/30"></div>
+              </div>
             </div>
-          </div>
-          <div className="flex h-6 rounded overflow-hidden bg-slate-100">
-            {/* 入库条形 */}
-            {item.inCount > 0 && (
-              <div
-                className="bg-emerald-500"
-                style={{ width: `${item.inCount * scale}%` }}
-                title={`入库: ${item.inCount}`}
-              />
+          );
+        }
+
+        // 单个日期（可能有交易或零值）
+        const hasTransactions = item.inCount > 0 || item.outCount > 0;
+
+        return (
+          <div key={item.date} className={`space-y-2 ${isZero ? 'opacity-80' : ''}`}>
+            <div className="flex items-center justify-between">
+              <div className={`text-sm font-medium ${hasTransactions ? 'text-slate-700' : 'text-slate-400'}`}>
+                {item.displayDate}
+              </div>
+              <div className={`text-sm ${hasTransactions ? 'text-slate-500' : 'text-slate-400'}`}>
+                {hasTransactions ? (
+                  <>
+                    入库: <span className="font-medium text-emerald-600">{item.inCount}</span> ·
+                    出库: <span className="font-medium text-rose-600">{item.outCount}</span>
+                  </>
+                ) : (
+                  '无交易'
+                )}
+              </div>
+            </div>
+            {hasTransactions ? (
+              <div className="flex h-6 rounded overflow-hidden bg-slate-100">
+                {/* 入库条形 */}
+                {item.inCount > 0 && (
+                  <div
+                    className="bg-emerald-500"
+                    style={{ width: `${item.inCount * scale}%` }}
+                    title={`入库: ${item.inCount}`}
+                  />
+                )}
+                {/* 出库条形 */}
+                {item.outCount > 0 && (
+                  <div
+                    className="bg-rose-500 ml-0.5"
+                    style={{ width: `${item.outCount * scale}%` }}
+                    title={`出库: ${item.outCount}`}
+                  />
+                )}
+              </div>
+            ) : (
+              <div className="h-4 rounded overflow-hidden bg-slate-100/50">
+                <div className="h-full w-full bg-slate-200/30"></div>
+              </div>
             )}
-            {/* 出库条形 */}
-            {item.outCount > 0 && (
-              <div
-                className="bg-rose-500 ml-0.5"
-                style={{ width: `${item.outCount * scale}%` }}
-                title={`出库: ${item.outCount}`}
-              />
-            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -695,7 +780,7 @@ function Dashboard() {
               </div>
             </div>
           </div>
-          <div className="p-4 md:p-6">
+          <div className="p-4 md:p-6 lg:max-h-[600px] lg:overflow-y-auto">
             <div className="mb-5 md:mb-6">
               <TransactionTrendChart data={dashboardData.transactionTrendData} />
             </div>
