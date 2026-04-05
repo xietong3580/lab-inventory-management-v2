@@ -522,35 +522,85 @@ function Dashboard() {
 
       {/* 两列布局：最近记录与预警概览 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-        {/* 最近出入库记录 */}
+        {/* 最近出入库记录 - 优化信息层级 */}
         <div className="bg-white border border-slate-200 rounded-lg">
           <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-100">
-            <h2 className="text-lg font-semibold text-slate-800">最近出入库记录</h2>
-            <p className="text-sm text-slate-500 mt-1">最近 5 条操作记录</p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-800">最近出入库记录</h2>
+                <p className="text-sm text-slate-500 mt-1">最新交易记录，按时间倒序排列</p>
+              </div>
+              <div className="text-xs text-slate-500">
+                共 <span className="font-medium text-slate-700">{dashboardData.recentTransactions.length}</span> 条记录
+              </div>
+            </div>
           </div>
           <div className="p-4 md:p-6">
-            <div className="space-y-3 md:space-y-4">
-              {dashboardData.recentTransactions.map((txn) => (
-                <div key={txn.id} className="flex items-center justify-between py-2 md:py-3 border-b border-slate-100 last:border-0">
-                  <div className="min-w-0 flex-1 pr-2">
-                    <div className="font-medium text-slate-800 truncate">{txn.productName}</div>
-                    <div className="text-xs md:text-sm text-slate-500 mt-1 truncate">
-                      {txn.date} · {txn.operator}
+            <div className="space-y-0 divide-y divide-slate-100">
+              {dashboardData.recentTransactions.map((txn) => {
+                const timeText = formatAuditTime(txn.date, 'compact');
+                const dateText = formatAuditTime(txn.date, 'date');
+                return (
+                  <div key={txn.id} className="group hover:bg-slate-50/50 transition-colors py-3 md:py-3.5">
+                    {/* 桌面端网格布局 - 优化为更清晰的摘要布局 */}
+                    <div className="hidden md:block">
+                      <div className="flex items-start gap-4">
+                        <div className="w-28 shrink-0">
+                          <div className="text-sm font-medium text-slate-800" title={timeText}>
+                            {timeText}
+                          </div>
+                          <div className="text-xs text-slate-500 mt-0.5" title={dateText}>
+                            {dateText}
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-1.5">
+                            <div className="text-sm font-medium text-slate-800 truncate" title={txn.productName}>
+                              {txn.productName}
+                            </div>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${txn.type === '入库' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                              {txn.type}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-slate-600">
+                            <div>操作人: <span className="font-medium text-slate-700">{txn.operator}</span></div>
+                            <div>数量: <span className="font-medium text-slate-800">{txn.quantity} 件</span></div>
+                          </div>
+                          <div className="mt-2">
+                            <StatusBadge status={txn.status} />
+                          </div>
+                        </div>
+                        <div className="shrink-0">
+                          <div className={`w-2 h-2 rounded-full ${txn.type === '入库' ? 'bg-emerald-400' : 'bg-rose-400'}`}></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 移动端卡片布局 */}
+                    <div className="md:hidden py-3">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="text-sm font-medium text-slate-700">{timeText}</div>
+                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${txn.type === '入库' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                          {txn.type}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="font-medium text-slate-800 truncate text-sm">{txn.productName}</div>
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm text-slate-600">{txn.operator}</div>
+                          <div className="text-sm font-medium text-slate-800">{txn.quantity} 件</div>
+                        </div>
+                        <div className="mt-1">
+                          <StatusBadge status={txn.status} />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <div className={`font-medium text-sm md:text-base ${txn.type === '入库' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {txn.type} {txn.quantity} 件
-                    </div>
-                    <div className="mt-1 md:mt-2">
-                      <StatusBadge status={txn.status} />
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div className="mt-4 md:mt-6 pt-4 md:pt-5 border-t border-slate-100">
-              <button className="w-full py-2 md:py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 rounded-md transition-colors">
+              <button className="w-full py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 rounded-md transition-colors flex items-center justify-center gap-1">
                 查看全部出入库记录 →
               </button>
             </div>
@@ -560,8 +610,15 @@ function Dashboard() {
         {/* 低库存预警概览 */}
         <div className="bg-white border border-slate-200 rounded-lg">
           <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-100">
-            <h2 className="text-lg font-semibold text-slate-800">低库存预警</h2>
-            <p className="text-sm text-slate-500 mt-1">当前 {dashboardData.lowStockCount} 个产品库存不足</p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-800">低库存预警</h2>
+                <p className="text-sm text-slate-500 mt-1">当前库存不足产品概览</p>
+              </div>
+              <div className="text-xs text-slate-500">
+                共 <span className="font-medium text-slate-700">{dashboardData.lowStockCount}</span> 个产品库存不足
+              </div>
+            </div>
           </div>
           <div className="p-4 md:p-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
@@ -621,45 +678,75 @@ function Dashboard() {
 
       {/* 第二组两列布局：交易趋势与低库存概览增强 */}
       <div className="mt-6 md:mt-8 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-        {/* 近7日交易趋势 */}
+        {/* 交易趋势分析 */}
         <div className="bg-white border border-slate-200 rounded-lg">
           <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-100">
-            <h2 className="text-lg font-semibold text-slate-800">
-              {timeRange === '7days' ? '近7日' : timeRange === '30days' ? '近30日' : '最近'}交易趋势
-            </h2>
-            <p className="text-sm text-slate-500 mt-1">
-              {timeRange === 'all' ? '所有交易记录的入库与出库数量趋势' : '入库与出库数量趋势'}
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-800">
+                  {timeRange === '7days' ? '近7日' : timeRange === '30days' ? '近30日' : '最近'}交易趋势
+                </h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  {timeRange === 'all' ? '全部交易记录的入库与出库数量趋势分析' : '入库与出库数量每日趋势对比'}
+                </p>
+              </div>
+              <div className="text-xs text-slate-500">
+                共 <span className="font-medium text-slate-700">{dashboardData.transactionSummary.totalTransactionsCount}</span> 笔交易
+              </div>
+            </div>
           </div>
           <div className="p-4 md:p-6">
-            <TransactionTrendChart data={dashboardData.transactionTrendData} />
+            <div className="mb-5 md:mb-6">
+              <TransactionTrendChart data={dashboardData.transactionTrendData} />
+            </div>
 
-            {/* 交易趋势汇总信息 */}
-            <div className="mt-4 md:mt-6 pt-4 md:pt-5 border-t border-slate-100">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
-                <div className="text-center">
-                  <div className="text-xs md:text-sm text-slate-500 mb-1">入库总量</div>
-                  <div className="text-base md:text-lg font-semibold text-emerald-600">{dashboardData.transactionSummary.totalInCount}</div>
-                  <div className="text-xs text-slate-400">件</div>
+            {/* 交易趋势汇总信息 - 优化为更清晰的信息卡片 */}
+            <div className="mt-6 md:mt-8 pt-5 md:pt-6 border-t border-slate-100">
+              <h3 className="text-sm font-medium text-slate-700 mb-3 md:mb-4">趋势汇总</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                <div className="bg-slate-50 border border-slate-200 rounded p-3 md:p-4">
+                  <div className="text-xs md:text-sm text-slate-500 mb-1 flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                    入库总量
+                  </div>
+                  <div className="text-xl md:text-2xl font-semibold text-emerald-600 mt-1">
+                    {dashboardData.transactionSummary.totalInCount}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">件 · 占总交易量</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-xs md:text-sm text-slate-500 mb-1">出库总量</div>
-                  <div className="text-base md:text-lg font-semibold text-rose-600">{dashboardData.transactionSummary.totalOutCount}</div>
-                  <div className="text-xs text-slate-400">件</div>
+                <div className="bg-slate-50 border border-slate-200 rounded p-3 md:p-4">
+                  <div className="text-xs md:text-sm text-slate-500 mb-1 flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-rose-500"></div>
+                    出库总量
+                  </div>
+                  <div className="text-xl md:text-2xl font-semibold text-rose-600 mt-1">
+                    {dashboardData.transactionSummary.totalOutCount}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">件 · 占总交易量</div>
                 </div>
-                <div className="text-center">
+                <div className="bg-slate-50 border border-slate-200 rounded p-3 md:p-4">
                   <div className="text-xs md:text-sm text-slate-500 mb-1">净变化</div>
-                  <div className={`text-base md:text-lg font-semibold ${dashboardData.transactionSummary.netChange >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  <div className={`text-xl md:text-2xl font-semibold mt-1 ${dashboardData.transactionSummary.netChange >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                     {dashboardData.transactionSummary.netChange >= 0 ? '+' : ''}{dashboardData.transactionSummary.netChange}
                   </div>
-                  <div className="text-xs text-slate-400">入库 - 出库</div>
+                  <div className="text-xs text-slate-500 mt-1">入库 - 出库</div>
                 </div>
-                <div className="text-center">
+                <div className="bg-slate-50 border border-slate-200 rounded p-3 md:p-4">
                   <div className="text-xs md:text-sm text-slate-500 mb-1">交易总笔数</div>
-                  <div className="text-base md:text-lg font-semibold text-slate-800">{dashboardData.transactionSummary.totalTransactionsCount}</div>
-                  <div className="text-xs text-slate-400">笔</div>
+                  <div className="text-xl md:text-2xl font-semibold text-slate-800 mt-1">
+                    {dashboardData.transactionSummary.totalTransactionsCount}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">笔 · 平均每日</div>
                 </div>
               </div>
+              {timeRange !== 'all' && (
+                <div className="mt-4 md:mt-5 pt-3 md:pt-4 border-t border-slate-100">
+                  <div className="text-xs text-slate-600">
+                    <span className="font-medium">趋势解读：</span>
+                    当前时间范围内入库总量 {dashboardData.transactionSummary.totalInCount >= dashboardData.transactionSummary.totalOutCount ? '大于' : '小于'} 出库总量，整体库存呈现{dashboardData.transactionSummary.netChange >= 0 ? '净增长' : '净减少'}趋势。
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -667,8 +754,15 @@ function Dashboard() {
         {/* 低库存概览增强 */}
         <div className="bg-white border border-slate-200 rounded-lg">
           <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-100">
-            <h2 className="text-lg font-semibold text-slate-800">低库存概览</h2>
-            <p className="text-sm text-slate-500 mt-1">低库存数量、占比与最需关注产品</p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-800">低库存概览</h2>
+                <p className="text-sm text-slate-500 mt-1">低库存数量、占比与最需关注产品</p>
+              </div>
+              <div className="text-xs text-slate-500">
+                占比 <span className="font-medium text-slate-700">{dashboardData.lowStockPercentage}%</span> · 总数 {dashboardData.totalProducts}
+              </div>
+            </div>
           </div>
           <div className="p-4 md:p-6">
             <LowStockOverview
@@ -681,56 +775,154 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* 审计日志概览统计 */}
+      {/* 审计日志概览统计 - 优化信息层级 */}
       <div className="mt-6 md:mt-8 bg-white border border-slate-200 rounded-lg">
         <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-slate-800">
-            {timeRange === '7days' ? '近7日' : timeRange === '30days' ? '近30日' : '全部'}审计记录统计
-          </h2>
-          <p className="text-sm text-slate-500 mt-1">按操作类型统计数量</p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">
+                {timeRange === '7days' ? '近7日' : timeRange === '30days' ? '近30日' : '全部'}审计记录统计
+              </h2>
+              <p className="text-sm text-slate-500 mt-1">按操作类型统计系统操作频率与分布</p>
+            </div>
+            <div className="text-xs text-slate-500">
+              总计 <span className="font-medium text-slate-700">{dashboardData.recentDaysAuditLogsCount}</span> 条审计记录
+            </div>
+          </div>
         </div>
         <div className="p-4 md:p-6">
-          <AuditLogStatsChart
-            stats={dashboardData.auditLogStatsArray}
-            maxCount={dashboardData.maxAuditLogCount}
-          />
+          <div className="mb-4">
+            <AuditLogStatsChart
+              stats={dashboardData.auditLogStatsArray}
+              maxCount={dashboardData.maxAuditLogCount}
+            />
+          </div>
+
+          {/* 操作类型分布摘要 */}
+          <div className="mt-5 md:mt-6 pt-4 md:pt-5 border-t border-slate-100">
+            <h3 className="text-sm font-medium text-slate-700 mb-3">操作类型分布</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3">
+              {dashboardData.auditLogStatsArray
+                .filter(item => item.count > 0)
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 6)
+                .map((item) => (
+                  <div key={item.type} className="flex items-center justify-between p-2 md:p-2.5 bg-slate-50 border border-slate-200 rounded">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${item.color.split(' ')[0].replace('bg-', 'bg-')}`}></div>
+                      <div className="text-xs md:text-sm font-medium text-slate-700 truncate">{item.label}</div>
+                    </div>
+                    <div className="text-xs md:text-sm font-semibold text-slate-800">{item.count}</div>
+                  </div>
+                ))}
+            </div>
+            {dashboardData.auditLogStatsArray.filter(item => item.count > 0).length === 0 && (
+              <div className="py-3 text-center text-slate-400 text-sm">
+                暂无操作类型分布数据
+              </div>
+            )}
+            {dashboardData.auditLogStatsArray.filter(item => item.count > 0).length > 0 && (
+              <div className="mt-3 md:mt-4 text-xs text-slate-600">
+                <span className="font-medium">分布解读：</span>
+                当前时间范围内，<span className="font-medium text-slate-800">
+                  {dashboardData.auditLogStatsArray.reduce((max, item) => item.count > max.count ? item : max, {count: 0, label: ''}).label}
+                </span> 操作最为频繁，反映了系统近期主要活动类型。
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* 最近操作记录 */}
+      {/* 最近操作记录 - 优化为后台首页摘要风格 */}
       <div className="mt-6 md:mt-8 bg-white border border-slate-200 rounded-lg">
         <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-slate-800">最近操作记录</h2>
-          <p className="text-sm text-slate-500 mt-1">系统最近 5 条操作记录</p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">最近操作记录</h2>
+              <p className="text-sm text-slate-500 mt-1">系统最近操作摘要，按时间倒序排列</p>
+            </div>
+            <div className="text-xs text-slate-500">
+              共 <span className="font-medium text-slate-700">{dashboardData.recentAuditLogs.length}</span> 条记录
+            </div>
+          </div>
         </div>
         <div className={`p-4 md:p-6 ${dashboardData.recentAuditLogs.length <= 2 ? 'pb-4' : ''}`}>
           {dashboardData.recentAuditLogs.length > 0 ? (
-            <div className={`${dashboardData.recentAuditLogs.length <= 2 ? 'space-y-2' : 'space-y-3'}`}>
+            <div className="space-y-0 divide-y divide-slate-100">
               {dashboardData.recentAuditLogs.map((log) => {
                 const actionConfig = getActionConfig(log.actionType);
-                const timeText = formatAuditTime(log.timestamp, 'time');
+                const timeText = formatAuditTime(log.timestamp, 'compact');
+                const dateText = formatAuditTime(log.timestamp, 'date');
                 const summaryText = generateAuditSummary(log, true);
+                const operatorText = getDisplayOperator(log.operator);
 
                 return (
-                  <div key={log.id} className="flex items-start justify-between py-2 md:py-3 border-b border-slate-100 last:border-0">
-                    <div className="flex items-start gap-2 md:gap-4 flex-1 min-w-0">
-                      {/* 时间列 */}
-                      <div className="shrink-0 w-12 md:w-16 text-xs md:text-sm font-medium text-slate-700">
-                        {timeText}
+                  <div key={log.id} className="group hover:bg-slate-50/50 transition-colors py-3 md:py-3.5">
+                    {/* 桌面端摘要布局 */}
+                    <div className="hidden md:block">
+                      <div className="flex items-start gap-4">
+                        {/* 左侧时间与日期区块 */}
+                        <div className="w-32 shrink-0">
+                          <div className="text-sm font-medium text-slate-800" title={timeText}>
+                            {timeText}
+                          </div>
+                          <div className="text-xs text-slate-500 mt-0.5" title={dateText}>
+                            {dateText}
+                          </div>
+                        </div>
+                        {/* 中间操作类型与产品信息 */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-1.5">
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${actionConfig.color}`}>
+                              {actionConfig.label}
+                            </span>
+                            <div className="text-sm font-medium text-slate-800 truncate" title={log.productName || '系统操作'}>
+                              {log.productName || '系统操作'}
+                            </div>
+                          </div>
+                          <div className="text-sm text-slate-600">
+                            {summaryText}
+                          </div>
+                          <div className="flex items-center gap-3 mt-2">
+                            <div className="text-xs text-slate-500">
+                              操作人: <span className="font-medium text-slate-700">{operatorText}</span>
+                            </div>
+                            {log.notes && (
+                              <div className="text-xs text-slate-500 truncate max-w-xs" title={log.notes}>
+                                备注: {log.notes}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {/* 右侧快速状态指示 */}
+                        <div className="shrink-0">
+                          <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+                        </div>
                       </div>
-                      {/* 操作类型标签 */}
-                      <div className="shrink-0">
-                        <span className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded text-xs font-medium ${actionConfig.color}`}>
+                    </div>
+
+                    {/* 移动端卡片布局 */}
+                    <div className="md:hidden">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="text-sm font-medium text-slate-700">{timeText}</div>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${actionConfig.color}`}>
                           {actionConfig.label}
                         </span>
                       </div>
-                      {/* 主要内容 */}
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium text-slate-800 truncate text-sm md:text-base">
-                          {log.productName || '-'}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="font-medium text-slate-800 truncate text-sm flex-1">
+                            {log.productName || '系统操作'}
+                          </div>
                         </div>
-                        <div className="text-xs md:text-sm text-slate-500 mt-1">
+                        <div className="text-xs text-slate-600">
                           {summaryText}
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-slate-500">
+                          <div>操作人: <span className="font-medium text-slate-700">{operatorText}</span></div>
+                          {log.notes && (
+                            <div className="truncate max-w-[120px]" title={log.notes}>有备注</div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -739,11 +931,21 @@ function Dashboard() {
               })}
             </div>
           ) : (
-            <div className="py-4 md:py-8 text-center">
+            <div className="py-8 md:py-12 text-center">
+              <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <div className="w-6 h-6 bg-slate-300 rounded"></div>
+              </div>
               <div className="text-slate-400 mb-2">暂无操作记录</div>
-              <div className="text-xs md:text-sm text-slate-500">
+              <div className="text-xs md:text-sm text-slate-500 max-w-md mx-auto">
                 执行新增产品、编辑产品、出入库等操作后，这里会显示最近记录
               </div>
+            </div>
+          )}
+          {dashboardData.recentAuditLogs.length > 0 && (
+            <div className="mt-4 md:mt-6 pt-4 md:pt-5 border-t border-slate-100">
+              <button className="w-full py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 rounded-md transition-colors flex items-center justify-center gap-1">
+                查看完整操作日志 →
+              </button>
             </div>
           )}
         </div>
