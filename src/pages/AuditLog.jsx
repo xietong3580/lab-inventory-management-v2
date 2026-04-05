@@ -8,6 +8,7 @@ import {
   actionTypeMap
 } from '../utils/auditLogHelpers';
 import { filterAuditLogs, hasActiveFilters } from '../utils/auditLogFilterHelpers';
+import { exportAuditLogsToCSV } from '../utils/exportHelpers';
 
 function AuditLog() {
   // 审计日志数据状态
@@ -25,6 +26,32 @@ function AuditLog() {
   // 处理日期范围变化
   const handleDateChange = (field, value) => {
     setDateRange((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // 导出当前筛选结果为 CSV
+  const handleExport = () => {
+    if (filteredLogs.length === 0) {
+      alert('没有可导出的数据，请先调整筛选条件或等待数据加载。');
+      return;
+    }
+
+    // 准备导出数据
+    const exportData = filteredLogs.map(log => {
+      const actionConfig = getActionConfig(log.actionType);
+      const displayTime = formatAuditTime(log.timestamp, 'compact');
+      const displayOperator = getDisplayOperator(log.operator);
+      const summaryText = generateAuditSummary(log, true);
+
+      return {
+        time: displayTime,
+        actionType: actionConfig.label,
+        productName: log.productName || '',
+        operator: displayOperator,
+        summary: summaryText
+      };
+    });
+
+    exportAuditLogsToCSV(exportData, 'audit-log-export');
   };
 
   // 加载审计日志数据
@@ -64,6 +91,18 @@ function AuditLog() {
         <p className="text-slate-600 mt-1">
           系统所有操作记录的完整列表
         </p>
+      </div>
+
+      {/* 操作栏：导出按钮 */}
+      <div className="mb-6 bg-white border border-slate-200 rounded-lg p-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-end gap-4">
+          <button
+            onClick={handleExport}
+            className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium"
+          >
+            导出 CSV
+          </button>
+        </div>
       </div>
 
       {/* 筛选工具栏 */}
