@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { productService as dataProductService } from '../services/dataService';
 import { getProductsWithCalculatedStatus, calculateProductStatus, updateProduct, addProduct, deleteProduct, getProductInventoryLedger } from '../services/productService';
 import { getLedgerTypeConfig, formatLedgerTime } from '../utils/inventoryHistoryHelpers';
 import { filterProducts, hasActiveFilters } from '../utils/productFilterHelpers';
@@ -63,9 +64,20 @@ function Products() {
 
   // 初始化产品数据
   useEffect(() => {
-    const products = getProductsWithCalculatedStatus();
-    setAllProducts(products);
-    setFilteredProducts(products);
+    const loadProducts = async () => {
+      try {
+        const products = await dataProductService.getProductsWithCalculatedStatus();
+        setAllProducts(products);
+        setFilteredProducts(products);
+      } catch (error) {
+        console.error('加载产品数据失败:', error);
+        // 降级使用原 mock 数据
+        const fallbackProducts = getProductsWithCalculatedStatus();
+        setAllProducts(fallbackProducts);
+        setFilteredProducts(fallbackProducts);
+      }
+    };
+    loadProducts();
   }, []);
 
   // 当产品数据、搜索词或分类变化时，重新筛选
@@ -156,7 +168,7 @@ function Products() {
   };
 
   // 表单提交
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
 
     // 轻量必填校验
@@ -169,41 +181,77 @@ function Products() {
       return;
     }
 
-    if (editingProduct) {
-      // 更新现有产品
-      const updates = {
-        ...formData,
-        currentStock: Number(formData.currentStock) || 0,
-        minStock: Number(formData.minStock) || 0,
-        lastUpdated: getToday()
-      };
-      const updatedProduct = updateProduct(editingProduct.id, updates);
-      if (updatedProduct) {
+    try {
+      if (editingProduct) {
+        // 更新现有产品
+        const updates = {
+          ...formData,
+          currentStock: Number(formData.currentStock) || 0,
+          minStock: Number(formData.minStock) || 0,
+          lastUpdated: getToday()
+        };
+        const updatedProduct = await dataProductService.updateProduct(editingProduct.id, updates);
+        if (updatedProduct) {
+          // 根据库存数量自动计算状态
+          updatedProduct.status = calculateProductStatus(updatedProduct);
+          setAllProducts(allProducts.map(p =>
+            p.id === editingProduct.id ? updatedProduct : p
+          ));
+        }
+      } else {
+        // 添加新产品
+        const newProductData = {
+          sku: formData.sku.trim(),
+          name: formData.name.trim(),
+          category: formData.category,
+          currentStock: Number(formData.currentStock) || 0,
+          minStock: Number(formData.minStock) || 0,
+          unit: formData.unit,
+          location: formData.location.trim(),
+          lastUpdated: getToday()
+        };
+        const newProduct = await dataProductService.addProduct(newProductData);
         // 根据库存数量自动计算状态
-        updatedProduct.status = calculateProductStatus(updatedProduct);
-        setAllProducts(allProducts.map(p =>
-          p.id === editingProduct.id ? updatedProduct : p
-        ));
+        newProduct.status = calculateProductStatus(newProduct);
+        setAllProducts([...allProducts, newProduct]);
       }
-    } else {
-      // 添加新产品
-      const newProductData = {
-        sku: formData.sku.trim(),
-        name: formData.name.trim(),
-        category: formData.category,
-        currentStock: Number(formData.currentStock) || 0,
-        minStock: Number(formData.minStock) || 0,
-        unit: formData.unit,
-        location: formData.location.trim(),
-        lastUpdated: getToday()
-      };
-      const newProduct = addProduct(newProductData);
-      // 根据库存数量自动计算状态
-      newProduct.status = calculateProductStatus(newProduct);
-      setAllProducts([...allProducts, newProduct]);
-    }
 
-    handleCloseModal();
+      handleCloseModal();
+    } catch (error) {
+      console.error('保存产品失败:', error);
+      alert(`操作失败: ${error.message}`);
+      // 降级使用原同步方法
+      if (editingProduct) {
+        const updates = {
+          ...formData,
+          currentStock: Number(formData.currentStock) || 0,
+          minStock: Number(formData.minStock) || 0,
+          lastUpdated: getToday()
+        };
+        const updatedProduct = updateProduct(editingProduct.id, updates);
+        if (updatedProduct) {
+          updatedProduct.status = calculateProductStatus(updatedProduct);
+          setAllProducts(allProducts.map(p =>
+            p.id === editingProduct.id ? updatedProduct : p
+          ));
+        }
+      } else {
+        const newProductData = {
+          sku: formData.sku.trim(),
+          name: formData.name.trim(),
+          category: formData.category,
+          currentStock: Number(formData.currentStock) || 0,
+          minStock: Number(formData.minStock) || 0,
+          unit: formData.unit,
+          location: formData.location.trim(),
+          lastUpdated: getToday()
+        };
+        const newProduct = addProduct(newProductData);
+        newProduct.status = calculateProductStatus(newProduct);
+        setAllProducts([...allProducts, newProduct]);
+        handleCloseModal();
+      }
+    }
   };
 
   // 表单字段变化处理
@@ -227,12 +275,27 @@ function Products() {
     }
   };
 
-  const handleDeleteProduct = (productId) => {
+  const handleDeleteProduct = async (productId) => {
     const product = allProducts.find(p => p.id === productId);
-    if (product && confirm(`确定要删除产品 "${product.name}"(${product.sku}) 吗？此操作不可撤销。`)) {
-      const success = deleteProduct(productId);
+    if (!product) return;
+
+    if (!confirm(`确定要删除产品 "${product.name}"(${product.sku}) 吗？此操作不可撤销。`)) {
+      return;
+    }
+
+    try {
+      const success = await dataProductService.deleteProduct(productId);
       if (success) {
         setAllProducts(allProducts.filter(p => p.id !== productId));
+      }
+    } catch (error) {
+      console.error('删除产品失败:', error);
+      // 降级使用原同步方法
+      const fallbackSuccess = deleteProduct(productId);
+      if (fallbackSuccess) {
+        setAllProducts(allProducts.filter(p => p.id !== productId));
+      } else {
+        alert(`删除失败: ${error.message}`);
       }
     }
   };
