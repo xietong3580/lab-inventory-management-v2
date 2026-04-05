@@ -5,7 +5,8 @@ import {
   generateAuditSummary,
   getDisplayOperator,
   getActionConfig,
-  actionTypeMap
+  actionTypeMap,
+  filterLogsByTimeRange
 } from '../utils/auditLogHelpers';
 
 function AuditLog() {
@@ -14,6 +15,7 @@ function AuditLog() {
   // 筛选状态
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedActionType, setSelectedActionType] = useState('');
+  const [selectedTimeRange, setSelectedTimeRange] = useState('all');
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -28,12 +30,15 @@ function AuditLog() {
   const filteredLogs = useMemo(() => {
     let filtered = [...auditLogs];
 
-    // 1. 按操作类型筛选
+    // 1. 按时间范围筛选
+    filtered = filterLogsByTimeRange(filtered, selectedTimeRange);
+
+    // 2. 按操作类型筛选
     if (selectedActionType) {
       filtered = filtered.filter(log => log.actionType === selectedActionType);
     }
 
-    // 2. 按产品名称关键词搜索（仅匹配 productName 字段）
+    // 3. 按产品名称关键词搜索（仅匹配 productName 字段）
     if (searchKeyword.trim()) {
       const keyword = searchKeyword.trim().toLowerCase();
       filtered = filtered.filter(log =>
@@ -42,12 +47,12 @@ function AuditLog() {
     }
 
     return filtered;
-  }, [auditLogs, searchKeyword, selectedActionType]);
+  }, [auditLogs, searchKeyword, selectedActionType, selectedTimeRange]);
 
   // 当筛选条件变化时重置分页
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchKeyword, selectedActionType]);
+  }, [searchKeyword, selectedActionType, selectedTimeRange]);
 
   // 分页计算
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -66,7 +71,7 @@ function AuditLog() {
       </div>
 
       {/* 筛选工具栏 */}
-      <div className="mb-6 bg-white border border-slate-200 rounded-lg p-4">
+      <div className="mb-6 bg-white border border-slate-200 rounded-lg p-3">
         <div className="flex flex-wrap items-center gap-3">
           {/* 产品名称搜索框 */}
           <div className="flex-1 min-w-[200px]">
@@ -103,8 +108,36 @@ function AuditLog() {
             </select>
           </div>
 
+          {/* 时间范围筛选 */}
+          <div className="min-w-[200px]">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              时间范围
+            </label>
+            <div className="flex flex-wrap gap-1">
+              {[
+                { value: 'all', label: '全部' },
+                { value: 'today', label: '今日' },
+                { value: 'week', label: '近7天' },
+                { value: 'month', label: '近30天' }
+              ].map((range) => (
+                <button
+                  key={range.value}
+                  type="button"
+                  className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                    selectedTimeRange === range.value
+                      ? 'bg-slate-700 text-white'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                  onClick={() => setSelectedTimeRange(range.value)}
+                >
+                  {range.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* 清空筛选按钮（仅在存在筛选条件时显示） */}
-          {(searchKeyword || selectedActionType) && (
+          {(searchKeyword || selectedActionType || selectedTimeRange !== 'all') && (
             <div className="self-end">
               <button
                 type="button"
@@ -112,6 +145,7 @@ function AuditLog() {
                 onClick={() => {
                   setSearchKeyword('');
                   setSelectedActionType('');
+                  setSelectedTimeRange('all');
                 }}
               >
                 清空筛选
@@ -130,7 +164,7 @@ function AuditLog() {
           </p>
         </div>
 
-        <div className="p-6">
+        <div className="p-4">
           {auditLogs.length === 0 ? (
             // 系统暂无日志
             <div className="py-12 text-center">
@@ -169,56 +203,56 @@ function AuditLog() {
               {/* 桌面端表格视图 (md及以上) */}
               {/* 表头行 */}
               <div className="grid grid-cols-12 gap-4 mb-4 pb-3 border-b border-slate-200">
-                <div className="col-span-2 text-sm font-medium text-slate-700">时间</div>
-                <div className="col-span-2 text-sm font-medium text-slate-700">操作类型</div>
-                <div className="col-span-2 text-sm font-medium text-slate-700">产品</div>
-                <div className="col-span-2 text-sm font-medium text-slate-700">操作人</div>
-                <div className="col-span-4 text-sm font-medium text-slate-700">摘要</div>
+                <div className="col-span-1 text-sm font-medium text-slate-700">时间</div>
+                <div className="col-span-1 text-sm font-medium text-slate-700">操作类型</div>
+                <div className="col-span-3 text-sm font-medium text-slate-700">产品</div>
+                <div className="col-span-1 text-sm font-medium text-slate-700">操作人</div>
+                <div className="col-span-6 text-sm font-medium text-slate-700">摘要</div>
               </div>
 
               {/* 日志行列表 */}
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {displayedLogs.map((log) => {
                   const actionConfig = getActionConfig(log.actionType);
-                  const displayTime = formatAuditTime(log.timestamp, 'full');
+                  const displayTime = formatAuditTime(log.timestamp, 'compact');
                   const displayOperator = getDisplayOperator(log.operator);
-                  const summaryText = generateAuditSummary(log);
+                  const summaryText = generateAuditSummary(log, true);
 
                   return (
                     <div
                       key={log.id}
-                      className="grid grid-cols-12 gap-4 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
+                      className="grid grid-cols-12 gap-4 py-2 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
                     >
                       {/* 时间列 */}
-                      <div className="col-span-2">
+                      <div className="col-span-1">
                         <div className="text-sm font-medium text-slate-800">
                           {displayTime}
                         </div>
                       </div>
 
                       {/* 操作类型列 */}
-                      <div className="col-span-2">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${actionConfig.color}`}>
+                      <div className="col-span-1">
+                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${actionConfig.color}`}>
                           {actionConfig.label}
                         </span>
                       </div>
 
                       {/* 产品列 */}
-                      <div className="col-span-2">
+                      <div className="col-span-3">
                         <div className="text-sm text-slate-800 truncate">
                           {log.productName || '-'}
                         </div>
                       </div>
 
                       {/* 操作人列 */}
-                      <div className="col-span-2">
+                      <div className="col-span-1">
                         <div className="text-sm text-slate-800">
                           {displayOperator}
                         </div>
                       </div>
 
                       {/* 摘要列 */}
-                      <div className="col-span-4">
+                      <div className="col-span-6">
                         <div className="text-sm text-slate-600">
                           {summaryText}
                         </div>
@@ -229,25 +263,25 @@ function AuditLog() {
               </div>
             </div>
 
-            <div className="block md:hidden space-y-4">
+            <div className="block md:hidden space-y-3">
               {/* 移动端卡片视图 (md以下) */}
               {displayedLogs.map((log) => {
                 const actionConfig = getActionConfig(log.actionType);
-                const displayTime = formatAuditTime(log.timestamp, 'full');
+                const displayTime = formatAuditTime(log.timestamp, 'compact');
                 const displayOperator = getDisplayOperator(log.operator);
-                const summaryText = generateAuditSummary(log);
+                const summaryText = generateAuditSummary(log, true);
 
                 return (
                   <div
                     key={log.id}
-                    className="bg-white border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors"
+                    className="bg-white border border-slate-200 rounded-lg p-3 hover:bg-slate-50 transition-colors"
                   >
                     {/* 卡片顶部：时间和操作类型 */}
                     <div className="flex justify-between items-start mb-3">
                       <div className="text-sm font-medium text-slate-800">
                         {displayTime}
                       </div>
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${actionConfig.color}`}>
+                      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${actionConfig.color}`}>
                         {actionConfig.label}
                       </span>
                     </div>

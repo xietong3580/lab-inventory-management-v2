@@ -13,7 +13,7 @@ export const actionTypeMap = {
 /**
  * 格式化审计日志时间戳
  * @param {string} timestamp - 时间戳字符串 (格式: YYYY-MM-DD HH:MM:SS)
- * @param {string} format - 格式: 'full' 完整时间, 'time' 仅时间, 'date' 仅日期
+ * @param {string} format - 格式: 'full' 完整时间, 'time' 仅时间, 'date' 仅日期, 'compact' 紧凑格式(MM-DD HH:MM)
  * @returns {string} 格式化后的时间字符串
  */
 export const formatAuditTime = (timestamp, format = 'full') => {
@@ -27,6 +27,13 @@ export const formatAuditTime = (timestamp, format = 'full') => {
     } else if (format === 'date') {
       // 仅显示 YYYY-MM-DD
       return timestamp.substring(0, 10);
+    } else if (format === 'compact') {
+      // 紧凑格式: MM-DD HH:MM (AuditLog 列表使用)
+      const month = timestamp.substring(5, 7);
+      const day = timestamp.substring(8, 10);
+      const hour = timestamp.substring(11, 13);
+      const minute = timestamp.substring(14, 16);
+      return `${month}-${day} ${hour}:${minute}`;
     } else {
       // 完整时间 YYYY-MM-DD HH:MM:SS (AuditLog 使用)
       return timestamp;
@@ -84,4 +91,48 @@ export const getDisplayOperator = (operator) => {
  */
 export const getActionConfig = (actionType) => {
   return actionTypeMap[actionType] || { label: actionType, color: 'bg-slate-50 text-slate-700' };
+};
+
+/**
+ * 根据时间范围筛选审计日志
+ * @param {Array} logs - 审计日志数组
+ * @param {string} timeRange - 时间范围: 'today', 'week', 'month', 'all'
+ * @returns {Array} 筛选后的日志数组
+ */
+export const filterLogsByTimeRange = (logs, timeRange) => {
+  if (timeRange === 'all' || !timeRange) {
+    return logs;
+  }
+
+  const now = new Date();
+  let startDate = new Date();
+
+  switch (timeRange) {
+    case 'today':
+      // 今日: 从当天0点开始
+      startDate.setHours(0, 0, 0, 0);
+      break;
+    case 'week':
+      // 近7天: 包括今天往前推7天
+      startDate.setDate(now.getDate() - 7);
+      startDate.setHours(0, 0, 0, 0);
+      break;
+    case 'month':
+      // 近30天: 包括今天往前推30天
+      startDate.setDate(now.getDate() - 30);
+      startDate.setHours(0, 0, 0, 0);
+      break;
+    default:
+      return logs;
+  }
+
+  return logs.filter(log => {
+    if (!log.timestamp) return false;
+    try {
+      const logDate = new Date(log.timestamp);
+      return logDate >= startDate;
+    } catch {
+      return false;
+    }
+  });
 };
