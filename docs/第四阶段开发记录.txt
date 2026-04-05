@@ -1,0 +1,573 @@
+开发记录简版
+
+功能名称：第四阶段规划与优先级判断
+
+本轮目标
+基于第三阶段完成状态，确定第四阶段推进方向，并选定第1轮最小可行任务。
+修改文件
+无代码修改
+改动摘要
+认可“先深化前端、暂不直接接后端”的总体方向
+不采纳“第四阶段第1轮先做图表库集成”作为首选
+将“高级筛选 / 查询能力深化”上调为第四阶段最高优先级
+最终确定第四阶段第1轮为：Transactions 高级筛选增强（MVP）
+测试结果
+本轮为规划判断，无代码测试
+当前项目状态适合进入第四阶段功能深化线
+当前状态
+✅ 规划完成，已确定第四阶段第1轮任务
+下一轮任务
+第四阶段第1轮：Transactions 高级筛选增强（MVP）
+================================
+开发记录简版
+
+功能名称：第四阶段第1轮：Transactions 高级筛选增强（MVP）
+
+本轮目标
+在现有 Transactions 页面增强筛选能力，支持自定义日期、状态筛选与组合条件。
+修改文件
+src/pages/Transactions.jsx
+改动摘要
+新增状态筛选下拉框：全部状态 / 已完成 / 已撤销 / 处理中
+新增自定义起止日期输入框
+保留快捷时间范围，并与其他条件按交集逻辑同时生效
+清空筛选按钮可一键恢复全部默认条件
+筛选区采用两行网格布局，移动端保持垂直堆叠可用
+测试结果
+待本地验收
+重点检查日期筛选、状态筛选、组合筛选、清空筛选、分页与结果计数
+当前状态
+已完成代码修改，等待页面验收
+预计 Git 提交信息
+feat: add advanced filters to transactions
+=========================
+开发记录简版
+
+功能名称：第四阶段第1轮：Transactions 高级筛选增强（MVP）
+
+本轮目标
+在现有 Transactions 页面增强筛选能力，支持自定义日期、状态筛选与组合条件。
+修改文件
+src/pages/Transactions.jsx
+改动摘要
+新增状态筛选下拉框：全部状态 / 已完成 / 已撤销 / 处理中
+新增自定义起止日期输入框
+保留快捷时间范围，并与其他条件按交集逻辑同时生效
+清空筛选按钮可一键恢复全部默认条件
+筛选区采用两行网格布局，移动端保持垂直堆叠可用
+测试结果
+桌面端验收通过
+移动端验收通过
+筛选区结构清晰
+高级筛选具备后台可用性
+未发现明显问题
+当前状态
+通过，待提交
+预计 Git 提交信息
+feat: add advanced filters to transactions
+=======================================
+开发记录简版
+
+功能名称：第四阶段第1轮：Transactions 高级筛选增强（MVP）
+
+本轮目标
+在现有 Transactions 页面增强筛选能力，支持自定义日期、状态筛选与组合条件。
+修改文件
+src/pages/Transactions.jsx
+改动摘要
+新增状态筛选下拉框：全部状态 / 已完成 / 已撤销 / 处理中
+新增自定义起止日期输入框
+保留快捷时间范围，并与其他条件按交集逻辑同时生效
+清空筛选按钮可一键恢复全部默认条件
+筛选区采用两行网格布局，移动端保持垂直堆叠可用
+测试结果
+桌面端验收通过
+移动端验收通过
+筛选区结构清晰
+高级筛选具备后台可用性
+已成功提交并 push
+当前状态
+✅ 已完成并 push 成功
+Git 记录
+commit: 8a70d99
+message: feat: add advanced filters to transactions
+========================================
+开发记录简版
+
+功能名称：第四阶段第2轮：AuditLog 高级筛选增强（MVP）
+
+本轮目标
+在现有 AuditLog 页面增强筛选能力，支持自定义日期、操作人搜索与多条件组合筛选。
+修改文件
+src/pages/AuditLog.jsx
+src/utils/auditLogFilterHelpers.js
+改动摘要
+新增操作人关键词搜索
+保留并整合产品名称搜索、操作类型筛选、快捷时间范围、自定义起止日期
+支持五维组合筛选同时生效
+提取筛选逻辑到独立 helper，提升可维护性
+清空筛选判断逻辑统一
+保持当前 UI 风格与响应式布局不变
+测试结果
+桌面端验收通过
+移动端验收通过
+筛选区结构清晰
+高级筛选具备后台可用性
+未发现明显问题
+当前状态
+通过，待提交
+预计 Git 提交信息
+feat: add advanced filters to audit log
+===========================================
+开发记录简版
+
+功能名称：第四阶段第2轮：AuditLog 高级筛选增强（MVP）
+
+本轮目标
+在现有 AuditLog 页面增强筛选能力，支持自定义日期、操作人搜索与多条件组合筛选。
+修改文件
+src/pages/AuditLog.jsx
+src/utils/auditLogFilterHelpers.js
+改动摘要
+新增操作人关键词搜索
+保留并整合产品名称搜索、操作类型筛选、快捷时间范围、自定义起止日期
+支持五维组合筛选同时生效
+提取筛选逻辑到独立 helper，提升可维护性
+清空筛选判断逻辑统一
+保持当前 UI 风格与响应式布局不变
+测试结果
+桌面端验收通过
+移动端验收通过
+筛选区结构清晰
+高级筛选具备后台可用性
+已成功提交并 push
+当前状态
+✅ 已完成并 push 成功
+Git 记录
+commit: 5eb8846
+message: feat: add advanced filters to audit log
+===============================================
+开发记录简版
+
+功能名称：第四阶段第3轮：Products 高级筛选增强（MVP）
+
+本轮目标
+在现有 Products 页面增强筛选能力，支持库存状态、库存区间与多条件组合筛选。
+修改文件
+src/pages/Products.jsx
+src/utils/productFilterHelpers.js
+改动摘要
+新增筛选工具模块，支持关键词、分类、库存状态、库存区间五维度组合筛选
+新增库存状态筛选：全部 / 正常 / 低库存
+新增当前库存最小值 / 最大值区间输入
+更新筛选逻辑，支持全部条件叠加
+更新重置功能，清空全部筛选条件
+筛选变化时自动跳回第一页
+保持原有关键词搜索与分类筛选兼容
+测试结果
+桌面端验收通过
+移动端验收通过
+筛选区结构清晰
+高级筛选具备后台可用性
+排版存在轻微非居中感，但不影响使用
+当前状态
+通过，待提交
+预计 Git 提交信息
+feat: add advanced filters to products
+==========================================
+开发记录简版
+
+功能名称：第四阶段第3轮：Products 高级筛选增强（MVP）
+
+本轮目标
+在现有 Products 页面增强筛选能力，支持库存状态、库存区间与多条件组合筛选。
+修改文件
+src/pages/Products.jsx
+src/utils/productFilterHelpers.js
+改动摘要
+新增筛选工具模块，支持关键词、分类、库存状态、库存区间五维度组合筛选
+新增库存状态筛选：全部 / 正常 / 低库存
+新增当前库存最小值 / 最大值区间输入
+更新筛选逻辑，支持全部条件叠加
+更新重置功能，清空全部筛选条件
+筛选变化时自动跳回第一页
+保持原有关键词搜索与分类筛选兼容
+测试结果
+桌面端验收通过
+移动端验收通过
+筛选区结构清晰
+高级筛选具备后台可用性
+已成功提交并 push
+当前状态
+✅ 已完成并 push 成功
+Git 记录
+commit: cdc7349
+message: feat: add advanced filters to products
+=====================================
+开发记录简版
+
+功能名称：第四阶段第4轮：多页面筛选体验统一收口（MVP）
+
+本轮目标
+对 Products、Transactions、AuditLog 三个页面的筛选区做体验统一收口，提升系统整体完成感。
+修改文件
+src/pages/Products.jsx
+src/pages/Transactions.jsx
+src/pages/AuditLog.jsx
+改动摘要
+统一标签样式、输入控件样式、快捷筛选按钮样式、清空筛选按钮样式
+Products 页面库存状态按钮改用统一快捷筛选样式
+Transactions / AuditLog 输入框补齐统一背景与类顺序
+保持各页面业务字段差异，仅统一基础设计语言
+不修改业务逻辑，不新增依赖，不接后端
+测试结果
+待本地验收
+重点检查三页视觉一致性、交互一致性、移动端堆叠一致性与功能回归
+当前状态
+已完成代码修改，等待页面验收
+预计 Git 提交信息
+style: unify filter UI across core pages
+===========================================
+开发记录简版
+
+功能名称：第四阶段第4轮：多页面筛选体验统一收口（MVP）
+
+本轮目标
+对 Products、Transactions、AuditLog 三个页面的筛选区做体验统一收口，提升系统整体完成感。
+修改文件
+src/pages/Products.jsx
+src/pages/Transactions.jsx
+src/pages/AuditLog.jsx
+改动摘要
+统一标签样式、输入控件样式、快捷筛选按钮样式、清空筛选按钮样式
+Products 页面库存状态按钮改用统一快捷筛选样式
+Transactions / AuditLog 输入框补齐统一背景与类顺序
+保持各页面业务字段差异，仅统一基础设计语言
+不修改业务逻辑，不新增依赖，不接后端
+测试结果
+页面观感与交互一致性已达到可提交状态
+当前仅需完成 Git 收口
+当前状态
+通过，待提交
+预计 Git 提交信息
+style: unify filter UI across core pages
+==========================================
+开发记录简版
+
+功能名称：第四阶段第4轮：多页面筛选体验统一收口（MVP）
+
+本轮目标
+对 Products、Transactions、AuditLog 三个页面的筛选区做体验统一收口，提升系统整体完成感。
+修改文件
+src/pages/Products.jsx
+src/pages/Transactions.jsx
+src/pages/AuditLog.jsx
+改动摘要
+统一标签样式、输入控件样式、快捷筛选按钮样式、清空筛选按钮样式
+Products 页面库存状态按钮改用统一快捷筛选样式
+Transactions / AuditLog 输入框补齐统一背景与类顺序
+保持各页面业务字段差异，仅统一基础设计语言
+不修改业务逻辑，不新增依赖，不接后端
+测试结果
+页面观感与交互一致性已通过
+本轮已成功提交并 push
+当前状态
+✅ 已完成并 push 成功
+Git 记录
+commit: 14fe66b
+message: style: unify filter UI across core pages
+===============================================
+
+开发记录简版
+
+功能名称：第四阶段第5轮：Transactions 导出能力（CSV 版 MVP）
+
+本轮目标
+在 Transactions 页面增加“导出当前筛选结果”能力，支持 CSV 导出，基于当前筛选结果，不接后端。
+
+修改文件
+src/pages/Transactions.jsx
+src/utils/exportHelpers.js
+
+改动摘要
+1. 在 Transactions 页面操作栏新增“导出 CSV”按钮
+2. 添加导出处理函数，基于当前筛选后的结果列表（filteredRecords）导出
+3. 集成现有 exportHelpers.js 中的 CSV 导出功能
+4. 导出内容包含：时间、记录类型、产品名称、SKU、数量、单位、操作人、状态、备注
+5. 文件名自动包含页面名和日期时间，例如：transactions-export-2026-04-05-14-30.csv
+6. 空结果时给出友好提示，不导出空文件
+7. 保持企业后台风格，按钮样式与现有操作栏协调
+
+测试结果
+待本地验收
+重点检查：导出按钮位置与样式、导出功能触发、CSV 文件内容与格式、文件名规范性、空结果提示
+
+当前状态
+已完成代码修改，等待页面验收
+
+预计 Git 提交信息
+feat: add CSV export to transactions (filtered results)
+===============================================
+开发记录简版
+
+功能名称：第四阶段第5轮：Transactions 导出能力（CSV 版 MVP）
+
+本轮目标
+在 Transactions 页面增加“导出当前筛选结果”的 CSV 导出能力。
+修改文件
+src/pages/Transactions.jsx
+复用：src/utils/exportHelpers.js（如本轮实际未改动，则不纳入提交）
+改动摘要
+在操作区新增“导出 CSV”按钮
+基于当前筛选结果 filteredRecords 执行导出
+导出字段包含时间、记录类型、产品名称、SKU、数量、单位、操作人、状态、备注
+文件名自动带日期时间
+空结果时给出友好提示，不导出空文件
+保持企业后台风格，不引入新依赖
+测试结果
+导出功能验收通过
+CSV 文件已成功下载并打开
+字段内容与格式基本正常
+移动端按钮布局正常
+当前可进入提交阶段
+当前状态
+通过，待提交
+预计 Git 提交信息
+feat: add CSV export to transactions
+===================================
+开发记录简版
+
+功能名称：第四阶段第5轮：Transactions 导出能力（CSV 版 MVP）
+
+本轮目标
+在 Transactions 页面增加“导出当前筛选结果”的 CSV 导出能力。
+修改文件
+src/pages/Transactions.jsx
+src/utils/exportHelpers.js
+改动摘要
+在操作区新增“导出 CSV”按钮
+基于当前筛选结果执行导出
+导出字段包含时间、类型、产品名称、SKU、数量、单位、操作人、状态、备注
+文件名自动带日期时间
+空结果时给出友好提示，不导出空文件
+使用独立导出工具文件，便于后续复用到其他页面
+测试结果
+导出功能验收通过
+CSV 文件已成功下载并打开
+字段内容与格式基本正常
+本轮已成功提交并 push
+当前状态
+✅ 已完成并 push 成功
+Git 记录
+commit: 35bed4a
+message: feat: add CSV export to transactions
+==============================================
+
+开发记录简版
+
+功能名称：第四阶段第6轮：AuditLog 导出能力（CSV 版 MVP）
+
+本轮目标
+在 AuditLog 页面增加“导出当前筛选结果”的 CSV 导出能力。
+
+修改文件
+src/pages/AuditLog.jsx
+src/utils/exportHelpers.js
+
+改动摘要
+1. 在 AuditLog 页面添加“导出 CSV”按钮，位于筛选工具栏上方
+2. 添加导出处理函数，基于当前筛选后的结果列表（filteredLogs）导出
+3. 在 exportHelpers.js 中新增 exportAuditLogsToCSV 函数，复用现有 CSV 导出逻辑
+4. 导出字段包含：时间、操作类型、产品名称、操作人、摘要
+5. 文件名自动包含页面名和日期时间，例如：audit-log-export-2026-04-05-14-30.csv
+6. 空结果时给出友好提示，不导出空文件
+7. 保持企业后台风格，按钮样式与 Transactions 页面一致
+
+测试结果
+待本地验收
+重点检查：导出按钮位置与样式、导出功能触发、CSV 文件内容与格式、文件名规范性、空结果提示
+
+当前状态
+已完成代码修改，等待页面验收
+
+预计 Git 提交信息
+feat: add CSV export to audit log (filtered results)
+==============================================
+开发记录简版
+
+第四阶段第6轮：AuditLog 导出能力（CSV 版 MVP）
+
+本轮目标：为 AuditLog 页面增加“导出当前筛选结果”的 CSV 导出能力
+实际修改文件：
+src/pages/AuditLog.jsx
+src/utils/exportHelpers.js
+已完成内容：
+新增 exportAuditLogsToCSV
+导出绑定 filteredLogs
+导出字段做页面可读化处理
+新增导出按钮
+空结果提示与时间文件名已接入
+当前状态：
+代码已完成，待页面验收
+提交注意：
+本轮先不要把 docs/第四阶段开发记录.txt 混入功能提交
+建议提交信息：
+feat: add CSV export to audit log
+========================================
+开发记录简版
+
+第四阶段第6轮：AuditLog 导出能力（CSV 版 MVP）
+
+页面验收：通过
+Git 边界：通过
+本轮提交文件：
+src/pages/AuditLog.jsx
+src/utils/exportHelpers.js
+本轮不提交：
+docs/第三阶段开发记录.txt
+docs/第三阶段总结.md
+docs/第四阶段开发记录.txt
+建议提交信息：
+feat: add CSV export to audit log
+==================================
+开发记录简版
+第四阶段第6轮完成确认
+功能：AuditLog 导出能力（CSV 版 MVP）
+提交结果：已完成并 push 成功
+远程提交：1814c58
+提交信息：feat: add CSV export to audit log
+第四阶段第7轮启动
+目标：Products 导出能力（CSV 版 MVP）
+计划修改文件：
+src/pages/Products.jsx
+src/utils/exportHelpers.js
+实现边界：
+只做 CSV
+只导出当前筛选结果
+不接后端
+不改 docs
+验收重点：
+导出结果与页面筛选一致
+字段可读
+样式与现有导出入口统一
+================================
+开发记录简版
+
+第四阶段第7轮：Products 导出能力（CSV 版 MVP）
+
+本轮目标：为 Products 页面增加“导出 CSV”能力
+实际修改文件：
+src/utils/exportHelpers.js
+src/pages/Products.jsx
+已完成内容：
+新增 exportProductsToCSV
+导出严格绑定 filteredProducts
+新增导出按钮
+空结果禁用按钮
+导出字段包含基础信息与扩展展示字段
+当前状态：
+代码已完成，等待页面验收
+验收重点：
+导出结果与页面筛选一致
+状态文案正确
+空结果禁用成立
+CSV 内容结构正确
+====================================
+开发记录简版
+第四阶段第7轮完成确认
+功能：Products 导出能力（CSV 版 MVP）
+提交结果：已完成并 push 成功
+远程提交：0fad195
+提交信息：feat: add CSV export to products
+第四阶段第8轮启动
+目标：多页面导出体验统一收口（MVP）
+计划修改文件：
+src/pages/Products.jsx
+src/pages/Transactions.jsx
+src/pages/AuditLog.jsx
+src/utils/exportHelpers.js
+实现边界：
+不新增功能
+只统一现有导出体验
+不改 docs
+验收重点：
+三页导出按钮文案统一
+三页导出按钮位置统一
+三页禁用态统一
+文件命名规则统一
+==============================
+开发记录简版
+
+第四阶段第8轮：多页面导出体验统一收口（MVP）
+
+本轮目标：统一 Products / Transactions / AuditLog 三页导出体验
+实际修改文件：
+src/pages/Products.jsx
+src/pages/Transactions.jsx
+src/pages/AuditLog.jsx
+已完成内容：
+按钮文案统一为 导出 CSV
+按钮位置统一到操作栏第一行右侧
+禁用态样式统一
+空结果提示文案统一
+文件命名规则统一
+当前状态：
+代码已完成，建议进行轻量页面验收后提交
+建议提交信息：
+style: unify export experience across core pages
+=========================================
+开发记录简版
+第四阶段第8轮完成确认
+功能：多页面导出体验统一收口（MVP）
+提交结果：已完成并 push 成功
+远程提交：aa7a860
+提交信息：style: unify export experience across core pages
+第四阶段第9轮启动
+目标：多页面筛选 / 空状态 / 操作栏细节收口（轻量版）
+计划修改文件：
+src/pages/Products.jsx
+src/pages/Transactions.jsx
+src/pages/AuditLog.jsx
+实现边界：
+不新增功能
+只做轻量 UI 收口
+不改 docs
+验收重点：
+三页计数文案统一
+三页空状态表达统一
+三页移动端操作栏更整齐
+==========================
+开发记录简版
+
+第四阶段第9轮：多页面筛选 / 空状态 / 操作栏细节收口（轻量版）
+
+本轮目标：统一 Products / Transactions / AuditLog 三页的空状态、筛选无结果、间距与移动端操作栏细节
+实际修改文件：
+src/pages/Products.jsx
+src/pages/Transactions.jsx
+src/pages/AuditLog.jsx
+已完成内容：
+空状态标题统一为 暂无数据
+筛选无结果标题统一为 未找到匹配的记录
+筛选卡片与分页区间距进一步统一
+移动端操作栏对齐策略更协调
+当前状态：
+代码已完成，建议进行轻量页面验收后提交
+建议提交信息：
+style: polish filter, empty states, and action bars across core pages
+====================================
+
+=== 第四阶段完成总结 ===
+
+第四阶段共完成 9 轮迭代，重点实现了：
+- 第1-4轮：高级筛选能力增强（Transactions、AuditLog、Products 多维度组合筛选）
+- 第5-8轮：CSV 导出能力增强（三页导出当前筛选结果）
+- 第9轮：界面细节与体验优化（空状态统一、操作栏优化）
+
+第四阶段使系统从基础查询升级为具备高级筛选、数据导出与统一体验的企业后台工作平台，为后续数据可视化、高级报表与用户体验优化奠定基础。
+
+文档更新：
+- README.md 已更新当前状态与第五阶段建议方向
+- docs/第四阶段总结.md 已创建，详细记录阶段目标、完成内容与价值
+
+第四阶段于 2026-04-05 完成。
