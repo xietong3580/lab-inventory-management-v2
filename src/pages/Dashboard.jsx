@@ -7,6 +7,9 @@ import {
   getDisplayOperator,
   getActionConfig
 } from '../utils/auditLogHelpers';
+import InventoryTrendChart from '../components/dashboard/InventoryTrendChart';
+import TransactionCompareChart from '../components/dashboard/TransactionCompareChart';
+import RiskDistributionChart from '../components/dashboard/RiskDistributionChart';
 
 // 统计卡片组件
 function StatCard({ title, value, description, iconColor }) {
@@ -481,6 +484,47 @@ function Dashboard() {
     };
     transactionSummary.netChange = transactionSummary.totalInCount - transactionSummary.totalOutCount;
 
+    // 计算每日净变化（入库 - 出库）基于当前时间范围
+    const dailyNetChange = {};
+    dateRange.forEach(date => {
+      const dayTransactions = allTransactions.filter(txn => {
+        const datePart = extractDatePart(txn.date);
+        return datePart === date;
+      });
+      const inCount = dayTransactions.filter(txn => txn.type === '入库').reduce((sum, txn) => sum + (Number(txn.quantity) || 0), 0);
+      const outCount = dayTransactions.filter(txn => txn.type === '出库').reduce((sum, txn) => sum + (Number(txn.quantity) || 0), 0);
+      dailyNetChange[date] = inCount - outCount;
+    });
+
+    // 计算净变化总和
+    const totalNetChange = dateRange.reduce((sum, date) => sum + (dailyNetChange[date] || 0), 0);
+    // 初始库存 = 当前总库存 - 净变化总和，这样累加后最后一天等于当前总库存
+    let runningStock = totalInventory - totalNetChange;
+    const inventoryTrendData = dateRange.map(date => {
+      runningStock += dailyNetChange[date] || 0;
+      return {
+        date,
+        totalStock: Math.max(0, Math.round(runningStock))
+      };
+    });
+
+    // 计算出入库对比数据（基于当前时间范围）
+    const transactionCompareData = dateRange.map(date => {
+      const dayTransactions = allTransactions.filter(txn => {
+        const datePart = extractDatePart(txn.date);
+        return datePart === date;
+      });
+      const inCount = dayTransactions.filter(txn => txn.type === '入库').reduce((sum, txn) => sum + (Number(txn.quantity) || 0), 0);
+      const outCount = dayTransactions.filter(txn => txn.type === '出库').reduce((sum, txn) => sum + (Number(txn.quantity) || 0), 0);
+      const [year, month, day] = date.split('-');
+      return {
+        date,
+        displayDate: `${month}-${day}`,
+        inCount,
+        outCount
+      };
+    });
+
     return {
       totalProducts,
       totalInventory,
@@ -496,9 +540,14 @@ function Dashboard() {
       maxAuditLogCount,
       recentTransactions,
       recentAuditLogs,
-      transactionSummary
+      transactionSummary,
+      inventoryTrendData,
+      transactionCompareData
     };
   }, [timeRange]); // 依赖时间范围
+
+  // 时间范围文本
+  const rangeText = timeRange === '7days' ? '近7日' : timeRange === '30days' ? '近30日' : '全部';
 
   // 动态统计卡片数据
   const dynamicDashboardStats = dashboardStats.map(stat => {
@@ -530,7 +579,6 @@ function Dashboard() {
         description: '当前低库存产品数量'
       };
     } else if (stat.id === 'recent-transactions') {
-      const rangeText = timeRange === '7days' ? '近7日' : timeRange === '30days' ? '近30日' : '全部';
       return {
         ...stat,
         title: `${rangeText}交易记录`,
@@ -538,7 +586,6 @@ function Dashboard() {
         description: `${rangeText}交易记录数`
       };
     } else if (stat.id === 'recent-audit-logs') {
-      const rangeText = timeRange === '7days' ? '近7日' : timeRange === '30days' ? '近30日' : '全部';
       return {
         ...stat,
         title: `${rangeText}审计记录`,
@@ -761,18 +808,18 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* 第二组两列布局：交易趋势与低库存概览增强 */}
-      <div className="mt-6 md:mt-8 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+      {/* 第二组三列布局：交易趋势、低库存概览增强与库存风险分布 */}
+      <div className="mt-6 md:mt-8 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
         {/* 交易趋势分析 */}
         <div className="bg-white border border-slate-200 rounded-lg">
           <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-100">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <h2 className="text-lg font-semibold text-slate-800">
-                  {timeRange === '7days' ? '近7日' : timeRange === '30days' ? '近30日' : '最近'}交易趋势
+                  库存与交易趋势
                 </h2>
                 <p className="text-sm text-slate-500 mt-1">
-                  {timeRange === 'all' ? '全部交易记录的入库与出库数量趋势分析' : '入库与出库数量每日趋势对比'}
+                  随时间范围查看库存变化与出入库对比
                 </p>
               </div>
               <div className="text-xs text-slate-500">
@@ -780,15 +827,24 @@ function Dashboard() {
               </div>
             </div>
           </div>
-          <div className="p-4 md:p-6 lg:max-h-[600px] lg:overflow-y-auto">
+          <div className="p-4 md:p-6">
             <div className="mb-5 md:mb-6">
-              <TransactionTrendChart data={dashboardData.transactionTrendData} />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+                <div>
+                  <h3 className="text-sm font-medium text-slate-700 mb-2">库存趋势（{rangeText}）</h3>
+                  <InventoryTrendChart data={dashboardData.inventoryTrendData} timeRangeLabel={rangeText} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-slate-700 mb-2">出入库对比（{rangeText}）</h3>
+                  <TransactionCompareChart data={dashboardData.transactionCompareData} timeRangeLabel={rangeText} />
+                </div>
+              </div>
             </div>
 
             {/* 交易趋势汇总信息 - 优化为更清晰的信息卡片 */}
             <div className="mt-6 md:mt-8 pt-5 md:pt-6 border-t border-slate-100">
               <h3 className="text-sm font-medium text-slate-700 mb-3 md:mb-4">趋势汇总</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+              <div className="grid grid-cols-2 gap-3 md:gap-4">
                 <div className="bg-slate-50 border border-slate-200 rounded p-3 md:p-4">
                   <div className="text-xs md:text-sm text-slate-500 mb-1 flex items-center gap-1">
                     <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
@@ -854,6 +910,28 @@ function Dashboard() {
               lowStockCount={dashboardData.lowStockCount}
               lowStockPercentage={dashboardData.lowStockPercentage}
               top3Products={dashboardData.top3LowStockProducts}
+              totalProducts={dashboardData.totalProducts}
+            />
+          </div>
+        </div>
+
+        {/* 库存风险分布 */}
+        <div className="bg-white border border-slate-200 rounded-lg">
+          <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-800">库存风险分布</h2>
+                <p className="text-sm text-slate-500 mt-1">正常库存与低库存比例分析</p>
+              </div>
+              <div className="text-xs text-slate-500">
+                总数 <span className="font-medium text-slate-700">{dashboardData.totalProducts}</span> 个产品
+              </div>
+            </div>
+          </div>
+          <div className="p-4 md:p-6">
+            <RiskDistributionChart
+              lowStockCount={dashboardData.lowStockCount}
+              normalStockCount={dashboardData.normalStockCount}
               totalProducts={dashboardData.totalProducts}
             />
           </div>
