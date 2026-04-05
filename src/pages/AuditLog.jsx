@@ -79,7 +79,7 @@ function AuditLog() {
                 id="product-search"
                 type="text"
                 placeholder="输入产品名称关键词..."
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
                 value={searchKeyword}
                 onChange={(e) => setSearchKeyword(e.target.value)}
               />
@@ -114,7 +114,7 @@ function AuditLog() {
                 id="operator-search"
                 type="text"
                 placeholder="输入操作人关键词..."
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
                 value={operatorSearch}
                 onChange={(e) => setOperatorSearch(e.target.value)}
               />
@@ -125,7 +125,7 @@ function AuditLog() {
               {hasActiveFilters({ searchKeyword, selectedActionType, selectedTimeRange, dateRange, operatorSearch }) && (
                 <button
                   type="button"
-                  className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 w-full"
+                  className="px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 transition-colors w-full"
                   onClick={() => {
                     setSearchKeyword('');
                     setSelectedActionType('');
@@ -179,7 +179,7 @@ function AuditLog() {
                 type="date"
                 value={dateRange.start}
                 onChange={(e) => handleDateChange('start', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
               />
             </div>
 
@@ -192,7 +192,7 @@ function AuditLog() {
                 type="date"
                 value={dateRange.end}
                 onChange={(e) => handleDateChange('end', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
               />
             </div>
 
@@ -237,7 +237,7 @@ function AuditLog() {
               {hasActiveFilters({ searchKeyword, selectedActionType, selectedTimeRange, dateRange, operatorSearch }) && (
                 <button
                   type="button"
-                  className="mt-6 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
+                  className="mt-6 px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 transition-colors"
                   onClick={() => {
                     setSearchKeyword('');
                     setSelectedActionType('');

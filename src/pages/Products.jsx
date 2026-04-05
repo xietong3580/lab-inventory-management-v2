@@ -29,6 +29,15 @@ function Products() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
+  // 是否有活跃筛选条件
+  const activeFilters = hasActiveFilters({
+    keyword: searchTerm,
+    category: selectedCategory,
+    status: selectedStatus,
+    minStock,
+    maxStock
+  });
+
   // 模态框和表单相关状态
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null); // null 表示新增，非null表示编辑
@@ -278,7 +287,7 @@ function Products() {
                 placeholder="搜索产品名称或 SKU..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full sm:w-64 px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                className="w-full sm:w-64 px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
               />
             </div>
 
@@ -286,7 +295,7 @@ function Products() {
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+              className="px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
             >
               <option value="all">全部分类</option>
               <option value="耗材">耗材</option>
@@ -298,16 +307,18 @@ function Products() {
             <div className="flex flex-col sm:flex-row gap-2">
               <button
                 onClick={handleSearch}
-                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors font-medium w-full sm:w-auto"
+                className="px-3 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors text-sm font-medium w-full sm:w-auto"
               >
                 搜索
               </button>
-              <button
-                onClick={handleReset}
-                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors w-full sm:w-auto"
-              >
-                重置
-              </button>
+              {activeFilters && (
+                <button
+                  onClick={handleReset}
+                  className="px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 transition-colors w-full sm:w-auto"
+                >
+                  清空筛选
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -319,7 +330,7 @@ function Products() {
             <label className="block text-sm font-medium text-slate-700 mb-1.5">
               库存状态
             </label>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-1">
               {[
                 { value: 'all', label: '全部' },
                 { value: '正常', label: '正常' },
@@ -328,7 +339,7 @@ function Products() {
                 <button
                   key={status.value}
                   type="button"
-                  className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
+                  className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
                     selectedStatus === status.value
                       ? 'bg-slate-700 text-white'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -376,158 +387,194 @@ function Products() {
       </div>
 
       {/* 产品表格 */}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        {/* 表格头部 */}
-        <div className="overflow-x-auto">
-          <table className="min-w-[900px] md:min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  SKU
-                </th>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  产品名称
-                </th>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  分类
-                </th>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  库存
-                </th>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  最低库存
-                </th>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  状态
-                </th>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  存储位置
-                </th>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {displayedProducts.map((product) => (
-                <tr key={product.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-slate-800">{product.sku}</div>
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4">
-                    <div className="text-sm font-medium text-slate-800">{product.name}</div>
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                    <div className="text-sm text-slate-700">{product.category}</div>
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-slate-800">
-                      {product.currentStock} {product.unit}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                    <div className="text-sm text-slate-700">
-                      {product.minStock} {product.unit}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                    <StatusBadge status={product.status} />
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4">
-                    <div className="text-sm text-slate-700">{product.location}</div>
-                    <div className="text-xs text-slate-500 mt-1">更新: {product.lastUpdated}</div>
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleEditProduct(product.id)}
-                        className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors"
-                      >
-                        编辑
-                      </button>
-                      <button
-                        onClick={() => handleOpenLedgerModal(product.id)}
-                        className="px-3 py-1.5 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors"
-                      >
-                        台账
-                      </button>
-                      <button
-                        onClick={() => handleDeleteProduct(product.id)}
-                        className="px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors"
-                      >
-                        删除
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* 分页控制 */}
-        <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex flex-col md:flex-row items-center md:items-center justify-center md:justify-between gap-4 md:gap-0">
-          <div className="w-full md:w-auto text-sm text-slate-600 text-center md:text-left">
-            显示第 {startIndex + 1} - {Math.min(endIndex, filteredProducts.length)} 条，共 {filteredProducts.length} 条记录
-          </div>
-          <div className="w-full md:w-auto flex justify-center flex-wrap items-center gap-2 whitespace-nowrap">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className={`px-3 py-1.5 rounded border text-sm ${
-                currentPage === 1
-                  ? 'border-slate-200 text-slate-400 cursor-not-allowed'
-                  : 'border-slate-300 text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              上一页
-            </button>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const pageNum = i + 1;
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`px-3 py-1.5 rounded border text-sm ${
-                      currentPage === pageNum
-                        ? 'bg-slate-700 text-white'
-                        : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-              {totalPages > 5 && (
-                <>
-                  <span className="text-slate-400">...</span>
-                  <button
-                    onClick={() => setCurrentPage(totalPages)}
-                    className={`px-3 py-1.5 rounded border text-sm ${
-                      currentPage === totalPages
-                        ? 'bg-slate-700 text-white'
-                        : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    {totalPages}
-                  </button>
-                </>
-              )}
+      <div className="bg-white border border-slate-200 rounded-lg">
+        {allProducts.length === 0 ? (
+          // 系统暂无产品
+          <div className="py-12 text-center">
+            <div className="text-slate-500 mb-2">暂无产品数据</div>
+            <div className="text-sm text-slate-500 max-w-md mx-auto">
+              点击"新增产品"按钮添加第一条产品记录。
             </div>
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className={`px-3 py-1.5 rounded border text-sm ${
-                currentPage === totalPages
-                  ? 'border-slate-200 text-slate-400 cursor-not-allowed'
-                  : 'border-slate-300 text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              下一页
-            </button>
           </div>
-        </div>
+        ) : filteredProducts.length === 0 ? (
+          // 筛选无结果
+          <div className="py-12 text-center">
+            <div className="text-slate-500 mb-2">未找到匹配的产品</div>
+            <div className="text-sm text-slate-500 max-w-md mx-auto mb-4">
+              当前筛选条件下未找到匹配的产品。请尝试：
+            </div>
+            <div className="text-sm text-slate-600 max-w-md mx-auto space-y-1">
+              <p>• 调整搜索关键词</p>
+              <p>• 选择不同的产品分类</p>
+              <p>• 调整库存状态筛选</p>
+              <p>• 调整库存数量范围</p>
+              <p>• 清空筛选条件以查看全部产品</p>
+            </div>
+            {activeFilters && (
+              <button
+                type="button"
+                className="mt-6 px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 transition-colors"
+                onClick={handleReset}
+              >
+                清空筛选
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* 表格头部 */}
+            <div className="overflow-x-auto">
+              <table className="min-w-[900px] md:min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                      SKU
+                    </th>
+                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                      产品名称
+                    </th>
+                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                      分类
+                    </th>
+                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                      库存
+                    </th>
+                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                      最低库存
+                    </th>
+                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                      状态
+                    </th>
+                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                      存储位置
+                    </th>
+                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                      操作
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {displayedProducts.map((product) => (
+                    <tr key={product.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-slate-800">{product.sku}</div>
+                      </td>
+                      <td className="px-4 py-3 md:px-6 md:py-4">
+                        <div className="text-sm font-medium text-slate-800">{product.name}</div>
+                      </td>
+                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                        <div className="text-sm text-slate-700">{product.category}</div>
+                      </td>
+                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-slate-800">
+                          {product.currentStock} {product.unit}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                        <div className="text-sm text-slate-700">
+                          {product.minStock} {product.unit}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                        <StatusBadge status={product.status} />
+                      </td>
+                      <td className="px-4 py-3 md:px-6 md:py-4">
+                        <div className="text-sm text-slate-700">{product.location}</div>
+                        <div className="text-xs text-slate-500 mt-1">更新: {product.lastUpdated}</div>
+                      </td>
+                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleEditProduct(product.id)}
+                            className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors"
+                          >
+                            编辑
+                          </button>
+                          <button
+                            onClick={() => handleOpenLedgerModal(product.id)}
+                            className="px-3 py-1.5 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors"
+                          >
+                            台账
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProduct(product.id)}
+                            className="px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors"
+                          >
+                            删除
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 分页控制 */}
+            <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex flex-col md:flex-row items-center md:items-center justify-center md:justify-between gap-4 md:gap-0">
+              <div className="w-full md:w-auto text-sm text-slate-600 text-center md:text-left">
+                显示第 {startIndex + 1} - {Math.min(endIndex, filteredProducts.length)} 条，共 {filteredProducts.length} 条记录
+              </div>
+              <div className="w-full md:w-auto flex justify-center flex-wrap items-center gap-2 whitespace-nowrap">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className={`px-3 py-1.5 rounded border text-sm ${
+                    currentPage === 1
+                      ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  上一页
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    const pageNum = i + 1;
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-3 py-1.5 rounded border text-sm ${
+                          currentPage === pageNum
+                            ? 'bg-slate-700 text-white'
+                            : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  {totalPages > 5 && (
+                    <>
+                      <span className="text-slate-400">...</span>
+                      <button
+                        onClick={() => setCurrentPage(totalPages)}
+                        className={`px-3 py-1.5 rounded border text-sm ${
+                          currentPage === totalPages
+                            ? 'bg-slate-700 text-white'
+                            : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {totalPages}
+                      </button>
+                    </>
+                  )}
+                </div>
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`px-3 py-1.5 rounded border text-sm ${
+                    currentPage === totalPages
+                      ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  下一页
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* 底部提示 */}

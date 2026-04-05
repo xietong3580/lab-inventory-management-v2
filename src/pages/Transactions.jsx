@@ -348,7 +348,7 @@ function Transactions() {
                 placeholder="产品名称、操作人..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent text-sm"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
               />
             </div>
 
@@ -360,7 +360,7 @@ function Transactions() {
               <select
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white text-sm"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
               >
                 {typeOptions.map((option) => (
                   <option key={option} value={option}>
@@ -378,7 +378,7 @@ function Transactions() {
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white text-sm"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
               >
                 {statusOptions.map((option) => (
                   <option key={option} value={option}>
@@ -396,7 +396,7 @@ function Transactions() {
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 w-full"
+                  className="px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 transition-colors w-full"
                 >
                   清空筛选
                 </button>
@@ -443,7 +443,7 @@ function Transactions() {
                 type="date"
                 value={dateRange.start}
                 onChange={(e) => handleDateChange('start', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent text-sm"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
               />
             </div>
 
@@ -456,7 +456,7 @@ function Transactions() {
                 type="date"
                 value={dateRange.end}
                 onChange={(e) => handleDateChange('end', e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent text-sm"
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
               />
             </div>
 
@@ -493,7 +493,7 @@ function Transactions() {
             {(searchTerm || selectedType !== 'all' || selectedStatus !== 'all' || selectedTimeRange !== 'all' || dateRange.start || dateRange.end) && (
               <button
                 type="button"
-                className="mt-6 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
+                className="mt-6 px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 transition-colors"
                 onClick={handleReset}
               >
                 清空筛选
