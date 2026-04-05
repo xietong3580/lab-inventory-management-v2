@@ -95,7 +95,7 @@ function AuditLog() {
 
       {/* 操作栏：导出按钮 */}
       <div className="mb-6 bg-white border border-slate-200 rounded-lg p-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-end gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-start md:justify-end gap-4">
           <button
             onClick={handleExport}
             disabled={filteredLogs.length === 0}
@@ -111,7 +111,7 @@ function AuditLog() {
       </div>
 
       {/* 筛选工具栏 */}
-      <div className="mb-6 bg-white border border-slate-200 rounded-lg p-3">
+      <div className="mb-6 bg-white border border-slate-200 rounded-lg p-4">
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* 产品名称搜索框 */}
@@ -259,7 +259,7 @@ function AuditLog() {
           {auditLogs.length === 0 ? (
             // 系统暂无日志
             <div className="py-12 text-center">
-              <div className="text-slate-500 mb-2">暂无操作记录</div>
+              <div className="text-slate-500 mb-2">暂无数据</div>
               <div className="text-sm text-slate-500 max-w-md mx-auto">
                 执行新增产品、编辑产品、出入库等操作后，这里会显示详细的操作日志记录。
               </div>
@@ -267,7 +267,7 @@ function AuditLog() {
           ) : filteredLogs.length === 0 ? (
             // 筛选无结果
             <div className="py-12 text-center">
-              <div className="text-slate-500 mb-2">未找到匹配的日志记录</div>
+              <div className="text-slate-500 mb-2">未找到匹配的记录</div>
               <div className="text-sm text-slate-500 max-w-md mx-auto mb-4">
                 当前筛选条件下未找到匹配的操作日志。请尝试：
               </div>
@@ -410,7 +410,7 @@ function AuditLog() {
 
             {/* 分页控制 */}
             {filteredLogs.length > 0 && (
-              <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex flex-col md:flex-row items-center md:items-center justify-center md:justify-between gap-4 md:gap-0 mt-4">
+              <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex flex-col md:flex-row items-center md:items-center justify-center md:justify-between gap-4 md:gap-0">
                 <div className="w-full md:w-auto text-sm text-slate-600 text-center md:text-left">
                   显示第 {startIndex + 1} - {Math.min(endIndex, filteredLogs.length)} 条，共 {filteredLogs.length} 条记录
                 </div>

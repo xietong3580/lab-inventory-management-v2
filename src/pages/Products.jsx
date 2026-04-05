@@ -413,7 +413,7 @@ function Products() {
         {allProducts.length === 0 ? (
           // 系统暂无产品
           <div className="py-12 text-center">
-            <div className="text-slate-500 mb-2">暂无产品数据</div>
+            <div className="text-slate-500 mb-2">暂无数据</div>
             <div className="text-sm text-slate-500 max-w-md mx-auto">
               点击"新增产品"按钮添加第一条产品记录。
             </div>
@@ -421,7 +421,7 @@ function Products() {
         ) : filteredProducts.length === 0 ? (
           // 筛选无结果
           <div className="py-12 text-center">
-            <div className="text-slate-500 mb-2">未找到匹配的产品</div>
+            <div className="text-slate-500 mb-2">未找到匹配的记录</div>
             <div className="text-sm text-slate-500 max-w-md mx-auto mb-4">
               当前筛选条件下未找到匹配的产品。请尝试：
             </div>

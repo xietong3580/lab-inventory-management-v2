@@ -354,7 +354,7 @@ function Transactions() {
       </div>
 
       {/* 筛选区域 */}
-      <div className="bg-white border border-slate-200 rounded-lg p-3 mb-6">
+      <div className="bg-white border border-slate-200 rounded-lg p-4 mb-6">
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* 关键字搜索 */}
@@ -490,7 +490,7 @@ function Transactions() {
         {transactionRecords.length === 0 ? (
           // 系统暂无记录
           <div className="py-12 text-center">
-            <div className="text-slate-500 mb-2">暂无出入库记录</div>
+            <div className="text-slate-500 mb-2">暂无数据</div>
             <div className="text-sm text-slate-500 max-w-md mx-auto">
               点击"新增记录"按钮添加第一条出入库记录。
             </div>
@@ -706,7 +706,7 @@ function Transactions() {
             </div>
 
             {/* 分页控制 */}
-            <div className="px-3 py-2 md:px-6 md:py-4 border-t border-slate-200 flex flex-col md:flex-row items-center md:items-center justify-center md:justify-between gap-4 md:gap-0">
+            <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex flex-col md:flex-row items-center md:items-center justify-center md:justify-between gap-4 md:gap-0">
               <div className="w-full md:w-auto text-sm text-slate-600 text-center md:text-left">
                 显示第 {startIndex + 1} - {Math.min(endIndex, filteredRecords.length)} 条，共 {filteredRecords.length} 条记录
               </div>
