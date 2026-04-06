@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { getProductsWithCalculatedStatus } from '../services/productService';
+import { productService } from '../services/dataService';
 
 // 紧急程度标签组件
 function UrgencyBadge({ urgency }) {
@@ -59,9 +59,54 @@ function Alerts() {
     return 'low';
   };
 
+  // 产品数据状态（通过统一服务层获取）
+  const [productsData, setProductsData] = useState({
+    productsWithStatus: [],
+    loading: true,
+    error: null
+  });
+
+  // 通过统一服务层获取产品数据
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchProductsData = async () => {
+      try {
+        setProductsData(prev => ({ ...prev, loading: true, error: null }));
+
+        // 通过统一服务层获取产品数据
+        const productsWithStatus = await productService.getProductsWithCalculatedStatus();
+
+        if (isMounted) {
+          setProductsData({
+            productsWithStatus,
+            loading: false,
+            error: null
+          });
+        }
+      } catch (error) {
+        console.error('[Alerts] 获取产品数据失败:', error);
+        if (isMounted) {
+          setProductsData(prev => ({
+            ...prev,
+            loading: false,
+            error: '产品数据加载失败，使用降级数据'
+          }));
+          // 错误时保持空数组，dynamicAlerts计算会使用空数组但不会崩溃
+        }
+      }
+    };
+
+    fetchProductsData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []); // 空依赖数组，只在组件挂载时获取一次
+
   // 实时计算动态预警数据（基于最新产品数据）
   const dynamicAlerts = useMemo(() => {
-    const products = getProductsWithCalculatedStatus();
+    const products = productsData.productsWithStatus || [];
 
     // 筛选低库存产品并转换为预警数据结构
     return products
@@ -74,7 +119,7 @@ function Alerts() {
         category: product.category,
         urgency: calculateUrgency(product)
       }));
-  }, []); // 空依赖数组，因为 getProductsWithCalculatedStatus 总是返回最新数据
+  }, [productsData.productsWithStatus]); // 依赖产品数据变化
 
   // 统计计算
   const totalAlerts = dynamicAlerts.length;
@@ -211,38 +256,56 @@ function Alerts() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {displayedAlerts.map((alert) => (
-                <tr key={alert.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-slate-800">{alert.productName}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-slate-700">{alert.category}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-lg font-semibold text-rose-600">{alert.currentStock}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-slate-700">{alert.minStock}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <StockRatioBar current={alert.currentStock} min={alert.minStock} />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <UrgencyBadge urgency={alert.urgency} />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex flex-col gap-2">
-                      <button className="px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors font-medium">
-                        立即补货
-                      </button>
-                      <button className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors">
-                        查看详情
-                      </button>
+              {productsData.loading ? (
+                <tr>
+                  <td colSpan="7" className="px-6 py-12 text-center">
+                    <div className="flex justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-700"></div>
                     </div>
+                    <p className="mt-2 text-slate-600">正在加载预警数据...</p>
                   </td>
                 </tr>
-              ))}
+              ) : productsData.error ? (
+                <tr>
+                  <td colSpan="7" className="px-6 py-12 text-center">
+                    <div className="text-rose-600 mb-2">⚠️ {productsData.error}</div>
+                    <p className="text-slate-600">将显示降级数据或空列表</p>
+                  </td>
+                </tr>
+              ) : (
+                displayedAlerts.map((alert) => (
+                  <tr key={alert.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-slate-800">{alert.productName}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-slate-700">{alert.category}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-lg font-semibold text-rose-600">{alert.currentStock}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-slate-700">{alert.minStock}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <StockRatioBar current={alert.currentStock} min={alert.minStock} />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <UrgencyBadge urgency={alert.urgency} />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-col gap-2">
+                        <button className="px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors font-medium">
+                          立即补货
+                        </button>
+                        <button className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors">
+                          查看详情
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
