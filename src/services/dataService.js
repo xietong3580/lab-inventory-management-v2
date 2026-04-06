@@ -41,6 +41,67 @@ export const setDataSourceMode = (mode) => {
  */
 export const getDataSourceMode = () => currentMode;
 
+// 字段映射配置：将API返回的字段名映射为前端期望的字段名
+const FIELD_MAPPING = {
+  // 产品字段映射
+  id: 'id',
+  sku: 'sku',
+  name: 'name',
+  category: 'category',
+  current_stock: 'currentStock',
+  min_stock: 'minStock',
+  unit: 'unit',
+  location: 'location',
+  last_updated: 'lastUpdated',
+  // 交易记录字段映射
+  product_name: 'productName',
+  transaction_type: 'type',
+  transaction_date: 'date',
+  // 审计日志字段映射
+  action_type: 'actionType',
+  product_id: 'productId',
+  timestamp: 'timestamp',
+  operator: 'operator',
+  details: 'details'
+};
+
+/**
+ * 规范化产品对象，确保字段名与前端期望一致
+ * @param {Object} product - API返回的产品对象
+ * @returns {Object} 规范化后的产品对象
+ */
+const normalizeProduct = (product) => {
+  if (!product || typeof product !== 'object') return product;
+
+  const normalized = {};
+
+  // 遍历映射配置，处理字段名转换
+  Object.entries(FIELD_MAPPING).forEach(([apiField, frontendField]) => {
+    if (apiField in product) {
+      normalized[frontendField] = product[apiField];
+    }
+  });
+
+  // 保留未映射的字段
+  Object.keys(product).forEach(key => {
+    if (!(key in FIELD_MAPPING)) {
+      normalized[key] = product[key];
+    }
+  });
+
+  return normalized;
+};
+
+/**
+ * 规范化产品列表
+ * @param {Array} products - API返回的产品列表
+ * @returns {Array} 规范化后的产品列表
+ */
+const normalizeProductList = (products) => {
+  if (!Array.isArray(products)) return [];
+  return products.map(normalizeProduct);
+};
+
 /**
  * 统一 API 请求封装
  */
@@ -97,7 +158,8 @@ export const productService = {
     } else {
       // API 模式
       const data = await apiRequest('/products/');
-      return data;
+      // 规范化字段名，确保与前端期望的字段名一致
+      return normalizeProductList(data);
     }
   },
 
@@ -112,7 +174,8 @@ export const productService = {
       return getProductById(id);
     } else {
       const data = await apiRequest(`/products/${id}`);
-      return data;
+      // 规范化字段名，确保与前端期望的字段名一致
+      return normalizeProduct(data);
     }
   },
 
@@ -130,7 +193,8 @@ export const productService = {
         method: 'POST',
         body: JSON.stringify(productData)
       });
-      return data;
+      // 规范化字段名，确保与前端期望的字段名一致
+      return normalizeProduct(data);
     }
   },
 
@@ -149,7 +213,8 @@ export const productService = {
         method: 'PUT',
         body: JSON.stringify(updates)
       });
-      return data;
+      // 规范化字段名，确保与前端期望的字段名一致
+      return normalizeProduct(data);
     }
   },
 

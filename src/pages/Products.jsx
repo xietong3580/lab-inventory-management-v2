@@ -23,6 +23,8 @@ function StatusBadge({ status }) {
 function Products() {
   const [allProducts, setAllProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
@@ -65,6 +67,8 @@ function Products() {
   // 初始化产品数据
   useEffect(() => {
     const loadProducts = async () => {
+      setIsLoading(true);
+      setError(null);
       try {
         const products = await dataProductService.getProductsWithCalculatedStatus();
         setAllProducts(products);
@@ -75,6 +79,10 @@ function Products() {
         const fallbackProducts = getProductsWithCalculatedStatus();
         setAllProducts(fallbackProducts);
         setFilteredProducts(fallbackProducts);
+        // 记录错误但继续使用降级数据
+        setError(`数据加载失败，已使用本地数据: ${error.message}`);
+      } finally {
+        setIsLoading(false);
       }
     };
     loadProducts();
@@ -470,6 +478,31 @@ function Products() {
           </div>
         </div>
       </div>
+
+      {/* 数据加载状态 */}
+      {isLoading && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+            <div className="text-blue-700 font-medium">正在加载产品数据...</div>
+          </div>
+        </div>
+      )}
+
+      {error && !isLoading && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="flex items-start">
+            <svg className="w-5 h-5 text-amber-600 mt-0.5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <div>
+              <div className="text-amber-800 font-medium">数据加载异常</div>
+              <div className="text-amber-700 text-sm mt-1">{error}</div>
+              <div className="text-amber-600 text-xs mt-2">系统已自动降级使用本地数据，功能不受影响。</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 产品表格 */}
       <div className="bg-white border border-slate-200 rounded-lg">
