@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { dashboardStats } from '../constants/mockData';
-import { getProductsWithCalculatedStatus, getAllProducts, getTransactions, getAuditLogs } from '../services/productService';
+import { getTransactions, getAuditLogs } from '../services/productService';
+import { productService } from '../services/dataService';
 import {
   formatAuditTime,
   generateAuditSummary,
@@ -306,6 +307,13 @@ function AuditLogStatsChart({ stats, maxCount }) {
 function Dashboard() {
   // 时间范围筛选状态
   const [timeRange, setTimeRange] = useState('7days'); // '7days', '30days', 'all'
+  // 产品数据状态（通过统一服务层获取）
+  const [productsData, setProductsData] = useState({
+    productsWithStatus: [],
+    allProducts: [],
+    loading: true,
+    error: null
+  });
 
   // 计算紧急程度（根据库存百分比）
   const calculateUrgency = (product) => {
@@ -315,14 +323,90 @@ function Dashboard() {
     return 'low';
   };
 
+  // 通过统一服务层获取产品数据
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchProductsData = async () => {
+      try {
+        setProductsData(prev => ({ ...prev, loading: true, error: null }));
+
+        // 通过统一服务层获取产品数据
+        const [productsWithStatus, allProducts] = await Promise.all([
+          productService.getProductsWithCalculatedStatus(),
+          productService.getAllProducts()
+        ]);
+
+        if (isMounted) {
+          setProductsData({
+            productsWithStatus,
+            allProducts,
+            loading: false,
+            error: null
+          });
+        }
+      } catch (error) {
+        console.error('[Dashboard] 获取产品数据失败:', error);
+        if (isMounted) {
+          setProductsData(prev => ({
+            ...prev,
+            loading: false,
+            error: '产品数据加载失败，使用降级数据'
+          }));
+          // 错误时保持空数组，dashboardData计算会使用空数组但不会崩溃
+        }
+      }
+    };
+
+    fetchProductsData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []); // 空依赖数组，只在组件挂载时获取一次
+
+  // 空数据兜底函数，避免加载过程中计算错误
+  const getEmptyDashboardData = () => {
+    const emptyDateRange = [];
+    return {
+      totalProducts: 0,
+      totalInventory: 0,
+      lowStockCount: 0,
+      normalStockCount: 0,
+      lowStockAlerts: [],
+      recentDaysTransactionsCount: 0,
+      recentDaysAuditLogsCount: 0,
+      transactionTrendData: emptyDateRange,
+      lowStockPercentage: 0,
+      top3LowStockProducts: [],
+      auditLogStatsArray: [],
+      maxAuditLogCount: 1,
+      recentTransactions: [],
+      recentAuditLogs: [],
+      transactionSummary: {
+        totalInCount: 0,
+        totalOutCount: 0,
+        totalTransactionsCount: 0,
+        totalQuantityCount: 0,
+        netChange: 0
+      },
+      inventoryTrendData: emptyDateRange,
+      transactionCompareData: emptyDateRange
+    };
+  };
 
   // 实时计算统计数据（基于最新产品数据）
   const dashboardData = useMemo(() => {
     // 根据时间范围确定天数，'all' 表示全部历史数据
     const days = timeRange === '7days' ? 7 : timeRange === '30days' ? 30 : null; // null 表示全部数据
 
-    const products = getProductsWithCalculatedStatus();
-    const allProducts = getAllProducts();
+    // 如果产品数据仍在加载，返回空数据避免计算错误
+    if (productsData.loading) {
+      return getEmptyDashboardData();
+    }
+
+    const products = productsData.productsWithStatus;
+    const allProducts = productsData.allProducts;
     const allTransactions = getTransactions();
     const allAuditLogs = getAuditLogs();
 
@@ -544,7 +628,7 @@ function Dashboard() {
       inventoryTrendData,
       transactionCompareData
     };
-  }, [timeRange]); // 依赖时间范围
+  }, [timeRange, productsData]); // 依赖时间范围和产品数据
 
   // 时间范围文本
   const rangeText = timeRange === '7days' ? '近7日' : timeRange === '30days' ? '近30日' : '全部';
