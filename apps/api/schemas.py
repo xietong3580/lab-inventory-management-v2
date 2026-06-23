@@ -41,15 +41,15 @@ class ProductResponse(ProductBase):
 
 # 交易记录相关模型
 class TransactionBase(BaseModel):
-    product_id: str
-    product_name: str
+    product_id: str = Field(..., alias="productId")
     type: str  # '入库'/'出库'
     quantity: int
-    unit: str
-    date: str
     operator: str
-    status: str = "completed"
     notes: Optional[str] = ""
+    status: str = "completed"
+
+    class Config:
+        populate_by_name = True  # 允许同时使用字段名和别名
 
 class TransactionCreate(TransactionBase):
     """创建交易记录请求模型"""

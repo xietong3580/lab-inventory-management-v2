@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { productService as dataProductService } from '../services/dataService';
-import { getProductsWithCalculatedStatus, calculateProductStatus, updateProduct, addProduct, deleteProduct, getProductInventoryLedger } from '../services/productService';
+import { getProductsWithCalculatedStatus, calculateProductStatus, updateProduct, addProduct, deleteProduct } from '../services/productService';
 import { getLedgerTypeConfig, formatLedgerTime } from '../utils/inventoryHistoryHelpers';
 import { filterProducts, hasActiveFilters } from '../utils/productFilterHelpers';
 import { exportProductsToCSV } from '../utils/exportHelpers';
 
-// 状态标签组件
+// 产品状态标签组件
 function StatusBadge({ status }) {
   const config = {
     正常: { text: '正常', bg: 'bg-emerald-50', textColor: 'text-emerald-700' },
@@ -15,6 +15,21 @@ function StatusBadge({ status }) {
 
   return (
     <span className={`px-2 py-1 rounded text-xs font-medium ${bg} ${textColor}`}>
+      {text}
+    </span>
+  );
+}
+
+// 台账状态标签组件
+function LedgerStatusBadge({ status }) {
+  const config = {
+    completed: { text: '已完成', bg: 'bg-emerald-50', textColor: 'text-emerald-700', border: 'border-emerald-200' },
+    reversed: { text: '已撤销', bg: 'bg-slate-50', textColor: 'text-slate-600', border: 'border-slate-300' },
+  };
+  const { text, bg, textColor, border } = config[status] || config.completed;
+
+  return (
+    <span className={`px-2 py-1 rounded text-xs font-medium border ${bg} ${textColor} ${border}`}>
       {text}
     </span>
   );
@@ -104,7 +119,7 @@ function Products() {
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(1);
     }
-  }, [allProducts, searchTerm, selectedCategory, selectedStatus, minStock, maxStock]);
+  }, [allProducts, searchTerm, selectedCategory, selectedStatus, minStock, maxStock, currentPage, itemsPerPage]);
 
   // 当筛选条件变化时，重置到第一页（提供更及时的响应）
   useEffect(() => {
@@ -309,7 +324,7 @@ function Products() {
   };
 
   // 打开台账弹窗
-  const handleOpenLedgerModal = (productId) => {
+  const handleOpenLedgerModal = async (productId) => {
     const product = allProducts.find(p => p.id === productId);
     if (!product) return;
 
@@ -318,7 +333,7 @@ function Products() {
     setLedgerModalOpen(true);
 
     try {
-      const ledger = getProductInventoryLedger(productId);
+      const ledger = await dataProductService.getProductInventoryLedger(productId);
       setLedgerData(ledger);
     } catch (error) {
       console.error('获取台账数据失败:', error);
@@ -896,6 +911,9 @@ function Products() {
                               类型
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                              状态
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
                               变动数量
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
@@ -926,6 +944,9 @@ function Products() {
                                   </span>
                                 </td>
                                 <td className="px-4 py-3 whitespace-nowrap">
+                                  <LedgerStatusBadge status={entry.status} />
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap">
                                   <div className={`text-sm font-medium ${entry.stockChange > 0 ? 'text-emerald-700' : entry.stockChange < 0 ? 'text-rose-700' : 'text-slate-700'}`}>
                                     {entry.stockChange > 0 ? '+' : ''}{entry.stockChange} {entry.unit}
                                   </div>
@@ -944,7 +965,12 @@ function Products() {
                                   <div className="text-sm text-slate-700">{entry.operator || '系统'}</div>
                                 </td>
                                 <td className="px-4 py-3">
-                                  <div className="text-sm text-slate-700 max-w-xs">{entry.notes || '-'}</div>
+                                  <div className="text-sm text-slate-700 max-w-xs">
+                                    {entry.notes || '-'}
+                                    {entry.status === 'reversed' && (
+                                      <div className="text-xs text-slate-500 mt-1">已撤销，不计入库存</div>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -961,9 +987,12 @@ function Products() {
                       return (
                         <div key={entry.id} className="border border-slate-200 rounded-lg p-4 bg-white">
                           <div className="flex justify-between items-start mb-3">
-                            <span className={`px-2 py-1 rounded text-xs font-medium border ${typeConfig.color}`}>
-                              {typeConfig.label}
-                            </span>
+                            <div className="flex flex-col gap-1">
+                              <span className={`px-2 py-1 rounded text-xs font-medium border ${typeConfig.color}`}>
+                                {typeConfig.label}
+                              </span>
+                              <LedgerStatusBadge status={entry.status} />
+                            </div>
                             <div className="text-sm text-slate-500">{formatLedgerTime(entry.timestamp)}</div>
                           </div>
 
@@ -995,12 +1024,15 @@ function Products() {
                             </div>
                           </div>
 
-                          {entry.notes && (
-                            <div>
-                              <div className="text-xs text-slate-500 mb-1">摘要说明</div>
-                              <div className="text-sm text-slate-700">{entry.notes}</div>
+                          <div>
+                            <div className="text-xs text-slate-500 mb-1">摘要说明</div>
+                            <div className="text-sm text-slate-700">
+                              {entry.notes || '-'}
+                              {entry.status === 'reversed' && (
+                                <div className="text-xs text-slate-500 mt-1">已撤销，不计入库存</div>
+                              )}
                             </div>
-                          )}
+                          </div>
                         </div>
                       );
                     })}

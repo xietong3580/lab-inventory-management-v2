@@ -54,6 +54,8 @@ class Product(Base):
 
     def to_dict(self):
         """转换为字典格式（与前端数据结构对齐）"""
+        # 实时计算库存状态，不信任数据库中可能过期的 status 字段
+        status = "低库存" if self.current_stock <= self.min_stock else "正常"
         return {
             "id": f"prod-{self.id:06d}",  # 与前端 ID 格式对齐
             "sku": self.sku,
@@ -63,7 +65,7 @@ class Product(Base):
             "minStock": self.min_stock,
             "unit": self.unit,
             "location": self.location or "",
-            "status": self.status,
+            "status": status,
             "lastUpdated": self.last_updated or "",
         }
 
@@ -92,6 +94,7 @@ class Transaction(Base):
         """转换为字典格式"""
         return {
             "id": f"txn-{self.id:06d}",
+            "productId": f"prod-{self.product_id:06d}",
             "productName": self.product_name,
             "type": self.type,
             "quantity": self.quantity,
@@ -126,4 +129,28 @@ class AuditLog(Base):
             "operator": self.operator,
             "timestamp": self.timestamp,
             "details": self.details,
+        }
+
+class User(Base):
+    """用户模型（最小可用版，不含密码/鉴权）"""
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(50), unique=True, nullable=False)
+    email = Column(String(100), nullable=True)
+    role = Column(String(30), nullable=False, default="操作员")
+    status = Column(String(20), nullable=False, default="活跃")  # 活跃/停用
+    last_login = Column(String(50), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.now)
+
+    def to_dict(self):
+        """转换为字典格式"""
+        return {
+            "id": f"user-{self.id:06d}",
+            "username": self.username,
+            "email": self.email or "",
+            "role": self.role,
+            "status": self.status,
+            "lastLogin": self.last_login or "",
         }

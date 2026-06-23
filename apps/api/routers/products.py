@@ -26,7 +26,11 @@ def get_products(
         query = query.filter(Product.category == category)
 
     if status and status != "all":
-        query = query.filter(Product.status == status)
+        # 实时计算库存状态进行筛选，不依赖数据库旧 status 字段
+        if status == "低库存":
+            query = query.filter(Product.current_stock <= Product.min_stock)
+        elif status == "正常":
+            query = query.filter(Product.current_stock > Product.min_stock)
 
     products = query.offset(skip).limit(limit).all()
     return [product.to_dict() for product in products]

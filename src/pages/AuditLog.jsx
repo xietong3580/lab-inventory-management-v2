@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { getAuditLogs } from '../services/productService';
+import { auditLogService } from '../services/dataService';
 import {
   formatAuditTime,
   generateAuditSummary,
@@ -13,6 +13,8 @@ import { exportAuditLogsToCSV } from '../utils/exportHelpers';
 function AuditLog() {
   // 审计日志数据状态
   const [auditLogs, setAuditLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   // 筛选状态
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedActionType, setSelectedActionType] = useState('');
@@ -56,8 +58,31 @@ function AuditLog() {
 
   // 加载审计日志数据
   useEffect(() => {
-    const logs = getAuditLogs(); // 已按时间倒序排列
-    setAuditLogs(logs);
+    const loadAuditLogs = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const logs = await auditLogService.getAuditLogs();
+        // 确保按时间倒序排列（最新在前）
+        const sortedLogs = [...logs].sort((a, b) => {
+          if (!a.timestamp || !b.timestamp) return 0;
+          try {
+            return new Date(b.timestamp) - new Date(a.timestamp);
+          } catch {
+            return 0;
+          }
+        });
+        setAuditLogs(sortedLogs);
+      } catch (error) {
+        console.error('加载审计日志失败:', error);
+        setError(`数据加载失败: ${error.message}`);
+        // 降级使用空数组，页面仍可正常显示
+        setAuditLogs([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadAuditLogs();
   }, []);
 
   // 筛选后的日志
@@ -256,7 +281,24 @@ function AuditLog() {
         </div>
 
         <div className="p-4">
-          {auditLogs.length === 0 ? (
+          {loading ? (
+            // 加载状态
+            <div className="py-12 text-center">
+              <div className="flex justify-center mb-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-700"></div>
+              </div>
+              <div className="text-slate-600">正在加载审计日志...</div>
+            </div>
+          ) : error ? (
+            // 错误状态
+            <div className="py-12 text-center">
+              <div className="text-rose-600 mb-2">⚠️ 数据加载异常</div>
+              <div className="text-sm text-slate-600 max-w-md mx-auto mb-4">{error}</div>
+              <div className="text-sm text-slate-500 max-w-md mx-auto">
+                系统已自动降级使用空数据，页面功能可能受限。
+              </div>
+            </div>
+          ) : auditLogs.length === 0 ? (
             // 系统暂无日志
             <div className="py-12 text-center">
               <div className="text-slate-500 mb-2">暂无数据</div>

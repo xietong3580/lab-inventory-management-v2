@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { getTransactions, addTransaction, getAllProducts, reverseTransaction } from '../services/productService';
+import { transactionService, productService } from '../services/dataService';
 import { exportTransactionsToCSV } from '../utils/exportHelpers';
 
 // 类型标签组件
@@ -48,6 +48,8 @@ function Transactions() {
   // 交易记录和产品数据
   const [transactionRecords, setTransactionRecords] = useState([]);
   const [products, setProducts] = useState([]);
+  const [loadingTransactions, setLoadingTransactions] = useState(false);
+  const [errorTransactions, setErrorTransactions] = useState(null);
 
   // 模态框和表单相关状态
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -68,8 +70,33 @@ function Transactions() {
 
   // 初始化数据
   useEffect(() => {
-    setTransactionRecords(getTransactions());
-    setProducts(getAllProducts());
+    const fetchData = async () => {
+      setLoadingTransactions(true);
+      setErrorTransactions(null);
+
+      try {
+        // 获取交易记录
+        const transactions = await transactionService.getTransactions();
+        setTransactionRecords(transactions);
+      } catch (error) {
+        console.error('[Transactions] 获取交易记录失败:', error);
+        setErrorTransactions('交易记录加载失败，使用降级数据');
+        // 保持空数组，页面仍可正常显示
+      } finally {
+        setLoadingTransactions(false);
+      }
+
+      try {
+        // 获取产品数据
+        const productsData = await productService.getAllProducts();
+        setProducts(productsData);
+      } catch (error) {
+        console.error('[Transactions] 获取产品数据失败:', error);
+        // 产品数据加载失败，下拉框可能为空，但不影响页面核心功能
+      }
+    };
+
+    fetchData();
   }, []);
 
   // 筛选交易记录
@@ -157,6 +184,18 @@ function Transactions() {
       );
     }
 
+    // 6. 按时间倒序排序（最新在前）
+    filtered.sort((a, b) => {
+      if (!a.date || !b.date) return 0;
+      try {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return dateB - dateA; // 降序：最新在前
+      } catch {
+        return 0;
+      }
+    });
+
     return filtered;
   }, [transactionRecords, selectedTimeRange, dateRange, selectedType, selectedStatus, searchTerm]);
 
@@ -221,7 +260,7 @@ function Transactions() {
   };
 
   // 表单提交 - 新增交易记录
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
 
@@ -241,7 +280,7 @@ function Transactions() {
 
     try {
       // 调用服务添加交易记录
-      addTransaction({
+      await transactionService.addTransaction({
         productId: formData.productId,
         type: formData.type,
         quantity: Number(formData.quantity),
@@ -250,9 +289,11 @@ function Transactions() {
       });
 
       // 刷新交易记录列表
-      setTransactionRecords(getTransactions());
+      const updatedTransactions = await transactionService.getTransactions();
+      setTransactionRecords(updatedTransactions);
       // 刷新产品列表（其他页面会用到）
-      setProducts(getAllProducts());
+      const updatedProducts = await productService.getAllProducts();
+      setProducts(updatedProducts);
 
       // 关闭模态框并重置表单
       handleCloseModal();
@@ -275,18 +316,20 @@ function Transactions() {
   };
 
   // 确认撤销交易记录
-  const handleConfirmReverse = () => {
+  const handleConfirmReverse = async () => {
     if (!reversingTransactionId) return;
 
     try {
       setReversalError('');
-      // 调用撤销函数（同步）
-      reverseTransaction(reversingTransactionId, '当前用户');
+      // 调用撤销函数（异步）
+      await transactionService.reverseTransaction(reversingTransactionId, '当前用户');
 
       // 刷新交易记录列表
-      setTransactionRecords(getTransactions());
+      const updatedTransactions = await transactionService.getTransactions();
+      setTransactionRecords(updatedTransactions);
       // 刷新产品列表（其他页面会用到）
-      setProducts(getAllProducts());
+      const updatedProducts = await productService.getAllProducts();
+      setProducts(updatedProducts);
 
       // 关闭确认对话框
       setReversingTransactionId(null);
@@ -487,7 +530,23 @@ function Transactions() {
 
       {/* 记录表格和卡片 */}
       <div className="bg-white border border-slate-200 rounded-lg">
-        {transactionRecords.length === 0 ? (
+        {loadingTransactions ? (
+          // 加载状态
+          <div className="py-12 text-center">
+            <div className="flex justify-center mb-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-700"></div>
+            </div>
+            <div className="text-slate-600">正在加载交易记录...</div>
+          </div>
+        ) : errorTransactions ? (
+          // 错误状态
+          <div className="py-12 text-center">
+            <div className="text-rose-600 mb-2">⚠️ {errorTransactions}</div>
+            <div className="text-sm text-slate-600 max-w-md mx-auto">
+              将显示降级数据或空列表，页面功能可能受限。
+            </div>
+          </div>
+        ) : transactionRecords.length === 0 ? (
           // 系统暂无记录
           <div className="py-12 text-center">
             <div className="text-slate-500 mb-2">暂无数据</div>

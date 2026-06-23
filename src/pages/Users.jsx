@@ -1,53 +1,36 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { userService } from '../services/dataService';
 
 function Users() {
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // 模拟用户数据
-  const users = [
-    {
-      id: 'user-001',
-      username: 'admin',
-      email: 'admin@example.com',
-      role: '管理员',
-      status: '活跃',
-      lastLogin: '2026-03-29 15:30',
-    },
-    {
-      id: 'user-002',
-      username: 'zhang.san',
-      email: 'zhang.san@example.com',
-      role: '仓库管理员',
-      status: '活跃',
-      lastLogin: '2026-03-28 10:20',
-    },
-    {
-      id: 'user-003',
-      username: 'li.si',
-      email: 'li.si@example.com',
-      role: '操作员',
-      status: '活跃',
-      lastLogin: '2026-03-27 14:45',
-    },
-    {
-      id: 'user-004',
-      username: 'wang.wu',
-      email: 'wang.wu@example.com',
-      role: '查看者',
-      status: '停用',
-      lastLogin: '2026-03-20 09:15',
-    },
-    {
-      id: 'user-005',
-      username: 'zhao.liu',
-      email: 'zhao.liu@example.com',
-      role: '操作员',
-      status: '活跃',
-      lastLogin: '2026-03-29 11:10',
-    },
-  ];
+  // 用户数据状态
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // 加载用户数据
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await userService.getAllUsers();
+        setUsers(data);
+      } catch (err) {
+        console.error('[Users] 加载用户数据失败:', err);
+        setError(err.message || '加载用户数据失败');
+        // 出错时保持空数组
+        setUsers([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUsers();
+  }, []);
 
   // 分页计算
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -118,127 +101,162 @@ function Users() {
 
       {/* 用户表格 */}
       <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-[800px] md:min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  用户名
-                </th>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  邮箱
-                </th>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  角色
-                </th>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  状态
-                </th>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  最后登录
-                </th>
-                <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {displayedUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-slate-800">{user.username}</div>
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                    <div className="text-sm text-slate-700">{user.email}</div>
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                    <RoleBadge role={user.role} />
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                    <StatusBadge status={user.status} />
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                    <div className="text-sm text-slate-700">{user.lastLogin}</div>
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <button className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors">
-                        编辑
-                      </button>
-                      <button className="px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors">
-                        {user.status === '停用' ? '启用' : '停用'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* 分页控制 */}
-        <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex flex-col md:flex-row items-center md:items-center justify-center md:justify-between gap-4 md:gap-0">
-          <div className="w-full md:w-auto text-sm text-slate-600 text-center md:text-left">
-            显示第 {startIndex + 1} - {Math.min(endIndex, users.length)} 条，共 {users.length} 条记录
+        {loading ? (
+          // 加载状态
+          <div className="p-8 text-center">
+            <div className="inline-block w-8 h-8 border-2 border-slate-300 border-t-slate-700 rounded-full animate-spin"></div>
+            <div className="mt-3 text-sm text-slate-600">正在加载用户数据...</div>
           </div>
-          <div className="w-full md:w-auto flex justify-center flex-wrap items-center gap-2 whitespace-nowrap">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className={`px-3 py-1.5 rounded border text-sm ${
-                currentPage === 1
-                  ? 'border-slate-200 text-slate-400 cursor-not-allowed'
-                  : 'border-slate-300 text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              上一页
-            </button>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const pageNum = i + 1;
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`px-3 py-1.5 rounded border text-sm ${
-                      currentPage === pageNum
-                        ? 'bg-slate-700 text-white'
-                        : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-              {totalPages > 5 && (
-                <>
-                  <span className="text-slate-400">...</span>
-                  <button
-                    onClick={() => setCurrentPage(totalPages)}
-                    className={`px-3 py-1.5 rounded border text-sm ${
-                      currentPage === totalPages
-                        ? 'bg-slate-700 text-white'
-                        : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    {totalPages}
-                  </button>
-                </>
-              )}
+        ) : error ? (
+          // 错误状态
+          <div className="p-8 text-center">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-rose-50 flex items-center justify-center">
+              <span className="text-2xl text-rose-600">!</span>
             </div>
+            <div className="text-sm font-medium text-rose-800 mb-2">加载用户数据失败</div>
+            <div className="text-sm text-slate-600 mb-4">{error}</div>
             <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className={`px-3 py-1.5 rounded border text-sm ${
-                currentPage === totalPages
-                  ? 'border-slate-200 text-slate-400 cursor-not-allowed'
-                  : 'border-slate-300 text-slate-700 hover:bg-slate-50'
-              }`}
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors font-medium"
             >
-              下一页
+              重试
             </button>
           </div>
-        </div>
+        ) : users.length === 0 ? (
+          // 空数据状态
+          <div className="p-8 text-center">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-slate-50 flex items-center justify-center">
+              <span className="text-2xl text-slate-500">👤</span>
+            </div>
+            <div className="text-sm font-medium text-slate-800 mb-2">暂无用户数据</div>
+            <div className="text-sm text-slate-600">系统当前没有用户记录</div>
+          </div>
+        ) : (
+          // 正常数据状态
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-[800px] md:min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                      用户名
+                    </th>
+                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                      邮箱
+                    </th>
+                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                      角色
+                    </th>
+                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                      状态
+                    </th>
+                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                      最后登录
+                    </th>
+                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                      操作
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {displayedUsers.map((user) => (
+                    <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-slate-800">{user.username}</div>
+                      </td>
+                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                        <div className="text-sm text-slate-700">{user.email}</div>
+                      </td>
+                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                        <RoleBadge role={user.role} />
+                      </td>
+                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                        <StatusBadge status={user.status} />
+                      </td>
+                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                        <div className="text-sm text-slate-700">{user.lastLogin}</div>
+                      </td>
+                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <button className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors">
+                            编辑
+                          </button>
+                          <button className="px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors">
+                            {user.status === '停用' ? '启用' : '停用'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 分页控制 */}
+            <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex flex-col md:flex-row items-center md:items-center justify-center md:justify-between gap-4 md:gap-0">
+              <div className="w-full md:w-auto text-sm text-slate-600 text-center md:text-left">
+                显示第 {startIndex + 1} - {Math.min(endIndex, users.length)} 条，共 {users.length} 条记录
+              </div>
+              <div className="w-full md:w-auto flex justify-center flex-wrap items-center gap-2 whitespace-nowrap">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className={`px-3 py-1.5 rounded border text-sm ${
+                    currentPage === 1
+                      ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  上一页
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    const pageNum = i + 1;
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-3 py-1.5 rounded border text-sm ${
+                          currentPage === pageNum
+                            ? 'bg-slate-700 text-white'
+                            : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  {totalPages > 5 && (
+                    <>
+                      <span className="text-slate-400">...</span>
+                      <button
+                        onClick={() => setCurrentPage(totalPages)}
+                        className={`px-3 py-1.5 rounded border text-sm ${
+                          currentPage === totalPages
+                            ? 'bg-slate-700 text-white'
+                            : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {totalPages}
+                      </button>
+                    </>
+                  )}
+                </div>
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`px-3 py-1.5 rounded border text-sm ${
+                    currentPage === totalPages
+                      ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  下一页
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* 底部提示 */}

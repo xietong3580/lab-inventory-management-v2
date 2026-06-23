@@ -1,11 +1,19 @@
-import { useState } from 'react';
-import { resetStorageData } from '../services/productService';
+import { useState, useEffect } from 'react';
+import { systemService } from '../services/dataService';
 
 function Settings() {
   // 重置相关状态
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetResult, setResetResult] = useState(null);
   const [isResetting, setIsResetting] = useState(false);
+  // 数据源模式状态
+  const [dataSourceMode, setDataSourceMode] = useState('unknown');
+
+  // 获取数据源模式
+  useEffect(() => {
+    const mode = systemService.getDataSourceMode();
+    setDataSourceMode(mode);
+  }, []);
 
   // 打开重置确认对话框
   const handleOpenResetConfirm = () => {
@@ -20,17 +28,17 @@ function Settings() {
   };
 
   // 确认执行重置
-  const handleConfirmReset = () => {
+  const handleConfirmReset = async () => {
     setIsResetting(true);
     setResetResult(null);
 
     try {
-      // 执行重置操作
-      const result = resetStorageData();
+      // 执行重置操作（根据数据源模式执行不同逻辑）
+      const result = await systemService.resetData();
       setResetResult(result);
 
-      // 重置成功后刷新页面
-      if (result.success) {
+      // 重置成功后刷新页面（仅mock模式成功时）
+      if (result.success && dataSourceMode === 'mock') {
         setTimeout(() => {
           window.location.reload();
         }, 1500);
@@ -227,6 +235,24 @@ function Settings() {
                 </button>
               </div>
               <div className="pt-4 border-t border-slate-100">
+                <div className="font-medium text-slate-800 mb-2">数据源状态</div>
+                <div className="mb-3 p-3 bg-slate-50 border border-slate-200 rounded-md">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-700">当前数据源模式:</span>
+                    <span className={`text-sm font-medium px-2 py-1 rounded ${dataSourceMode === 'api' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                      {dataSourceMode === 'api' ? 'API 模式 (真实数据)' : dataSourceMode === 'mock' ? 'MOCK 模式 (演示数据)' : '未知'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-500 mt-2">
+                    {dataSourceMode === 'api'
+                      ? '系统当前使用真实后端数据，重置操作仅影响本地缓存。'
+                      : dataSourceMode === 'mock'
+                      ? '系统当前使用本地演示数据，重置操作将恢复为初始测试状态。'
+                      : '数据源模式检测中...'}
+                  </div>
+                </div>
+              </div>
+              <div className="pt-4 border-t border-slate-100">
                 <div className="font-medium text-slate-800 mb-2">开发调试</div>
                 <p className="text-sm text-slate-600 mb-3">
                   重置本地测试数据。此操作将清空当前浏览器中的本地演示数据，恢复为初始测试状态。
@@ -297,10 +323,14 @@ function Settings() {
                     </div>
                     <div>
                       <div className="text-sm font-medium text-rose-800 mb-1">
-                        此操作将清空当前浏览器中的本地演示数据
+                        {dataSourceMode === 'api'
+                          ? '当前为 API 模式，重置操作仅影响本地缓存'
+                          : '此操作将清空当前浏览器中的本地演示数据'}
                       </div>
                       <div className="text-sm text-rose-700">
-                        系统会恢复为初始测试状态，请谨慎操作
+                        {dataSourceMode === 'api'
+                          ? '系统数据来自真实后端，重置不会影响真实业务数据'
+                          : '系统会恢复为初始测试状态，请谨慎操作'}
                       </div>
                     </div>
                   </div>
@@ -309,22 +339,45 @@ function Settings() {
                 <div className="text-sm text-slate-700 mb-4">
                   <p className="font-medium text-slate-800 mb-2">操作影响：</p>
                   <ul className="space-y-2 pl-5">
-                    <li className="flex items-start">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-500 mt-1.5 mr-2"></span>
-                      <span>清空所有产品、交易记录、审计日志的本地存储</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-500 mt-1.5 mr-2"></span>
-                      <span>恢复为初始 mock 测试数据</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 mr-2"></span>
-                      <span>此操作仅影响当前浏览器本地数据，不影响真实业务系统</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 mr-2"></span>
-                      <span>重置成功后页面将自动刷新</span>
-                    </li>
+                    {dataSourceMode === 'api' ? (
+                      <>
+                        <li className="flex items-start">
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-500 mt-1.5 mr-2"></span>
+                          <span>仅清空浏览器本地缓存数据，不影响真实后端数据</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-500 mt-1.5 mr-2"></span>
+                          <span>页面刷新后将重新从 API 加载真实数据</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 mr-2"></span>
+                          <span>此操作不会影响真实业务系统的产品库存和交易记录</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 mr-2"></span>
+                          <span>重置成功后页面将自动刷新，重新加载 API 数据</span>
+                        </li>
+                      </>
+                    ) : (
+                      <>
+                        <li className="flex items-start">
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-500 mt-1.5 mr-2"></span>
+                          <span>清空所有产品、交易记录、审计日志的本地存储</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-500 mt-1.5 mr-2"></span>
+                          <span>恢复为初始 mock 测试数据</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 mr-2"></span>
+                          <span>此操作仅影响当前浏览器本地数据，不影响真实业务系统</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 mr-2"></span>
+                          <span>重置成功后页面将自动刷新</span>
+                        </li>
+                      </>
+                    )}
                   </ul>
                 </div>
               </div>

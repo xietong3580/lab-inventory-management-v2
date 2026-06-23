@@ -54,15 +54,26 @@ const FIELD_MAPPING = {
   location: 'location',
   last_updated: 'lastUpdated',
   // 交易记录字段映射
+  transaction_id: 'id',
+  product_id: 'productId',
   product_name: 'productName',
   transaction_type: 'type',
   transaction_date: 'date',
+  quantity: 'quantity',
+  operator: 'operator',
+  notes: 'notes',
+  status: 'status',
+  created_at: 'createdAt',
   // 审计日志字段映射
   action_type: 'actionType',
-  product_id: 'productId',
   timestamp: 'timestamp',
-  operator: 'operator',
-  details: 'details'
+  details: 'details',
+  // 用户字段映射
+  username: 'username',
+  email: 'email',
+  role: 'role',
+  user_status: 'status',
+  last_login: 'lastLogin'
 };
 
 /**
@@ -103,6 +114,150 @@ const normalizeProductList = (products) => {
 };
 
 /**
+ * 规范化交易记录对象，确保字段名与前端期望一致
+ * @param {Object} transaction - API返回的交易对象
+ * @returns {Object} 规范化后的交易对象
+ */
+const normalizeTransaction = (transaction) => {
+  if (!transaction || typeof transaction !== 'object') return transaction;
+
+  const normalized = {};
+
+  // 遍历映射配置，处理字段名转换
+  Object.entries(FIELD_MAPPING).forEach(([apiField, frontendField]) => {
+    if (apiField in transaction) {
+      normalized[frontendField] = transaction[apiField];
+    }
+  });
+
+  // 保留未映射的字段
+  Object.keys(transaction).forEach(key => {
+    if (!(key in FIELD_MAPPING)) {
+      normalized[key] = transaction[key];
+    }
+  });
+
+  // 确保必要字段存在
+  if (!normalized.id && transaction.transaction_id) {
+    normalized.id = transaction.transaction_id;
+  }
+  if (!normalized.productId && transaction.product_id) {
+    normalized.productId = transaction.product_id;
+  }
+  if (!normalized.type && transaction.transaction_type) {
+    normalized.type = transaction.transaction_type;
+  }
+  if (!normalized.date && transaction.transaction_date) {
+    normalized.date = transaction.transaction_date;
+  }
+  if (!normalized.createdAt && transaction.created_at) {
+    normalized.createdAt = transaction.created_at;
+  }
+
+  return normalized;
+};
+
+/**
+ * 规范化交易记录列表
+ * @param {Array} transactions - API返回的交易列表
+ * @returns {Array} 规范化后的交易列表
+ */
+const normalizeTransactionList = (transactions) => {
+  if (!Array.isArray(transactions)) return [];
+  return transactions.map(normalizeTransaction);
+};
+
+/**
+ * 规范化审计日志对象，确保字段名与前端期望一致
+ * @param {Object} auditLog - API返回的审计日志对象
+ * @returns {Object} 规范化后的审计日志对象
+ */
+const normalizeAuditLog = (auditLog) => {
+  if (!auditLog || typeof auditLog !== 'object') return auditLog;
+
+  const normalized = {};
+
+  // 遍历映射配置，处理字段名转换
+  Object.entries(FIELD_MAPPING).forEach(([apiField, frontendField]) => {
+    if (apiField in auditLog) {
+      normalized[frontendField] = auditLog[apiField];
+    }
+  });
+
+  // 保留未映射的字段
+  Object.keys(auditLog).forEach(key => {
+    if (!(key in FIELD_MAPPING)) {
+      normalized[key] = auditLog[key];
+    }
+  });
+
+  // 确保必要字段存在
+  if (!normalized.timestamp && auditLog.created_at) {
+    normalized.timestamp = auditLog.created_at;
+  }
+  if (!normalized.actionType && auditLog.action_type) {
+    normalized.actionType = auditLog.action_type;
+  }
+
+  return normalized;
+};
+
+/**
+ * 规范化审计日志列表
+ * @param {Array} auditLogs - API返回的审计日志列表
+ * @returns {Array} 规范化后的审计日志列表
+ */
+const normalizeAuditLogList = (auditLogs) => {
+  if (!Array.isArray(auditLogs)) return [];
+  return auditLogs.map(normalizeAuditLog);
+};
+
+/**
+ * 规范化用户对象，确保字段名与前端期望一致
+ * @param {Object} user - API返回的用户对象
+ * @returns {Object} 规范化后的用户对象
+ */
+const normalizeUser = (user) => {
+  if (!user || typeof user !== 'object') return user;
+
+  const normalized = {};
+
+  // 遍历映射配置，处理字段名转换
+  Object.entries(FIELD_MAPPING).forEach(([apiField, frontendField]) => {
+    if (apiField in user) {
+      normalized[frontendField] = user[apiField];
+    }
+  });
+
+  // 保留未映射的字段
+  Object.keys(user).forEach(key => {
+    if (!(key in FIELD_MAPPING)) {
+      normalized[key] = user[key];
+    }
+  });
+
+  // 确保必要字段存在
+  if (!normalized.id && user.user_id) {
+    normalized.id = user.user_id;
+  }
+  if (!normalized.status && user.user_status) {
+    normalized.status = user.user_status;
+  }
+
+  return normalized;
+};
+
+/**
+ * 规范化用户列表
+ * @param {Array} users - API返回的用户列表
+ * @returns {Array} 规范化后的用户列表
+ */
+const normalizeUserList = (users) => {
+  if (!Array.isArray(users)) return [];
+  return users.map(normalizeUser);
+};
+
+/**
  * 统一 API 请求封装
  */
 const apiRequest = async (endpoint, options = {}) => {
@@ -132,10 +287,10 @@ const apiRequest = async (endpoint, options = {}) => {
     clearTimeout(timeoutId);
     console.error(`[dataService] API 请求失败: ${endpoint}`, error);
 
-    // 如果 API 失败，自动降级到 mock 模式
+    // API 模式下不自动降级到 mock，让调用方决定如何处理错误
+    // 生产环境不能静默显示假数据
     if (currentMode === DATA_SOURCE_MODE.API) {
-      console.warn(`[dataService] API 请求失败，自动降级到 mock 模式`);
-      currentMode = DATA_SOURCE_MODE.MOCK;
+      console.error(`[dataService] API 模式下请求失败，不降级：${endpoint}`);
     }
 
     throw error;
@@ -244,12 +399,18 @@ export const productService = {
       const { getProductsWithCalculatedStatus } = await import('./productService.js');
       return getProductsWithCalculatedStatus();
     } else {
-      const products = await this.getAllProducts();
-      // 计算状态
-      return products.map(product => ({
-        ...product,
-        status: this.calculateProductStatus(product)
-      }));
+      try {
+        const products = await this.getAllProducts();
+        // 计算状态
+        return products.map(product => ({
+          ...product,
+          status: this.calculateProductStatus(product)
+        }));
+      } catch (error) {
+        console.error('[dataService] 获取带状态产品列表失败:', error);
+        // API 模式下不降级到 mock，保持错误状态让页面展示 error
+        throw error;
+      }
     }
   },
 
@@ -262,6 +423,145 @@ export const productService = {
     const current = Number(product.currentStock) || 0;
     const min = Number(product.minStock) || 0;
     return current <= min ? '低库存' : '正常';
+  },
+
+  /**
+   * 获取产品库存台账（基于真实交易记录生成）
+   * @param {string} productId - 产品ID
+   * @returns {Promise<Array>} 台账数据列表
+   */
+  async getProductInventoryLedger(productId) {
+    if (currentMode === DATA_SOURCE_MODE.MOCK) {
+      const { getProductInventoryLedger } = await import('./productService.js');
+      return getProductInventoryLedger(productId);
+    } else {
+      // API模式：获取该产品的所有交易记录，转换为台账格式
+      try {
+        // 先获取所有交易记录
+        const allTransactions = await apiRequest('/transactions/');
+        // 过滤出该产品的交易记录，统一处理 product_id/productId 字段名和类型
+        const productTransactions = allTransactions.filter(txn => {
+          const txnProductId = txn.product_id !== undefined ? txn.product_id : txn.productId;
+          // 统一转换为字符串比较
+          return String(txnProductId) === String(productId);
+        });
+
+        // 获取产品当前库存
+        let productCurrentStock = 0;
+        try {
+          const productData = await apiRequest(`/products/${productId}`);
+          const normalizedProduct = normalizeProduct(productData);
+          productCurrentStock = Number(normalizedProduct.currentStock) || 0;
+        } catch (error) {
+          console.warn(`[dataService] 无法获取产品 ${productId} 的当前库存，使用默认值 0`, error);
+        }
+
+        // 转换为台账格式
+        const ledger = [];
+        // 按时间倒序排序（最新在前），优先使用 transaction_date，其次 date，最后 created_at
+        const sortedTransactions = [...productTransactions].sort((a, b) => {
+          const dateA = a.transaction_date || a.date || a.created_at;
+          const dateB = b.transaction_date || b.date || b.created_at;
+          return new Date(dateB) - new Date(dateA);
+        });
+
+        // 计算所有 completed 交易的净变化总和，并收集每个交易的变化量
+        let totalNetChange = 0;
+        const transactionChanges = {};
+        // 按时间正序（从最早到最新）计算
+        const chronologicalTransactions = [...sortedTransactions].reverse();
+        for (const txn of chronologicalTransactions) {
+          const normalizedTxn = normalizeTransaction(txn);
+          let stockChange = 0;
+          if (normalizedTxn.status === 'completed') {
+            const quantity = Math.abs(Number(normalizedTxn.quantity) || 0);
+            const isOutbound = normalizedTxn.type === '出库';
+            stockChange = isOutbound ? -quantity : quantity;
+            totalNetChange += stockChange;
+          }
+          transactionChanges[normalizedTxn.id] = {
+            stockChange,
+            normalizedTxn
+          };
+        }
+
+        // 计算偏移量：使得最新交易后的库存等于产品当前库存
+        const offset = productCurrentStock - totalNetChange;
+
+        // 计算每个交易前的库存余额（按时间正序，从最早开始）
+        const stockBeforeTransaction = {};
+        let cumulativeStock = offset; // 从偏移量（期初库存）开始
+        for (const txn of chronologicalTransactions) {
+          const normalizedTxn = normalizeTransaction(txn);
+          const txnId = normalizedTxn.id;
+          stockBeforeTransaction[txnId] = cumulativeStock;
+          // 只有 completed 交易才影响累计库存
+          if (normalizedTxn.status === 'completed') {
+            const quantity = Math.abs(Number(normalizedTxn.quantity) || 0);
+            const isOutbound = normalizedTxn.type === '出库';
+            const stockChange = isOutbound ? -quantity : quantity;
+            cumulativeStock += stockChange;
+          }
+        }
+
+        // 遍历交易记录（倒序，最新在前），生成台账条目
+        for (const txn of sortedTransactions) {
+          const normalizedTxn = normalizeTransaction(txn);
+
+          // 确定台账类型
+          let ledgerType = '库存调整';
+          if (normalizedTxn.type === '入库') {
+            ledgerType = '入库';
+          } else if (normalizedTxn.type === '出库') {
+            ledgerType = '出库';
+          } else if (normalizedTxn.type === '调整') {
+            ledgerType = '库存调整';
+          }
+
+          // 获取交易状态和备注
+          const status = normalizedTxn.status || 'completed';
+          const notes = normalizedTxn.notes || '';
+
+          // 计算库存变化：只有 completed 交易才影响库存
+          let stockChange = 0;
+          if (status === 'completed') {
+            const quantity = Math.abs(Number(normalizedTxn.quantity) || 0);
+            stockChange = normalizedTxn.type === '出库' ? -quantity : quantity;
+          }
+
+          // 计算变更前后库存
+          let oldStock = stockBeforeTransaction[normalizedTxn.id] || 0;
+          let newStock = oldStock + stockChange;
+          // 对于 reversed 记录，确保 oldStock = newStock，且 stockChange 为 0
+          if (status === 'reversed') {
+            // 已撤销的交易不影响库存，前后库存相等
+            newStock = oldStock;
+            stockChange = 0;
+          }
+
+          // 构建台账条目
+          ledger.push({
+            id: normalizedTxn.id || `txn_${txn.transaction_id || Date.now()}`,
+            type: ledgerType,
+            timestamp: normalizedTxn.date || normalizedTxn.transaction_date || normalizedTxn.createdAt || new Date().toISOString(),
+            stockChange,
+            oldStock,
+            newStock,
+            operator: normalizedTxn.operator || '系统',
+            notes: notes, // 使用真实备注，空字符串时前端显示-
+            unit: normalizedTxn.unit || '个',
+            status: status // 包含交易状态
+          });
+        }
+
+        console.log(`[dataService] 生成产品 ${productId} 台账，共 ${ledger.length} 条记录`);
+        return ledger;
+      } catch (error) {
+        console.error('[dataService] 获取产品台账失败:', error);
+        // API 模式下不降级到 mock，抛出错误让页面展示 error 状态
+        throw error;
+      }
+    }
   }
 };
 
@@ -278,8 +578,15 @@ export const transactionService = {
       const { getTransactions } = await import('./productService.js');
       return getTransactions();
     } else {
-      const data = await apiRequest('/transactions/');
-      return data;
+      try {
+        const data = await apiRequest('/transactions/');
+        // 规范化字段名，确保与前端期望的字段名一致
+        return normalizeTransactionList(data);
+      } catch (error) {
+        console.error('[dataService] 获取交易记录失败:', error);
+        // API 模式下不降级到 mock，抛出错误让页面展示 error 状态
+        throw error;
+      }
     }
   },
 
@@ -299,6 +606,25 @@ export const transactionService = {
       });
       return data;
     }
+  },
+
+  /**
+   * 撤销交易记录
+   * @param {string} transactionId - 交易记录ID
+   * @param {string} reversedBy - 撤销操作人
+   * @returns {Promise<Object>} 撤销后的记录
+   */
+  async reverseTransaction(transactionId, reversedBy = '系统') {
+    if (currentMode === DATA_SOURCE_MODE.MOCK) {
+      const { reverseTransaction } = await import('./productService.js');
+      return reverseTransaction(transactionId, reversedBy);
+    } else {
+      const data = await apiRequest(`/transactions/${transactionId}/reverse`, {
+        method: 'POST',
+        body: JSON.stringify({ reversedBy })
+      });
+      return data;
+    }
   }
 };
 
@@ -315,8 +641,126 @@ export const auditLogService = {
       const { getAuditLogs } = await import('./productService.js');
       return getAuditLogs();
     } else {
-      const data = await apiRequest('/audit-logs/');
-      return data;
+      try {
+        const data = await apiRequest('/audit-logs/');
+        // 规范化字段名，确保与前端期望的字段名一致
+        return normalizeAuditLogList(data);
+      } catch (error) {
+        console.error('[dataService] 获取审计日志失败:', error);
+        // API 模式下不降级到 mock，抛出错误让页面展示 error 状态
+        throw error;
+      }
+    }
+  }
+};
+
+/**
+ * 用户相关数据服务
+ */
+export const userService = {
+  /**
+   * 获取所有用户
+   * @returns {Promise<Array>} 用户列表
+   */
+  async getAllUsers() {
+    if (currentMode === DATA_SOURCE_MODE.MOCK) {
+      // 返回模拟用户数据（与Users.jsx中的模拟数据一致）
+      return [
+        {
+          id: 'user-001',
+          username: 'admin',
+          email: 'admin@example.com',
+          role: '管理员',
+          status: '活跃',
+          lastLogin: '2026-03-29 15:30',
+        },
+        {
+          id: 'user-002',
+          username: 'zhang.san',
+          email: 'zhang.san@example.com',
+          role: '仓库管理员',
+          status: '活跃',
+          lastLogin: '2026-03-28 10:20',
+        },
+        {
+          id: 'user-003',
+          username: 'li.si',
+          email: 'li.si@example.com',
+          role: '操作员',
+          status: '活跃',
+          lastLogin: '2026-03-27 14:45',
+        },
+        {
+          id: 'user-004',
+          username: 'wang.wu',
+          email: 'wang.wu@example.com',
+          role: '查看者',
+          status: '停用',
+          lastLogin: '2026-03-20 09:15',
+        },
+        {
+          id: 'user-005',
+          username: 'zhao.liu',
+          email: 'zhao.liu@example.com',
+          role: '操作员',
+          status: '活跃',
+          lastLogin: '2026-03-29 11:10',
+        },
+      ];
+    } else {
+      const originalMode = currentMode; // 保存当前模式
+      try {
+        const data = await apiRequest('/users/');
+        // 规范化字段名，确保与前端期望的字段名一致
+        return normalizeUserList(data);
+      } catch (error) {
+        console.warn('[dataService] 获取用户数据失败，降级到 mock 数据:', error);
+        // 恢复原始模式，避免影响其他服务
+        currentMode = originalMode;
+        // 局部降级：直接返回 mock 用户数据
+        return [
+          {
+            id: 'user-001',
+            username: 'admin',
+            email: 'admin@example.com',
+            role: '管理员',
+            status: '活跃',
+            lastLogin: '2026-03-29 15:30',
+          },
+          {
+            id: 'user-002',
+            username: 'zhang.san',
+            email: 'zhang.san@example.com',
+            role: '仓库管理员',
+            status: '活跃',
+            lastLogin: '2026-03-28 10:20',
+          },
+          {
+            id: 'user-003',
+            username: 'li.si',
+            email: 'li.si@example.com',
+            role: '操作员',
+            status: '活跃',
+            lastLogin: '2026-03-27 14:45',
+          },
+          {
+            id: 'user-004',
+            username: 'wang.wu',
+            email: 'wang.wu@example.com',
+            role: '查看者',
+            status: '停用',
+            lastLogin: '2026-03-20 09:15',
+          },
+          {
+            id: 'user-005',
+            username: 'zhao.liu',
+            email: 'zhao.liu@example.com',
+            role: '操作员',
+            status: '活跃',
+            lastLogin: '2026-03-29 11:10',
+          },
+        ];
+      }
     }
   }
 };
@@ -335,55 +779,93 @@ export const dashboardService = {
       const { dashboardStats } = await import('../constants/mockData.js');
       return dashboardStats;
     } else {
-      const data = await apiRequest('/dashboard/stats');
-      // 转换为前端需要的格式
-      return [
-        {
-          id: 'total-products',
-          title: '产品总数',
-          value: data.total_products.toString(),
-          change: '+0',
-          changeType: 'neutral',
-          description: '实时数据',
-          iconColor: 'bg-slate-600',
-        },
-        {
-          id: 'normal-stock',
-          title: '正常库存',
-          value: data.normal_stock_count.toString(),
-          change: '+0',
-          changeType: 'neutral',
-          description: '库存正常产品数',
-          iconColor: 'bg-emerald-500',
-        },
-        {
-          id: 'low-stock-alerts',
-          title: '低库存预警',
-          value: data.low_stock_count.toString(),
-          change: '+0',
-          changeType: 'neutral',
-          description: '需及时补货',
-          iconColor: 'bg-amber-500',
-        },
-        {
-          id: 'recent-transactions',
-          title: '近7日交易记录',
-          value: data.recent_transactions_count.toString(),
-          change: '+0',
-          changeType: 'neutral',
-          description: '交易活动',
-          iconColor: 'bg-blue-500',
-        },
-        {
-          id: 'recent-audit-logs',
-          title: '近7日审计记录',
-          value: data.recent_audit_logs_count.toString(),
-          change: '+0',
-          changeType: 'neutral',
-          description: '系统活动',
-          iconColor: 'bg-violet-500',
-        },
-      ];
+      try {
+        const data = await apiRequest('/dashboard/stats');
+        // 转换为前端需要的格式
+        return [
+          {
+            id: 'total-products',
+            title: '产品总数',
+            value: data.total_products.toString(),
+            change: '+0',
+            changeType: 'neutral',
+            description: '实时数据',
+            iconColor: 'bg-slate-600',
+          },
+          {
+            id: 'normal-stock',
+            title: '正常库存',
+            value: data.normal_stock_count.toString(),
+            change: '+0',
+            changeType: 'neutral',
+            description: '库存正常产品数',
+            iconColor: 'bg-emerald-500',
+          },
+          {
+            id: 'low-stock-alerts',
+            title: '低库存预警',
+            value: data.low_stock_count.toString(),
+            change: '+0',
+            changeType: 'neutral',
+            description: '需及时补货',
+            iconColor: 'bg-amber-500',
+          },
+          {
+            id: 'recent-transactions',
+            title: '近7日交易记录',
+            value: data.recent_transactions_count.toString(),
+            change: '+0',
+            changeType: 'neutral',
+            description: '交易活动',
+            iconColor: 'bg-blue-500',
+          },
+          {
+            id: 'recent-audit-logs',
+            title: '近7日审计记录',
+            value: data.recent_audit_logs_count.toString(),
+            change: '+0',
+            changeType: 'neutral',
+            description: '系统活动',
+            iconColor: 'bg-violet-500',
+          },
+        ];
+      } catch (error) {
+        console.error('[dataService] 获取仪表盘统计数据失败:', error);
+        // API 模式下不降级到 mock，抛出错误让页面展示 error 状态
+        throw error;
+      }
+    }
+  }
+};
+
+/**
+ * 系统相关数据服务
+ */
+export const systemService = {
+  /**
+   * 获取当前数据源模式
+   * @returns {string} 当前模式 ('mock' 或 'api')
+   */
+  getDataSourceMode() {
+    return currentMode;
+  },
+
+  /**
+   * 重置数据（根据当前模式执行不同操作）
+   * @returns {Promise<Object>} 重置结果
+   */
+  async resetData() {
+    if (currentMode === DATA_SOURCE_MODE.MOCK) {
+      // mock 模式：重置本地存储数据
+      const { resetStorageData } = await import('./productService.js');
+      return resetStorageData();
+    } else {
+      // API 模式：不支持重置真实数据
+      console.warn('[dataService] API 模式下不支持重置数据操作');
+      return {
+        success: false,
+        message: '当前为 API 模式，数据来自真实后端，不支持重置操作。'
+      };
     }
   }
 };
@@ -395,5 +877,7 @@ export default {
   productService,
   transactionService,
   auditLogService,
-  dashboardService
+  userService,
+  dashboardService,
+  systemService
 };

@@ -1,7 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { dashboardStats } from '../constants/mockData';
-import { getTransactions, getAuditLogs } from '../services/productService';
-import { productService } from '../services/dataService';
+import { productService, transactionService, auditLogService, dashboardService } from '../services/dataService';
 import {
   formatAuditTime,
   generateAuditSummary,
@@ -315,6 +313,27 @@ function Dashboard() {
     error: null
   });
 
+  // 交易记录数据状态
+  const [transactionsData, setTransactionsData] = useState({
+    transactions: [],
+    loading: true,
+    error: null
+  });
+
+  // 审计日志数据状态
+  const [auditLogsData, setAuditLogsData] = useState({
+    auditLogs: [],
+    loading: true,
+    error: null
+  });
+
+  // 仪表盘统计数据状态
+  const [dashboardStatsData, setDashboardStatsData] = useState({
+    stats: [],
+    loading: true,
+    error: null
+  });
+
   // 计算紧急程度（根据库存百分比）
   const calculateUrgency = (product) => {
     const ratio = product.currentStock / product.minStock;
@@ -365,6 +384,65 @@ function Dashboard() {
     };
   }, []); // 空依赖数组，只在组件挂载时获取一次
 
+  // 获取交易记录、审计日志和仪表盘统计数据
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchAllData = async () => {
+      try {
+        // 并行获取交易记录、审计日志和仪表盘统计数据
+        const [transactions, auditLogs, stats] = await Promise.all([
+          transactionService.getTransactions(),
+          auditLogService.getAuditLogs(),
+          dashboardService.getDashboardStats()
+        ]);
+
+        if (isMounted) {
+          setTransactionsData({
+            transactions,
+            loading: false,
+            error: null
+          });
+          setAuditLogsData({
+            auditLogs,
+            loading: false,
+            error: null
+          });
+          setDashboardStatsData({
+            stats,
+            loading: false,
+            error: null
+          });
+        }
+      } catch (error) {
+        console.error('[Dashboard] 获取数据失败:', error);
+        if (isMounted) {
+          setTransactionsData(prev => ({
+            ...prev,
+            loading: false,
+            error: '交易数据加载失败，使用降级数据'
+          }));
+          setAuditLogsData(prev => ({
+            ...prev,
+            loading: false,
+            error: '审计日志加载失败，使用降级数据'
+          }));
+          setDashboardStatsData(prev => ({
+            ...prev,
+            loading: false,
+            error: '仪表盘统计数据加载失败，使用降级数据'
+          }));
+        }
+      }
+    };
+
+    fetchAllData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []); // 空依赖数组，只在组件挂载时获取一次
+
   // 空数据兜底函数，避免加载过程中计算错误
   const getEmptyDashboardData = () => {
     const emptyDateRange = [];
@@ -400,15 +478,18 @@ function Dashboard() {
     // 根据时间范围确定天数，'all' 表示全部历史数据
     const days = timeRange === '7days' ? 7 : timeRange === '30days' ? 30 : null; // null 表示全部数据
 
-    // 如果产品数据仍在加载，返回空数据避免计算错误
-    if (productsData.loading) {
+    // 如果产品数据、交易数据或审计日志数据仍在加载，返回空数据避免计算错误
+    if (productsData.loading || transactionsData.loading || auditLogsData.loading) {
       return getEmptyDashboardData();
     }
 
     const products = productsData.productsWithStatus;
     const allProducts = productsData.allProducts;
-    const allTransactions = getTransactions();
-    const allAuditLogs = getAuditLogs();
+    const allTransactions = transactionsData.transactions;
+    const allAuditLogs = auditLogsData.auditLogs;
+
+    // 已完成交易（用于趋势统计）
+    const completedTransactions = allTransactions.filter(txn => txn.status === 'completed');
 
     // 计算产品总数
     const totalProducts = allProducts.length;
@@ -447,8 +528,13 @@ function Dashboard() {
     // 从日期时间字符串中提取日期部分（YYYY-MM-DD）
     const extractDatePart = (dateTimeStr) => {
       if (!dateTimeStr) return '';
-      // 格式可能是 "2026-03-29 14:30" 或 "2026-03-29"
-      return dateTimeStr.split(' ')[0];
+      // 支持多种格式: "2026-03-29 14:30"、"2026-03-29"、ISO格式 "2026-03-29T14:30:00Z"
+      if (dateTimeStr.includes(' ')) {
+        return dateTimeStr.split(' ')[0];
+      } else if (dateTimeStr.includes('T')) {
+        return dateTimeStr.split('T')[0];
+      }
+      return dateTimeStr; // 已经是日期格式
     };
 
     // 根据时间范围获取要统计的日期列表
@@ -486,6 +572,14 @@ function Dashboard() {
     });
     const recentDaysTransactionsCount = recentDaysTransactions.length;
 
+    // 计算选定时间范围内已完成交易的数量（用于趋势统计）
+    const completedRecentDaysTransactions = completedTransactions.filter(txn => {
+      if (!txn.date) return false;
+      const datePart = extractDatePart(txn.date);
+      return dateRange.includes(datePart);
+    });
+    const completedRecentDaysTransactionsCount = completedRecentDaysTransactions.length;
+
     // 计算选定时间范围内的审计日志数量
     const recentDaysAuditLogs = allAuditLogs.filter(log => {
       if (!log.timestamp) return false;
@@ -494,9 +588,9 @@ function Dashboard() {
     });
     const recentDaysAuditLogsCount = recentDaysAuditLogs.length;
 
-    // 计算交易趋势数据（按日期统计入库/出库数量）
+    // 计算交易趋势数据（按日期统计入库/出库数量，只统计 completed 状态交易）
     const transactionTrendData = dateRange.map(date => {
-      const dayTransactions = allTransactions.filter(txn => {
+      const dayTransactions = completedTransactions.filter(txn => {
         if (!txn.date) return false;
         const datePart = extractDatePart(txn.date);
         return datePart === date;
@@ -505,7 +599,7 @@ function Dashboard() {
       const outCount = dayTransactions.filter(txn => txn.type === '出库').reduce((sum, txn) => sum + (Number(txn.quantity) || 0), 0);
 
       // 格式化日期显示（MM-DD）
-      const [year, month, day] = date.split('-');
+      const [_, month, day] = date.split('-');
       return {
         date,
         displayDate: `${month}-${day}`,
@@ -556,22 +650,26 @@ function Dashboard() {
       .sort((a, b) => new Date(b.date) - new Date(a.date))
       .slice(0, 5);
 
-    // 获取选定时间范围内最近5条审计日志（已按时间倒序排列）
-    const recentAuditLogs = recentDaysAuditLogs.slice(0, 5);
+    // 获取选定时间范围内最近5条审计日志（按时间倒序排列）
+    const sortedRecentDaysAuditLogs = [...recentDaysAuditLogs].sort((a, b) =>
+      new Date(b.timestamp) - new Date(a.timestamp)
+    );
+    const recentAuditLogs = sortedRecentDaysAuditLogs.slice(0, 5);
 
     // 计算交易趋势汇总数据
     const transactionSummary = {
       totalInCount: transactionTrendData.reduce((sum, item) => sum + item.inCount, 0),
       totalOutCount: transactionTrendData.reduce((sum, item) => sum + item.outCount, 0),
-      totalTransactionsCount: recentDaysTransactionsCount, // 交易记录总笔数
+      totalTransactionsCount: completedRecentDaysTransactionsCount, // 已完成交易总笔数（趋势统计口径）
       totalQuantityCount: transactionTrendData.reduce((sum, item) => sum + item.totalCount, 0), // 出入库总数量
     };
     transactionSummary.netChange = transactionSummary.totalInCount - transactionSummary.totalOutCount;
 
-    // 计算每日净变化（入库 - 出库）基于当前时间范围
+    // 计算每日净变化（入库 - 出库）基于当前时间范围，只统计 completed 状态交易
     const dailyNetChange = {};
     dateRange.forEach(date => {
-      const dayTransactions = allTransactions.filter(txn => {
+      const dayTransactions = completedTransactions.filter(txn => {
+        if (!txn.date) return false;
         const datePart = extractDatePart(txn.date);
         return datePart === date;
       });
@@ -592,15 +690,16 @@ function Dashboard() {
       };
     });
 
-    // 计算出入库对比数据（基于当前时间范围）
+    // 计算出入库对比数据（基于当前时间范围），只统计 completed 状态交易
     const transactionCompareData = dateRange.map(date => {
-      const dayTransactions = allTransactions.filter(txn => {
+      const dayTransactions = completedTransactions.filter(txn => {
+        if (!txn.date) return false;
         const datePart = extractDatePart(txn.date);
         return datePart === date;
       });
       const inCount = dayTransactions.filter(txn => txn.type === '入库').reduce((sum, txn) => sum + (Number(txn.quantity) || 0), 0);
       const outCount = dayTransactions.filter(txn => txn.type === '出库').reduce((sum, txn) => sum + (Number(txn.quantity) || 0), 0);
-      const [year, month, day] = date.split('-');
+      const [_, month, day] = date.split('-');
       return {
         date,
         displayDate: `${month}-${day}`,
@@ -628,13 +727,13 @@ function Dashboard() {
       inventoryTrendData,
       transactionCompareData
     };
-  }, [timeRange, productsData]); // 依赖时间范围和产品数据
+  }, [timeRange, productsData, transactionsData, auditLogsData]); // 依赖时间范围、产品数据、交易数据和审计日志数据
 
   // 时间范围文本
   const rangeText = timeRange === '7days' ? '近7日' : timeRange === '30days' ? '近30日' : '全部';
 
   // 动态统计卡片数据
-  const dynamicDashboardStats = dashboardStats.map(stat => {
+  const dynamicDashboardStats = (dashboardStatsData.stats || []).map(stat => {
     const {
       totalProducts,
       totalInventory,

@@ -19,7 +19,9 @@ function UrgencyBadge({ urgency }) {
 
 // 库存比例条组件
 function StockRatioBar({ current, min }) {
-  const ratio = Math.min(100, Math.round((current / min) * 100));
+  const currentNum = Number(current) || 0;
+  const minNum = Number(min) || 1; // 避免除以0
+  const ratio = Math.min(100, Math.round((currentNum / minNum) * 100));
   const getColor = () => {
     if (ratio <= 30) return 'bg-rose-500';
     if (ratio <= 60) return 'bg-amber-500';
@@ -29,8 +31,8 @@ function StockRatioBar({ current, min }) {
   return (
     <div className="w-full">
       <div className="flex justify-between text-sm mb-1">
-        <span className="text-slate-700">当前库存: {current}</span>
-        <span className="text-slate-500">最低: {min}</span>
+        <span className="text-slate-700">当前库存: {currentNum}</span>
+        <span className="text-slate-500">最低: {minNum}</span>
       </div>
       <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
         <div
@@ -53,7 +55,9 @@ function Alerts() {
 
   // 计算紧急程度（根据库存百分比）
   const calculateUrgency = (product) => {
-    const ratio = product.currentStock / product.minStock;
+    const current = Number(product.currentStock) || 0;
+    const min = Number(product.minStock) || 1; // 避免除以0
+    const ratio = current / min;
     if (ratio <= 0.2) return 'high';
     if (ratio <= 0.5) return 'medium';
     return 'low';
