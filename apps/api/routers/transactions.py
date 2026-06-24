@@ -6,8 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
 
-from database import get_db, Transaction, Product, AuditLog
+from database import get_db, Transaction, Product, AuditLog, User
 from schemas import TransactionCreate
+from auth import get_current_user, require_admin
 
 router = APIRouter()
 
@@ -15,20 +16,22 @@ router = APIRouter()
 def get_transactions(
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """获取交易记录列表"""
+    """获取交易记录列表（需登录）"""
     transactions = db.query(Transaction).offset(skip).limit(limit).all()
     return [txn.to_dict() for txn in transactions]
 
 @router.post("/", response_model=dict)
-def create_transaction(transaction_data: TransactionCreate, db: Session = Depends(get_db)):
-    """创建交易记录并更新产品库存"""
+def create_transaction(transaction_data: TransactionCreate, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
+    """创建交易记录并更新产品库存（需管理员权限，operator 自动绑定当前用户）"""
     # 从模型中获取字段（支持别名）
     product_id = transaction_data.product_id
     type_ = transaction_data.type
     quantity = transaction_data.quantity
-    operator = transaction_data.operator
+    # 不再信任前端传入 operator，使用当前登录用户
+    operator = current_user.display_name or current_user.username
     notes = transaction_data.notes or ''
 
     # 验证类型
@@ -104,8 +107,8 @@ def create_transaction(transaction_data: TransactionCreate, db: Session = Depend
     return transaction.to_dict()
 
 @router.get("/{transaction_id}")
-def get_transaction(transaction_id: str, db: Session = Depends(get_db)):
-    """获取单个交易记录"""
+def get_transaction(transaction_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """获取单个交易记录（需登录）"""
     # 解析交易ID（格式：txn-000001）
     try:
         if transaction_id.startswith('txn-'):
@@ -122,17 +125,15 @@ def get_transaction(transaction_id: str, db: Session = Depends(get_db)):
     return transaction.to_dict()
 
 @router.delete("/{transaction_id}")
-def delete_transaction(transaction_id: str):
-    """删除交易记录（骨架）"""
+def delete_transaction(transaction_id: str, current_user: User = Depends(require_admin)):
+    """删除交易记录（骨架，需管理员权限）"""
     return {"message": f"删除交易记录 {transaction_id}（骨架）"}
 
 @router.post("/{transaction_id}/reverse")
-def reverse_transaction(transaction_id: str, request_data: dict = None, db: Session = Depends(get_db)):
-    """撤销交易记录并回滚库存"""
-    # 提取撤销操作人
-    reversed_by = '系统'
-    if request_data and 'reversedBy' in request_data:
-        reversed_by = request_data['reversedBy']
+def reverse_transaction(transaction_id: str, request_data: dict = None, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
+    """撤销交易记录并回滚库存（需管理员权限，reversed_by 自动绑定当前用户）"""
+    # 不再信任前端传入 operator，使用当前登录用户
+    reversed_by = current_user.display_name or current_user.username
 
     # 解析交易ID（格式：txn-000001）
     try:

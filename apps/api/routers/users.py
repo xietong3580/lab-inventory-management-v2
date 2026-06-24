@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from database import get_db, User
+from auth import get_current_user
 
 router = APIRouter()
 
@@ -24,9 +25,10 @@ DEFAULT_ADMIN = {
 def get_users(
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """获取用户列表"""
+    """获取用户列表（需登录）"""
     users = db.query(User).offset(skip).limit(limit).all()
 
     if users:
@@ -44,8 +46,8 @@ def get_users(
 
 
 @router.get("/{user_id}")
-def get_user(user_id: str, db: Session = Depends(get_db)):
-    """获取单个用户（骨架）"""
+def get_user(user_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """获取单个用户（需登录）"""
     # 解析用户ID（格式：user-000001 或 user-default-admin）
     if user_id == "user-default-admin":
         return {

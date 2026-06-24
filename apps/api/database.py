@@ -31,6 +31,33 @@ def init_db():
     """初始化数据库，创建所有表"""
     Base.metadata.create_all(bind=engine)
     print(f"数据库已初始化: {DATABASE_URL}")
+    migrate_users()
+
+def migrate_users():
+    """迁移 users 表：检查并逐列添加缺失字段（安全迁移，不删除数据）"""
+    import sqlite3
+    import os
+
+    db_path = os.path.join(BASE_DIR, 'inventory.db')
+    conn = sqlite3.connect(db_path)
+    cursor = conn.execute("PRAGMA table_info(users)")
+    existing_columns = {row[1] for row in cursor.fetchall()}
+
+    # 需要按需添加的列（列名, SQLite 类型）
+    new_columns = [
+        ("password_hash", "VARCHAR(128)"),
+        ("display_name", "VARCHAR(100)"),
+        ("is_active", "BOOLEAN DEFAULT 1"),
+    ]
+
+    for col_name, col_type in new_columns:
+        if col_name not in existing_columns:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
+            print(f"  [迁移] users 表已添加列: {col_name} ({col_type})")
+
+    conn.commit()
+    conn.close()
+
 
 # 模型定义
 class Product(Base):
@@ -132,25 +159,30 @@ class AuditLog(Base):
         }
 
 class User(Base):
-    """用户模型（最小可用版，不含密码/鉴权）"""
+    """用户模型（最小可用版，含 bcrypt 密码哈希）"""
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, nullable=False)
+    password_hash = Column(String(128), nullable=True)  # bcrypt 哈希密码
+    display_name = Column(String(100), nullable=True)    # 显示名称
     email = Column(String(100), nullable=True)
     role = Column(String(30), nullable=False, default="操作员")
+    is_active = Column(Boolean, nullable=False, default=True)  # 是否激活
     status = Column(String(20), nullable=False, default="活跃")  # 活跃/停用
     last_login = Column(String(50), nullable=True)
 
     created_at = Column(DateTime, default=datetime.now)
 
     def to_dict(self):
-        """转换为字典格式"""
+        """转换为字典格式（不输出 password_hash）"""
         return {
             "id": f"user-{self.id:06d}",
             "username": self.username,
+            "display_name": self.display_name or self.username,
             "email": self.email or "",
             "role": self.role,
+            "is_active": bool(self.is_active) if self.is_active is not None else True,
             "status": self.status,
             "lastLogin": self.last_login or "",
         }

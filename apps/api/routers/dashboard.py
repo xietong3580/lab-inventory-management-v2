@@ -7,13 +7,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
 
-from database import get_db, Product, Transaction, AuditLog
+from database import get_db, Product, Transaction, AuditLog, User
+from auth import get_current_user
 
 router = APIRouter()
 
 @router.get("/stats")
-def get_dashboard_stats(db: Session = Depends(get_db)):
-    """获取仪表盘统计数据"""
+def get_dashboard_stats(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """获取仪表盘统计数据（需登录）"""
     # 产品总数
     total_products = db.query(func.count(Product.id)).scalar() or 0
 
@@ -43,8 +44,8 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     }
 
 @router.get("/recent-transactions")
-def get_recent_transactions(db: Session = Depends(get_db)):
-    """获取近期交易记录（最近7天）"""
+def get_recent_transactions(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """获取近期交易记录（需登录）"""
     seven_days_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
     transactions = db.query(Transaction).filter(
         Transaction.date >= seven_days_ago
@@ -52,7 +53,7 @@ def get_recent_transactions(db: Session = Depends(get_db)):
     return [txn.to_dict() for txn in transactions]
 
 @router.get("/low-stock-alerts")
-def get_low_stock_alerts(db: Session = Depends(get_db)):
-    """获取低库存预警（实时计算）"""
+def get_low_stock_alerts(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """获取低库存预警（需登录）"""
     low_stock_products = db.query(Product).filter(Product.current_stock <= Product.min_stock).limit(10).all()
     return [product.to_dict() for product in low_stock_products]

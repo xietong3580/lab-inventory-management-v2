@@ -7,8 +7,9 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from database import SessionLocal, Product, Transaction, AuditLog, init_db
+from database import SessionLocal, Product, Transaction, AuditLog, User, init_db
 from datetime import datetime
+import bcrypt
 
 # mock 数据（从前端 mockData.js 转换）
 mock_products = [
@@ -166,5 +167,70 @@ def seed_database():
     finally:
         db.close()
 
+def seed_users():
+    """
+    创建测试用户账号。
+    分别检查 admin 和 viewer 是否存在，不存在才创建，不覆盖已有用户。
+    密码使用 bcrypt 哈希保存。
+    """
+    db = SessionLocal()
+    try:
+        test_users = [
+            {
+                "username": "admin",
+                "display_name": "管理员",
+                "email": "admin@example.com",
+                "role": "admin",
+                "is_active": True,
+                "status": "活跃",
+                "plain_password": "admin123",
+            },
+            {
+                "username": "viewer",
+                "display_name": "观察者",
+                "email": "viewer@example.com",
+                "role": "viewer",
+                "is_active": True,
+                "status": "活跃",
+                "plain_password": "viewer123",
+            },
+        ]
+
+        for user_data in test_users:
+            existing = db.query(User).filter(User.username == user_data["username"]).first()
+            if existing:
+                print(f"  [跳过] 用户 '{user_data['username']}' 已存在，不覆盖")
+                continue
+
+            user = User(
+                username=user_data["username"],
+                password_hash=bcrypt.hashpw(
+                    user_data["plain_password"].encode("utf-8"),
+                    bcrypt.gensalt()
+                ).decode("utf-8"),
+                display_name=user_data["display_name"],
+                email=user_data["email"],
+                role=user_data["role"],
+                is_active=user_data["is_active"],
+                status=user_data["status"],
+            )
+            db.add(user)
+            print(f"  [创建] 用户 '{user_data['username']}' (角色: {user_data['role']})")
+
+        db.commit()
+        print("  seed_users 完成")
+
+    except Exception as e:
+        db.rollback()
+        print(f"  seed_users 失败: {e}")
+        raise
+    finally:
+        db.close()
+
+
 if __name__ == "__main__":
-    seed_database()
+    if len(sys.argv) > 1 and sys.argv[1] == "--users":
+        # 仅 seed 用户测试账号（安全，不修改其他表）
+        seed_users()
+    else:
+        seed_database()

@@ -6,8 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
 
-from database import get_db, Product
+from database import get_db, Product, User
 from schemas import ProductCreate, ProductUpdate, ProductResponse
+from auth import get_current_user, require_admin
 
 router = APIRouter()
 
@@ -17,9 +18,10 @@ def get_products(
     limit: int = 100,
     category: str = None,
     status: str = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """获取产品列表"""
+    """获取产品列表（需登录）"""
     query = db.query(Product)
 
     if category and category != "all":
@@ -36,8 +38,8 @@ def get_products(
     return [product.to_dict() for product in products]
 
 @router.get("/{product_id}")
-def get_product(product_id: str, db: Session = Depends(get_db)):
-    """获取单个产品详情"""
+def get_product(product_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """获取单个产品详情（需登录）"""
     try:
         # 解析产品ID（格式：prod-000001）
         if product_id.startswith("prod-"):
@@ -54,8 +56,8 @@ def get_product(product_id: str, db: Session = Depends(get_db)):
     return product.to_dict()
 
 @router.post("/", response_model=ProductResponse)
-def create_product(product_data: ProductCreate, db: Session = Depends(get_db)):
-    """创建新产品"""
+def create_product(product_data: ProductCreate, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
+    """创建新产品（需管理员权限）"""
     # 检查SKU是否已存在
     existing = db.query(Product).filter(Product.sku == product_data.sku).first()
     if existing:
@@ -87,9 +89,10 @@ def create_product(product_data: ProductCreate, db: Session = Depends(get_db)):
 def update_product(
     product_id: str,
     product_data: ProductUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
 ):
-    """更新产品信息"""
+    """更新产品信息（需管理员权限）"""
     try:
         if product_id.startswith("prod-"):
             db_id = int(product_id[5:])
@@ -142,8 +145,8 @@ def update_product(
     return product.to_dict()
 
 @router.delete("/{product_id}")
-def delete_product(product_id: str, db: Session = Depends(get_db)):
-    """删除产品"""
+def delete_product(product_id: str, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
+    """删除产品（需管理员权限）"""
     try:
         if product_id.startswith("prod-"):
             db_id = int(product_id[5:])
