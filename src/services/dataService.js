@@ -23,6 +23,23 @@ const API_CONFIG = {
 };
 
 /**
+ * 获取认证请求头（包含 Bearer token，如果已登录）
+ * @returns {Object} 包含 Authorization 的 headers 对象
+ */
+const getAuthHeaders = () => {
+  const headers = {};
+  try {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  } catch {
+    // localStorage 不可用时忽略
+  }
+  return headers;
+};
+
+/**
  * 设置数据源模式
  * @param {string} mode - 'mock' 或 'api'
  */
@@ -270,6 +287,7 @@ const apiRequest = async (endpoint, options = {}) => {
       ...options,
       headers: {
         ...API_CONFIG.DEFAULT_HEADERS,
+        ...getAuthHeaders(),
         ...options.headers
       },
       signal: controller.signal
@@ -279,12 +297,27 @@ const apiRequest = async (endpoint, options = {}) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`API 请求失败: ${response.status} ${response.statusText} - ${errorText}`);
+      const status = response.status;
+
+      // 401/403 时不静默降级到 mock，抛出明确错误
+      if (status === 401 || status === 403) {
+        console.error(`[dataService] 鉴权失败 (${status}): ${endpoint}`, errorText);
+        throw new Error(`鉴权失败 (${status}): 请重新登录`);
+      }
+
+      throw new Error(`API 请求失败: ${status} ${response.statusText} - ${errorText}`);
     }
 
     return await response.json();
   } catch (error) {
     clearTimeout(timeoutId);
+
+    // 如果是网络错误或超时，不在 API 模式下静默降级
+    if (error.name === 'AbortError') {
+      console.error(`[dataService] API 请求超时: ${endpoint}`);
+      throw new Error(`请求超时: ${endpoint}`);
+    }
+
     console.error(`[dataService] API 请求失败: ${endpoint}`, error);
 
     // API 模式下不自动降级到 mock，让调用方决定如何处理错误

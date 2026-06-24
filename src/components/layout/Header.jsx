@@ -1,4 +1,16 @@
+import { useAuth, ROLE_LABELS } from '../../contexts/AuthContext';
+
 function Header({ toggleSidebar }) {
+  const { currentUser, logout } = useAuth();
+
+  const displayName = currentUser?.displayName || currentUser?.username || '用户';
+  const roleLabel = ROLE_LABELS[currentUser?.role] || currentUser?.role || '';
+  const firstChar = displayName.charAt(0);
+
+  const handleLogout = () => {
+    logout();
+  };
+
   return (
     <header className="h-16 border-b border-slate-200 bg-white px-6 flex items-center justify-between">
       {/* 左侧：汉堡菜单按钮 + 页面标题 */}
@@ -22,23 +34,39 @@ function Header({ toggleSidebar }) {
       </div>
 
       {/* 右侧：操作区 */}
-      <div className="flex items-center gap-4">
-        {/* 通知图标占位 */}
-        <button
-          className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded"
-          aria-label="通知"
-        >
-          <div className="w-5 h-5 bg-slate-300 rounded-full"></div>
-        </button>
-
-        {/* 用户信息占位 */}
+      <div className="flex items-center gap-3">
+        {/* 用户信息 */}
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-slate-200 rounded-full"></div>
+          <div className="w-8 h-8 bg-slate-700 text-white rounded-full flex items-center justify-center text-sm font-medium">
+            {firstChar}
+          </div>
           <div className="hidden md:block">
-            <div className="text-sm font-medium text-slate-800">管理员</div>
-            <div className="text-xs text-slate-500">admin@example.com</div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-slate-800">{displayName}</span>
+              {roleLabel && (
+                <span className={`text-xs px-1.5 py-0.5 rounded ${
+                  currentUser?.role === 'admin'
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-slate-100 text-slate-600'
+                }`}>
+                  {roleLabel}
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-slate-500">
+              {currentUser?.username || ''}
+            </div>
           </div>
         </div>
+
+        {/* 退出登录按钮 */}
+        <button
+          onClick={handleLogout}
+          className="text-sm text-slate-500 hover:text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-md transition-colors"
+          title="退出登录"
+        >
+          退出
+        </button>
       </div>
     </header>
   );

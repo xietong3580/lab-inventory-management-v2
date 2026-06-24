@@ -1,13 +1,21 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
+
   const [formData, setFormData] = useState({
     username: '',
     password: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  // 登录成功后跳转的目标路径
+  const from = location.state?.from || '/dashboard';
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -15,19 +23,24 @@ function Login() {
       ...prev,
       [name]: value,
     }));
+    // 用户重新输入时清除错误
+    if (error) setError('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // 模拟登录过程 - 仅 UI 演示，不接入真实逻辑
+    setError('');
     setIsSubmitting(true);
 
-    // 模拟 API 调用延迟
-    setTimeout(() => {
+    try {
+      await login(formData.username, formData.password);
+      // 登录成功，跳转到目标页面
+      navigate(from, { replace: true });
+    } catch (err) {
+      setError(err.message || '登录失败，请检查用户名和密码');
+    } finally {
       setIsSubmitting(false);
-      // 跳转到仪表盘（后续可改为真实鉴权）
-      navigate('/dashboard');
-    }, 800);
+    }
   };
 
   const isFormValid = formData.username.trim() !== '' && formData.password.trim() !== '';
@@ -94,6 +107,13 @@ function Login() {
                 required
               />
             </div>
+
+            {/* 登录错误提示 */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+                {error}
+              </div>
+            )}
 
             {/* 辅助操作行 */}
             <div className="flex items-center justify-between text-sm">
