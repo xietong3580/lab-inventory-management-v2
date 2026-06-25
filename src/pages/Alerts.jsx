@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { productService } from '../services/dataService';
+import { usePermission } from '../hooks/usePermission';
 
 // 紧急程度标签组件
 function UrgencyBadge({ urgency }) {
@@ -48,6 +49,8 @@ function StockRatioBar({ current, min }) {
 }
 
 function Alerts() {
+  const { canWrite, adminOnlyTitle } = usePermission();
+
   const [selectedUrgency, setSelectedUrgency] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -299,7 +302,13 @@ function Alerts() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col gap-2">
-                        <button className="px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors font-medium">
+                        <button
+                          disabled={!canWrite}
+                          title={!canWrite ? adminOnlyTitle : ''}
+                          className={`px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors font-medium ${
+                            !canWrite ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
+                        >
                           立即补货
                         </button>
                         <button className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors">

@@ -4,6 +4,7 @@ import { getProductsWithCalculatedStatus, calculateProductStatus, updateProduct,
 import { getLedgerTypeConfig, formatLedgerTime } from '../utils/inventoryHistoryHelpers';
 import { filterProducts, hasActiveFilters } from '../utils/productFilterHelpers';
 import { exportProductsToCSV } from '../utils/exportHelpers';
+import { usePermission } from '../hooks/usePermission';
 
 // 产品状态标签组件
 function StatusBadge({ status }) {
@@ -42,6 +43,8 @@ function Products() {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const { canWrite, adminOnlyTitle } = usePermission();
+
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [minStock, setMinStock] = useState('');
   const [maxStock, setMaxStock] = useState('');
@@ -157,6 +160,7 @@ function Products() {
 
   // 打开模态框（新增或编辑）
   const handleOpenModal = (product = null) => {
+    if (!canWrite) return; // viewer 不可新增/编辑
     setEditingProduct(product);
     if (product) {
       // 编辑模式：回填现有数据
@@ -193,6 +197,8 @@ function Products() {
   // 表单提交
   const handleFormSubmit = async (e) => {
     e.preventDefault();
+
+    if (!canWrite) return; // viewer 不可提交
 
     // 轻量必填校验
     if (!formData.name.trim()) {
@@ -299,6 +305,7 @@ function Products() {
   };
 
   const handleDeleteProduct = async (productId) => {
+    if (!canWrite) return; // viewer 不可删除
     const product = allProducts.find(p => p.id === productId);
     if (!product) return;
 
@@ -368,7 +375,13 @@ function Products() {
           {/* 左侧：新增产品按钮 */}
           <button
             onClick={handleAddProduct}
-            className="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium"
+            disabled={!canWrite}
+            title={!canWrite ? adminOnlyTitle : ''}
+            className={`px-4 py-2 rounded-md transition-colors font-medium ${
+              !canWrite
+                ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                : 'bg-slate-700 text-white hover:bg-slate-800'
+            }`}
           >
             + 新增产品
           </button>
@@ -376,9 +389,10 @@ function Products() {
           {/* 右侧：导出按钮 */}
           <button
             onClick={handleExport}
-            disabled={filteredProducts.length === 0}
+            disabled={!canWrite || filteredProducts.length === 0}
+            title={!canWrite ? adminOnlyTitle : ''}
             className={`px-4 py-2 border rounded-md transition-colors font-medium ${
-              filteredProducts.length === 0
+              !canWrite || filteredProducts.length === 0
                 ? 'border-slate-200 text-slate-400 cursor-not-allowed'
                 : 'border-slate-300 text-slate-700 hover:bg-slate-50'
             }`}
@@ -619,7 +633,13 @@ function Products() {
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleEditProduct(product.id)}
-                            className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors"
+                            disabled={!canWrite}
+                            title={!canWrite ? adminOnlyTitle : ''}
+                            className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                              !canWrite
+                                ? 'bg-slate-50 text-slate-400 cursor-not-allowed'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            }`}
                           >
                             编辑
                           </button>
@@ -631,7 +651,13 @@ function Products() {
                           </button>
                           <button
                             onClick={() => handleDeleteProduct(product.id)}
-                            className="px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors"
+                            disabled={!canWrite}
+                            title={!canWrite ? adminOnlyTitle : ''}
+                            className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                              !canWrite
+                                ? 'bg-rose-50 text-rose-300 cursor-not-allowed'
+                                : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+                            }`}
                           >
                             删除
                           </button>

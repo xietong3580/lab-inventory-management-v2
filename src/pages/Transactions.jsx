@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { transactionService, productService } from '../services/dataService';
 import { exportTransactionsToCSV } from '../utils/exportHelpers';
+import { usePermission } from '../hooks/usePermission';
 
 // 类型标签组件
 function TypeBadge({ type }) {
@@ -44,6 +45,8 @@ function Transactions() {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  const { canWrite, adminOnlyTitle } = usePermission();
 
   // 交易记录和产品数据
   const [transactionRecords, setTransactionRecords] = useState([]);
@@ -234,6 +237,7 @@ function Transactions() {
 
   // 打开新增记录模态框
   const handleOpenModal = () => {
+    if (!canWrite) return; // viewer 不可新增记录
     setFormData({
       productId: '',
       type: '入库',
@@ -264,6 +268,7 @@ function Transactions() {
     e.preventDefault();
     setFormError('');
 
+    if (!canWrite) return; // viewer 不可提交
     // 基础校验
     if (!formData.productId) {
       setFormError('请选择产品');
@@ -305,6 +310,7 @@ function Transactions() {
 
   // 点击撤销按钮
   const handleReverseClick = (transactionId) => {
+    if (!canWrite) return; // viewer 不可撤销
     setReversingTransactionId(transactionId);
     setReversalError('');
   };
@@ -317,6 +323,7 @@ function Transactions() {
 
   // 确认撤销交易记录
   const handleConfirmReverse = async () => {
+    if (!canWrite) return; // viewer 不可撤销
     if (!reversingTransactionId) return;
 
     try {
@@ -376,7 +383,13 @@ function Transactions() {
           {/* 左侧：新增记录按钮 */}
           <button
             onClick={handleOpenModal}
-            className="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium"
+            disabled={!canWrite}
+            title={!canWrite ? adminOnlyTitle : ''}
+            className={`px-4 py-2 rounded-md transition-colors font-medium ${
+              !canWrite
+                ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                : 'bg-slate-700 text-white hover:bg-slate-800'
+            }`}
           >
             + 新增记录
           </button>
@@ -384,9 +397,10 @@ function Transactions() {
           {/* 右侧：导出当前筛选结果按钮 */}
           <button
             onClick={handleExport}
-            disabled={filteredRecords.length === 0}
+            disabled={!canWrite || filteredRecords.length === 0}
+            title={!canWrite ? adminOnlyTitle : ''}
             className={`px-4 py-2 border rounded-md transition-colors font-medium ${
-              filteredRecords.length === 0
+              !canWrite || filteredRecords.length === 0
                 ? 'border-slate-200 text-slate-400 cursor-not-allowed'
                 : 'border-slate-300 text-slate-700 hover:bg-slate-50'
             }`}
@@ -650,8 +664,13 @@ function Transactions() {
                             {record.status === 'completed' ? (
                               <button
                                 onClick={() => handleReverseClick(record.id)}
-                                className="px-2 py-1 text-xs bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors"
-                                title="撤销此交易记录并回滚库存"
+                                disabled={!canWrite}
+                                title={!canWrite ? adminOnlyTitle : '撤销此交易记录并回滚库存'}
+                                className={`px-2 py-1 text-xs rounded transition-colors ${
+                                  !canWrite
+                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                    : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+                                }`}
                               >
                                 撤销
                               </button>
@@ -737,8 +756,13 @@ function Transactions() {
                     {record.status === 'completed' ? (
                       <button
                         onClick={() => handleReverseClick(record.id)}
-                        className="px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors flex-1"
-                        title="撤销此交易记录并回滚库存"
+                        disabled={!canWrite}
+                        title={!canWrite ? adminOnlyTitle : '撤销此交易记录并回滚库存'}
+                        className={`px-3 py-1.5 text-sm rounded transition-colors flex-1 ${
+                          !canWrite
+                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                            : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+                        }`}
                       >
                         撤销
                       </button>

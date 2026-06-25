@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { systemService } from '../services/dataService';
+import { usePermission } from '../hooks/usePermission';
 
 function Settings() {
+  const { canWrite, adminOnlyTitle } = usePermission();
   // 重置相关状态
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetResult, setResetResult] = useState(null);
@@ -82,7 +84,9 @@ function Settings() {
                   min="0"
                   max="100"
                   defaultValue="30"
-                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                  disabled={!canWrite}
+                  title={!canWrite ? adminOnlyTitle : ''}
+                  className={`w-full h-2 bg-slate-200 rounded-lg appearance-none ${canWrite ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
                 />
                 <span className="text-sm font-medium text-slate-800 w-12">30%</span>
               </div>
@@ -98,7 +102,9 @@ function Settings() {
                   min="0"
                   max="100"
                   defaultValue="60"
-                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                  disabled={!canWrite}
+                  title={!canWrite ? adminOnlyTitle : ''}
+                  className={`w-full h-2 bg-slate-200 rounded-lg appearance-none ${canWrite ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
                 />
                 <span className="text-sm font-medium text-slate-800 w-12">60%</span>
               </div>
@@ -119,8 +125,8 @@ function Settings() {
                 <div className="font-medium text-slate-800">低库存预警通知</div>
                 <div className="text-sm text-slate-500 mt-1">库存低于阈值时发送通知</div>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" className="sr-only peer" defaultChecked />
+              <label className={`relative inline-flex items-center ${canWrite ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`} title={!canWrite ? adminOnlyTitle : ''}>
+                <input type="checkbox" className="sr-only peer" defaultChecked disabled={!canWrite} />
                 <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-slate-700"></div>
               </label>
             </div>
@@ -129,8 +135,8 @@ function Settings() {
                 <div className="font-medium text-slate-800">每日库存报告</div>
                 <div className="text-sm text-slate-500 mt-1">每日发送库存状态摘要</div>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" className="sr-only peer" />
+              <label className={`relative inline-flex items-center ${canWrite ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`} title={!canWrite ? adminOnlyTitle : ''}>
+                <input type="checkbox" className="sr-only peer" disabled={!canWrite} />
                 <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-slate-700"></div>
               </label>
             </div>
@@ -139,8 +145,8 @@ function Settings() {
                 <div className="font-medium text-slate-800">出入库记录通知</div>
                 <div className="text-sm text-slate-500 mt-1">重要出入库操作时发送通知</div>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" className="sr-only peer" defaultChecked />
+              <label className={`relative inline-flex items-center ${canWrite ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`} title={!canWrite ? adminOnlyTitle : ''}>
+                <input type="checkbox" className="sr-only peer" defaultChecked disabled={!canWrite} />
                 <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-slate-700"></div>
               </label>
             </div>
@@ -162,7 +168,12 @@ function Settings() {
                 <input
                   type="text"
                   defaultValue="库存自动化管理系统 V2"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                  readOnly={!canWrite}
+                  disabled={!canWrite}
+                  title={!canWrite ? adminOnlyTitle : ''}
+                  className={`w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent ${
+                    !canWrite ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''
+                  }`}
                 />
               </div>
               <div>
@@ -172,7 +183,12 @@ function Settings() {
                 <input
                   type="text"
                   defaultValue="PRONOVATION 普诺实验商城"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                  readOnly={!canWrite}
+                  disabled={!canWrite}
+                  title={!canWrite ? adminOnlyTitle : ''}
+                  className={`w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent ${
+                    !canWrite ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''
+                  }`}
                 />
               </div>
               <div className="md:col-span-2">
@@ -182,7 +198,12 @@ function Settings() {
                 <textarea
                   rows="3"
                   defaultValue="独立新版库存管理系统，用于管理实验耗材、试剂和设备的库存，提供实时监控、预警和报表功能。"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent resize-none"
+                  readOnly={!canWrite}
+                  disabled={!canWrite}
+                  title={!canWrite ? adminOnlyTitle : ''}
+                  className={`w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent resize-none ${
+                    !canWrite ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''
+                  }`}
                 />
               </div>
             </div>
@@ -223,7 +244,13 @@ function Settings() {
               <div>
                 <div className="font-medium text-slate-800 mb-2">数据备份</div>
                 <p className="text-sm text-slate-600 mb-3">手动触发系统数据备份</p>
-                <button className="px-4 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors font-medium">
+                <button
+                  disabled={!canWrite}
+                  title={!canWrite ? adminOnlyTitle : ''}
+                  className={`px-4 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors font-medium ${
+                    !canWrite ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
                   立即备份
                 </button>
               </div>
@@ -259,7 +286,11 @@ function Settings() {
                 </p>
                 <button
                   onClick={handleOpenResetConfirm}
-                  className="px-4 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded-md hover:bg-rose-100 transition-colors font-medium"
+                  disabled={!canWrite}
+                  title={!canWrite ? adminOnlyTitle : ''}
+                  className={`px-4 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded-md hover:bg-rose-100 transition-colors font-medium ${
+                    !canWrite ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                 >
                   重置本地测试数据
                 </button>
@@ -428,10 +459,22 @@ function Settings() {
       {/* 操作按钮 */}
       <div className="mt-8 p-4 md:p-6 bg-white border border-slate-200 rounded-lg">
         <div className="flex justify-end gap-4">
-          <button className="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium">
+          <button
+            disabled={!canWrite}
+            title={!canWrite ? adminOnlyTitle : ''}
+            className={`px-6 py-2.5 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium ${
+              !canWrite ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+          >
             恢复默认
           </button>
-          <button className="px-6 py-2.5 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium">
+          <button
+            disabled={!canWrite}
+            title={!canWrite ? adminOnlyTitle : ''}
+            className={`px-6 py-2.5 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium ${
+              !canWrite ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+          >
             保存设置
           </button>
         </div>

@@ -300,9 +300,13 @@ const apiRequest = async (endpoint, options = {}) => {
       const status = response.status;
 
       // 401/403 时不静默降级到 mock，抛出明确错误
-      if (status === 401 || status === 403) {
-        console.error(`[dataService] 鉴权失败 (${status}): ${endpoint}`, errorText);
-        throw new Error(`鉴权失败 (${status}): 请重新登录`);
+      if (status === 401) {
+        console.error(`[dataService] 鉴权失败 (401): ${endpoint}`, errorText);
+        throw new Error(`鉴权失败 (401): 请重新登录`);
+      }
+      if (status === 403) {
+        console.error(`[dataService] 鉴权失败 (403): ${endpoint}`, errorText);
+        throw new Error(`鉴权失败 (403): 仅管理员可操作，当前账号无权限，请联系管理员`);
       }
 
       throw new Error(`API 请求失败: ${status} ${response.statusText} - ${errorText}`);

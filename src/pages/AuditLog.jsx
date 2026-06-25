@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { auditLogService } from '../services/dataService';
+import { usePermission } from '../hooks/usePermission';
 import {
   formatAuditTime,
   generateAuditSummary,
@@ -11,6 +12,8 @@ import { filterAuditLogs, hasActiveFilters } from '../utils/auditLogFilterHelper
 import { exportAuditLogsToCSV } from '../utils/exportHelpers';
 
 function AuditLog() {
+  const { canWrite, adminOnlyTitle } = usePermission();
+
   // 审计日志数据状态
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -123,9 +126,10 @@ function AuditLog() {
         <div className="flex flex-col md:flex-row md:items-center justify-start md:justify-end gap-4">
           <button
             onClick={handleExport}
-            disabled={filteredLogs.length === 0}
+            disabled={!canWrite || filteredLogs.length === 0}
+            title={!canWrite ? adminOnlyTitle : ''}
             className={`px-4 py-2 border rounded-md transition-colors font-medium ${
-              filteredLogs.length === 0
+              !canWrite || filteredLogs.length === 0
                 ? 'border-slate-200 text-slate-400 cursor-not-allowed'
                 : 'border-slate-300 text-slate-700 hover:bg-slate-50'
             }`}

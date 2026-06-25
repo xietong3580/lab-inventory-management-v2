@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { userService } from '../services/dataService';
+import { usePermission } from '../hooks/usePermission';
 
 function Users() {
+  const { canWrite, adminOnlyTitle } = usePermission();
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -83,7 +85,13 @@ function Users() {
       {/* 操作栏 */}
       <div className="bg-white border border-slate-200 rounded-lg p-4 mb-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <button className="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium">
+          <button
+            disabled={!canWrite}
+            title={!canWrite ? adminOnlyTitle : ''}
+            className={`px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium ${
+              !canWrite ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+          >
             + 新增用户
           </button>
           <div className="flex flex-col sm:flex-row gap-3">
@@ -178,10 +186,22 @@ function Users() {
                       </td>
                       <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          <button className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors">
+                          <button
+                            disabled={!canWrite}
+                            title={!canWrite ? adminOnlyTitle : ''}
+                            className={`px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors ${
+                              !canWrite ? 'opacity-50 cursor-not-allowed' : ''
+                            }`}
+                          >
                             编辑
                           </button>
-                          <button className="px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors">
+                          <button
+                            disabled={!canWrite}
+                            title={!canWrite ? adminOnlyTitle : ''}
+                            className={`px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors ${
+                              !canWrite ? 'opacity-50 cursor-not-allowed' : ''
+                            }`}
+                          >
                             {user.status === '停用' ? '启用' : '停用'}
                           </button>
                         </div>
