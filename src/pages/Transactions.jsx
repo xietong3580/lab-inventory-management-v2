@@ -66,6 +66,7 @@ function Transactions() {
   const [formError, setFormError] = useState('');
   const [reversingTransactionId, setReversingTransactionId] = useState(null);
   const [reversalError, setReversalError] = useState('');
+  const [detailRecord, setDetailRecord] = useState(null);
 
   // 筛选选项
   const typeOptions = ['all', '入库', '出库'];
@@ -252,6 +253,16 @@ function Transactions() {
   // 关闭新增记录模态框
   const handleCloseModal = () => {
     setIsModalOpen(false);
+  };
+
+  // 打开交易详情弹窗（只读，admin 和 viewer 均可使用）
+  const handleShowDetail = (record) => {
+    setDetailRecord(record);
+  };
+
+  // 关闭交易详情弹窗
+  const handleCloseDetail = () => {
+    setDetailRecord(null);
   };
 
   // 表单字段变化处理
@@ -658,7 +669,10 @@ function Transactions() {
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap w-32">
                           <div className="flex items-center gap-2">
-                            <button className="px-2 py-1 text-xs bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors">
+                            <button
+                              onClick={() => handleShowDetail(record)}
+                              className="px-2 py-1 text-xs bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors"
+                            >
                               详情
                             </button>
                             {record.status === 'completed' ? (
@@ -750,7 +764,10 @@ function Transactions() {
 
                   {/* 卡片底部：操作按钮 */}
                   <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
-                    <button className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors flex-1">
+                    <button
+                      onClick={() => handleShowDetail(record)}
+                      className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors flex-1"
+                    >
                       详情
                     </button>
                     {record.status === 'completed' ? (
@@ -1056,6 +1073,73 @@ function Transactions() {
                   确认撤销
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 交易详情弹窗（只读，admin 和 viewer 均可查看） */}
+      {detailRecord && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-slate-200">
+              <h2 className="text-xl font-semibold text-slate-800">交易详情</h2>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <div className="text-xs text-slate-500 mb-1">交易编号</div>
+                  <div className="text-sm font-medium text-slate-800">{detailRecord.id || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500 mb-1">时间</div>
+                  <div className="text-sm font-medium text-slate-800">{detailRecord.date || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500 mb-1">产品名称</div>
+                  <div className="text-sm font-medium text-slate-800">{detailRecord.productName || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500 mb-1">交易类型</div>
+                  <div>
+                    <TypeBadge type={detailRecord.type} />
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500 mb-1">数量</div>
+                  <div className="text-sm font-medium text-slate-800">
+                    {detailRecord.quantity} {detailRecord.unit || ''}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500 mb-1">操作人</div>
+                  <div className="text-sm font-medium text-slate-800">{detailRecord.operator || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500 mb-1">状态</div>
+                  <div>
+                    <StatusBadge status={detailRecord.status} />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-xs text-slate-500 mb-1">备注</div>
+                <div className="text-sm text-slate-800 bg-slate-50 rounded-md p-3 border border-slate-200">
+                  {detailRecord.notes || '无'}
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end">
+              <button
+                type="button"
+                onClick={handleCloseDetail}
+                className="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium"
+              >
+                关闭
+              </button>
             </div>
           </div>
         </div>

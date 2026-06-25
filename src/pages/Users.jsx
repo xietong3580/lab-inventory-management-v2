@@ -4,6 +4,11 @@ import { usePermission } from '../hooks/usePermission';
 
 function Users() {
   const { canWrite, adminOnlyTitle } = usePermission();
+
+  // 写操作暂未开放的统一提示
+  const handleWriteNotAvailable = () => {
+    alert('用户管理写操作将在下一阶段开放');
+  };
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -86,6 +91,7 @@ function Users() {
       <div className="bg-white border border-slate-200 rounded-lg p-4 mb-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <button
+            onClick={canWrite ? handleWriteNotAvailable : undefined}
             disabled={!canWrite}
             title={!canWrite ? adminOnlyTitle : ''}
             className={`px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium ${
@@ -187,6 +193,7 @@ function Users() {
                       <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <button
+                            onClick={canWrite ? handleWriteNotAvailable : undefined}
                             disabled={!canWrite}
                             title={!canWrite ? adminOnlyTitle : ''}
                             className={`px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors ${
@@ -196,6 +203,7 @@ function Users() {
                             编辑
                           </button>
                           <button
+                            onClick={canWrite ? handleWriteNotAvailable : undefined}
                             disabled={!canWrite}
                             title={!canWrite ? adminOnlyTitle : ''}
                             className={`px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors ${
