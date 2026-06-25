@@ -82,6 +82,34 @@ class AuditLogResponse(AuditLogBase):
     class Config:
         from_attributes = True
 
+# 用户管理相关模型（Step 7-2）
+class UserCreate(BaseModel):
+    """创建用户请求模型"""
+    username: str = Field(..., min_length=1, max_length=50)
+    display_name: Optional[str] = None
+    email: Optional[str] = None
+    role: str = "viewer"
+    password: str = Field(..., min_length=6, max_length=128)
+
+
+class UserUpdate(BaseModel):
+    """编辑用户请求模型"""
+    username: Optional[str] = Field(None, min_length=1, max_length=50)
+    display_name: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[str] = None
+
+
+class UserStatusUpdate(BaseModel):
+    """用户状态更新请求模型"""
+    is_active: bool
+
+
+class UserPasswordReset(BaseModel):
+    """重置密码请求模型"""
+    new_password: str = Field(..., min_length=6, max_length=128)
+
+
 # 仪表盘数据模型
 class DashboardStats(BaseModel):
     total_products: int
