@@ -110,6 +110,12 @@ class UserPasswordReset(BaseModel):
     new_password: str = Field(..., min_length=6, max_length=128)
 
 
+class ChangePassword(BaseModel):
+    """当前用户修改自己密码请求模型"""
+    old_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=6, max_length=128)
+
+
 # 仪表盘数据模型
 class DashboardStats(BaseModel):
     total_products: int

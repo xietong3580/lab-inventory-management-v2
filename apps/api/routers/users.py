@@ -19,7 +19,7 @@ ALLOWED_ROLES = {"admin", "viewer"}
 DEFAULT_ADMIN = {
     "username": "admin",
     "email": "admin@example.com",
-    "role": "管理员",
+    "role": "admin",
     "status": "活跃",
     "last_login": datetime.now().strftime("%Y-%m-%d %H:%M"),
 }

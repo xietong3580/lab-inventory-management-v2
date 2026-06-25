@@ -167,7 +167,7 @@ class User(Base):
     password_hash = Column(String(128), nullable=True)  # bcrypt 哈希密码
     display_name = Column(String(100), nullable=True)    # 显示名称
     email = Column(String(100), nullable=True)
-    role = Column(String(30), nullable=False, default="操作员")
+    role = Column(String(30), nullable=False, default="viewer")
     is_active = Column(Boolean, nullable=False, default=True)  # 是否激活
     status = Column(String(20), nullable=False, default="活跃")  # 活跃/停用
     last_login = Column(String(50), nullable=True)
