@@ -87,8 +87,10 @@ const FIELD_MAPPING = {
   details: 'details',
   // 用户字段映射
   username: 'username',
+  display_name: 'displayName',
   email: 'email',
   role: 'role',
+  is_active: 'isActive',
   user_status: 'status',
   last_login: 'lastLogin'
 };
@@ -701,13 +703,13 @@ export const userService = {
    */
   async getAllUsers() {
     if (currentMode === DATA_SOURCE_MODE.MOCK) {
-      // 返回模拟用户数据（与Users.jsx中的模拟数据一致）
+      // 返回模拟用户数据（role 使用英文值，与后端一致）
       return [
         {
           id: 'user-001',
           username: 'admin',
           email: 'admin@example.com',
-          role: '管理员',
+          role: 'admin',
           status: '活跃',
           lastLogin: '2026-03-29 15:30',
         },
@@ -715,7 +717,7 @@ export const userService = {
           id: 'user-002',
           username: 'zhang.san',
           email: 'zhang.san@example.com',
-          role: '仓库管理员',
+          role: 'viewer',
           status: '活跃',
           lastLogin: '2026-03-28 10:20',
         },
@@ -723,7 +725,7 @@ export const userService = {
           id: 'user-003',
           username: 'li.si',
           email: 'li.si@example.com',
-          role: '操作员',
+          role: 'viewer',
           status: '活跃',
           lastLogin: '2026-03-27 14:45',
         },
@@ -731,7 +733,7 @@ export const userService = {
           id: 'user-004',
           username: 'wang.wu',
           email: 'wang.wu@example.com',
-          role: '查看者',
+          role: 'viewer',
           status: '停用',
           lastLogin: '2026-03-20 09:15',
         },
@@ -739,67 +741,86 @@ export const userService = {
           id: 'user-005',
           username: 'zhao.liu',
           email: 'zhao.liu@example.com',
-          role: '操作员',
+          role: 'viewer',
           status: '活跃',
           lastLogin: '2026-03-29 11:10',
         },
       ];
     } else {
-      const originalMode = currentMode; // 保存当前模式
-      try {
-        const data = await apiRequest('/users/');
-        // 规范化字段名，确保与前端期望的字段名一致
-        return normalizeUserList(data);
-      } catch (error) {
-        console.warn('[dataService] 获取用户数据失败，降级到 mock 数据:', error);
-        // 恢复原始模式，避免影响其他服务
-        currentMode = originalMode;
-        // 局部降级：直接返回 mock 用户数据
-        return [
-          {
-            id: 'user-001',
-            username: 'admin',
-            email: 'admin@example.com',
-            role: '管理员',
-            status: '活跃',
-            lastLogin: '2026-03-29 15:30',
-          },
-          {
-            id: 'user-002',
-            username: 'zhang.san',
-            email: 'zhang.san@example.com',
-            role: '仓库管理员',
-            status: '活跃',
-            lastLogin: '2026-03-28 10:20',
-          },
-          {
-            id: 'user-003',
-            username: 'li.si',
-            email: 'li.si@example.com',
-            role: '操作员',
-            status: '活跃',
-            lastLogin: '2026-03-27 14:45',
-          },
-          {
-            id: 'user-004',
-            username: 'wang.wu',
-            email: 'wang.wu@example.com',
-            role: '查看者',
-            status: '停用',
-            lastLogin: '2026-03-20 09:15',
-          },
-          {
-            id: 'user-005',
-            username: 'zhao.liu',
-            email: 'zhao.liu@example.com',
-            role: '操作员',
-            status: '活跃',
-            lastLogin: '2026-03-29 11:10',
-          },
-        ];
-      }
+      const data = await apiRequest('/users/');
+      return normalizeUserList(data);
     }
-  }
+  },
+
+  /**
+   * 新增用户（需管理员权限）
+   * @param {Object} payload - { username, password, display_name?, email?, role? }
+   *   字段与后端 UserCreate schema 对齐（snake_case）
+   *   role 仅允许 "admin" 或 "viewer"，默认 "viewer"
+   * @returns {Promise<Object>} 创建的用户对象
+   */
+  async createUser(payload) {
+    if (currentMode === DATA_SOURCE_MODE.MOCK) {
+      throw new Error('Mock 模式暂不支持新增用户，请切换到 API 模式');
+    }
+    const data = await apiRequest('/users/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return normalizeUser(data);
+  },
+
+  /**
+   * 编辑用户信息（需管理员权限）
+   * @param {string} userId - 用户 ID（如 user-000001）
+   * @param {Object} payload - { username?, display_name?, email?, role? }
+   *   role 仅允许 "admin" 或 "viewer"
+   * @returns {Promise<Object>} 更新后的用户对象
+   */
+  async updateUser(userId, payload) {
+    if (currentMode === DATA_SOURCE_MODE.MOCK) {
+      throw new Error('Mock 模式暂不支持编辑用户，请切换到 API 模式');
+    }
+    const data = await apiRequest(`/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    return normalizeUser(data);
+  },
+
+  /**
+   * 启用/停用用户（需管理员权限）
+   * @param {string} userId - 用户 ID（如 user-000001）
+   * @param {boolean} isActive - true 启用，false 停用
+   * @returns {Promise<Object>} 更新后的用户对象
+   */
+  async updateUserStatus(userId, isActive) {
+    if (currentMode === DATA_SOURCE_MODE.MOCK) {
+      throw new Error('Mock 模式暂不支持修改用户状态，请切换到 API 模式');
+    }
+    const data = await apiRequest(`/users/${userId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_active: isActive }),
+    });
+    return normalizeUser(data);
+  },
+
+  /**
+   * 管理员重置用户密码（需管理员权限）
+   * @param {string} userId - 用户 ID（如 user-000001）
+   * @param {string} newPassword - 新密码（至少 6 位）
+   * @returns {Promise<Object>} 更新后的用户对象
+   */
+  async resetUserPassword(userId, newPassword) {
+    if (currentMode === DATA_SOURCE_MODE.MOCK) {
+      throw new Error('Mock 模式暂不支持重置密码，请切换到 API 模式');
+    }
+    const data = await apiRequest(`/users/${userId}/password`, {
+      method: 'PATCH',
+      body: JSON.stringify({ new_password: newPassword }),
+    });
+    return normalizeUser(data);
+  },
 };
 
 /**
