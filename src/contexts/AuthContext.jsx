@@ -9,7 +9,7 @@ const AuthContext = createContext(null);
  */
 export const ROLE_LABELS = {
   admin: '管理员',
-  viewer: '查看者',
+  viewer: '只读用户',
 };
 
 /**

@@ -5,7 +5,7 @@ import { usePermission } from '../hooks/usePermission';
 // 角色值英文 → 中文显示映射
 const ROLE_DISPLAY = {
   admin: '管理员',
-  viewer: '查看者',
+  viewer: '只读用户',
 };
 
 function Users() {
@@ -268,14 +268,14 @@ function Users() {
   // ============================================================================
   function RoleBadge({ role }) {
     // 先查英文映射，再查中文直接匹配，最后兜底
-    const display = ROLE_DISPLAY[role] || role || '查看者';
+    const display = ROLE_DISPLAY[role] || role || '只读用户';
     const config = {
       admin: { bg: 'bg-slate-100', textColor: 'text-slate-800' },
       viewer: { bg: 'bg-slate-50', textColor: 'text-slate-600' },
       管理员: { bg: 'bg-slate-100', textColor: 'text-slate-800' },
-      查看者: { bg: 'bg-slate-50', textColor: 'text-slate-600' },
+      只读用户: { bg: 'bg-slate-50', textColor: 'text-slate-600' },
     };
-    const { bg, textColor } = config[role] || config['查看者'];
+    const { bg, textColor } = config[role] || config['只读用户'];
 
     return (
       <span className={`px-2 py-1 rounded text-xs font-medium ${bg} ${textColor}`}>
@@ -525,7 +525,7 @@ function Users() {
       {/* 底部提示 */}
       <div className="mt-6 p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-lg">
         <div className="text-sm text-slate-600">
-          提示：管理员可新增、编辑、启用/停用用户账户，以及重置用户密码。角色分为"管理员"（admin，可读写）和"查看者"（viewer，只读）。
+          提示：管理员可新增、编辑、启用/停用用户账户，以及重置用户密码。角色分为"管理员"（admin，可读写）和"只读用户"（viewer，只读）。
         </div>
       </div>
 
@@ -591,7 +591,7 @@ function Users() {
                   onChange={(e) => setAddForm({ ...addForm, role: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent text-sm bg-white"
                 >
-                  <option value="viewer">查看者 (viewer)</option>
+                  <option value="viewer">只读用户 (viewer)</option>
                   <option value="admin">管理员 (admin)</option>
                 </select>
               </div>
@@ -694,7 +694,7 @@ function Users() {
                   onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent text-sm bg-white"
                 >
-                  <option value="viewer">查看者 (viewer)</option>
+                  <option value="viewer">只读用户 (viewer)</option>
                   <option value="admin">管理员 (admin)</option>
                 </select>
               </div>
