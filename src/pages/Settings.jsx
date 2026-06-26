@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { systemService } from '../services/dataService';
 import { usePermission } from '../hooks/usePermission';
+import { changePassword } from '../services/authService';
 
 function Settings() {
   const { canWrite, adminOnlyTitle } = usePermission();
@@ -10,6 +11,11 @@ function Settings() {
   const [isResetting, setIsResetting] = useState(false);
   // 数据源模式状态
   const [dataSourceMode, setDataSourceMode] = useState('unknown');
+  // 修改密码相关状态
+  const [pwdForm, setPwdForm] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
+  const [pwdError, setPwdError] = useState('');
+  const [pwdSuccess, setPwdSuccess] = useState('');
+  const [isChangingPwd, setIsChangingPwd] = useState(false);
 
   // 获取数据源模式
   useEffect(() => {
@@ -52,6 +58,45 @@ function Settings() {
       });
     } finally {
       setIsResetting(false);
+    }
+  };
+
+  // 修改密码表单变化
+  const handlePwdChange = (field, value) => {
+    setPwdForm(prev => ({ ...prev, [field]: value }));
+    setPwdError('');
+    setPwdSuccess('');
+  };
+
+  // 提交修改密码
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPwdError('');
+    setPwdSuccess('');
+
+    // 前端校验
+    if (!pwdForm.oldPassword.trim()) {
+      setPwdError('请输入当前密码');
+      return;
+    }
+    if (pwdForm.newPassword.length < 6) {
+      setPwdError('新密码不能少于 6 位');
+      return;
+    }
+    if (pwdForm.newPassword !== pwdForm.confirmPassword) {
+      setPwdError('两次新密码输入不一致');
+      return;
+    }
+
+    setIsChangingPwd(true);
+    try {
+      await changePassword(pwdForm.oldPassword, pwdForm.newPassword);
+      setPwdSuccess('密码修改成功，请牢记新密码');
+      setPwdForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err) {
+      setPwdError(err.message || '密码修改失败，请检查当前密码后重试');
+    } finally {
+      setIsChangingPwd(false);
     }
   };
 
@@ -329,6 +374,84 @@ function Settings() {
                 本系统为独立新版库存管理系统，不影响现有旧版系统运行。
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* 账号安全 / 修改密码 */}
+        <div className="bg-white border border-slate-200 rounded-lg lg:col-span-2">
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h2 className="text-lg font-semibold text-slate-800">账号安全</h2>
+            <p className="text-sm text-slate-500 mt-1">修改当前登录账号的密码</p>
+          </div>
+          <div className="p-4 md:p-6">
+            <form onSubmit={handleChangePassword} className="max-w-lg">
+              {/* 当前密码 */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  当前密码
+                </label>
+                <input
+                  type="password"
+                  value={pwdForm.oldPassword}
+                  onChange={(e) => handlePwdChange('oldPassword', e.target.value)}
+                  placeholder="请输入当前密码"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                />
+              </div>
+              {/* 新密码 */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  新密码
+                </label>
+                <input
+                  type="password"
+                  value={pwdForm.newPassword}
+                  onChange={(e) => handlePwdChange('newPassword', e.target.value)}
+                  placeholder="新密码（不少于 6 位）"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                />
+              </div>
+              {/* 确认新密码 */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  确认新密码
+                </label>
+                <input
+                  type="password"
+                  value={pwdForm.confirmPassword}
+                  onChange={(e) => handlePwdChange('confirmPassword', e.target.value)}
+                  placeholder="请再次输入新密码"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                />
+              </div>
+              {/* 错误提示 */}
+              {pwdError && (
+                <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-md">
+                  <span className="text-sm text-rose-700">{pwdError}</span>
+                </div>
+              )}
+              {/* 成功提示 */}
+              {pwdSuccess && (
+                <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-md">
+                  <span className="text-sm text-emerald-700">{pwdSuccess}</span>
+                </div>
+              )}
+              {/* 提交按钮 */}
+              <button
+                type="submit"
+                disabled={isChangingPwd}
+                className="px-6 py-2.5 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isChangingPwd ? (
+                  <>
+                    <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    修改中...
+                  </>
+                ) : (
+                  '修改密码'
+                )}
+              </button>
+            </form>
           </div>
         </div>
       </div>

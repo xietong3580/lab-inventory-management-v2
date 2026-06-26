@@ -104,3 +104,34 @@ export async function getMe() {
 
   return user;
 }
+
+/**
+ * 修改当前用户密码
+ * @param {string} oldPassword - 当前密码
+ * @param {string} newPassword - 新密码
+ * @returns {Promise<{message: string}>}
+ */
+export async function changePassword(oldPassword, newPassword) {
+  const token = getToken();
+  if (!token) {
+    throw new Error('未登录');
+  }
+
+  const response = await fetch(`${API_BASE}/auth/change-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    // 后端字段为 snake_case: old_password, new_password
+    body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || '密码修改失败，请检查当前密码后重试');
+  }
+
+  return response.json();
+}
