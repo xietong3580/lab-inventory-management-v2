@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { systemService } from '../services/dataService';
 import { usePermission } from '../hooks/usePermission';
 import { changePassword } from '../services/authService';
-import { createManualBackup, formatBytes } from '../services/backupService';
+import { createManualBackup, getBackups, formatBytes } from '../services/backupService';
 
 function Settings() {
   const { canWrite, adminOnlyTitle } = usePermission();
@@ -20,12 +20,40 @@ function Settings() {
   // 备份相关状态
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [backupResult, setBackupResult] = useState(null);
+  // 备份列表相关状态
+  const [backupList, setBackupList] = useState([]);
+  const [isLoadingList, setIsLoadingList] = useState(false);
+  const [listError, setListError] = useState('');
 
   // 获取数据源模式
   useEffect(() => {
     const mode = systemService.getDataSourceMode();
     setDataSourceMode(mode);
   }, []);
+
+  // 加载备份文件列表（仅管理员）
+  const loadBackupList = async () => {
+    if (!canWrite) return;
+    setIsLoadingList(true);
+    setListError('');
+    try {
+      const data = await getBackups();
+      setBackupList(data.items || []);
+    } catch (err) {
+      setListError(err.message || '加载备份列表失败');
+      setBackupList([]);
+    } finally {
+      setIsLoadingList(false);
+    }
+  };
+
+  // admin 进入页面时自动加载备份列表
+  useEffect(() => {
+    if (canWrite) {
+      loadBackupList();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canWrite]);
 
   // 打开重置确认对话框
   const handleOpenResetConfirm = () => {
@@ -112,6 +140,10 @@ function Settings() {
     try {
       const result = await createManualBackup();
       setBackupResult(result);
+      // 备份成功后自动刷新列表
+      if (result.success) {
+        loadBackupList();
+      }
     } catch (err) {
       setBackupResult({
         success: false,
@@ -362,6 +394,47 @@ function Settings() {
                     ) : (
                       <div className="text-rose-700">{backupResult.message}</div>
                     )}
+                  </div>
+                )}
+                {/* 备份文件列表 */}
+                {canWrite && (
+                  <div className="pt-3 border-t border-slate-100">
+                    <div className="font-medium text-slate-800 text-sm mb-2">备份记录</div>
+                    {isLoadingList && (
+                      <div className="text-sm text-slate-500 py-2">正在加载备份记录...</div>
+                    )}
+                    {listError && !isLoadingList && (
+                      <div className="text-sm text-rose-600 py-2">{listError}</div>
+                    )}
+                    {!isLoadingList && !listError && backupList.length === 0 && (
+                      <div className="text-sm text-slate-400 py-2">暂无备份记录</div>
+                    )}
+                    {!isLoadingList && backupList.length > 0 && (
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {backupList.map((item) => (
+                          <div key={item.filename} className="flex items-center justify-between py-1.5 px-2 bg-slate-50 border border-slate-100 rounded text-xs">
+                            <div className="min-w-0 flex-1 mr-2">
+                              <div className="font-mono text-slate-700 truncate">{item.filename}</div>
+                              <div className="text-slate-500 mt-0.5">
+                                {formatBytes(item.size_bytes)} · {new Date(item.created_at).toLocaleString('zh-CN')}
+                              </div>
+                            </div>
+                            <span className={`shrink-0 px-1.5 py-0.5 rounded text-xs font-medium ${
+                              item.integrity_check === 'ok'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-rose-100 text-rose-700'
+                            }`}>
+                              {item.integrity_check === 'ok' ? '通过' : '异常'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {!canWrite && (
+                  <div className="pt-3 border-t border-slate-100">
+                    <div className="text-sm text-slate-400 py-2">仅管理员可查看备份记录</div>
                   </div>
                 )}
               </div>

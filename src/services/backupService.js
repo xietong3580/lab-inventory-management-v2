@@ -59,3 +59,43 @@ export async function createManualBackup() {
 
   return response.json();
 }
+
+/**
+ * 获取备份文件列表（仅管理员可用）
+ * @returns {Promise<{
+ *   success: boolean,
+ *   items: Array<{
+ *     filename: string,
+ *     relative_path: string,
+ *     size_bytes: number,
+ *     created_at: string,
+ *     integrity_check: string
+ *   }>,
+ *   count: number,
+ *   message: string
+ * }>}
+ */
+export async function getBackups() {
+  const token = getToken();
+  if (!token) {
+    throw new Error('未登录');
+  }
+
+  const response = await fetch(`${API_BASE}/backups`, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 403) {
+      throw new Error('需要管理员权限才能查看备份列表');
+    }
+    throw new Error(errorData.detail || `获取备份列表失败 (${response.status})`);
+  }
+
+  return response.json();
+}
