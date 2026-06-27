@@ -1,11 +1,13 @@
 """
-备份 API 路由：手动触发数据库备份
+备份 API 路由：手动触发数据库备份 + 备份文件列表
 """
 
 import sqlite3
 import shutil
+import os
 from datetime import datetime
 from pathlib import Path
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -27,6 +29,21 @@ class BackupResponse(BaseModel):
     size_bytes: int
     created_at: str
     integrity_check: str
+    message: str
+
+
+class BackupItem(BaseModel):
+    filename: str
+    relative_path: str
+    size_bytes: int
+    created_at: str
+    integrity_check: str
+
+
+class BackupListResponse(BaseModel):
+    success: bool
+    items: List[BackupItem]
+    count: int
     message: str
 
 
@@ -154,4 +171,57 @@ def manual_backup(admin: str = Depends(require_admin)):
         created_at=created_at,
         integrity_check="ok",
         message=f"备份成功：{filename}（{final_size:,} 字节）",
+    )
+
+
+@router.get("", response_model=BackupListResponse)
+@router.get("/", response_model=BackupListResponse)
+def list_backups(admin: str = Depends(require_admin)):
+    """
+    获取备份文件列表（仅管理员）
+
+    按文件修改时间倒序排列，最新的备份在最前。
+    对每个备份文件执行 SQLite integrity_check。
+    """
+    items: List[BackupItem] = []
+
+    # 如果备份目录不存在，返回空列表
+    if not BACKUP_DIR.exists():
+        return BackupListResponse(
+            success=True,
+            items=[],
+            count=0,
+            message="备份目录尚未创建，无备份文件",
+        )
+
+    # 扫描备份目录中的 inventory-backup-*.db 文件
+    backup_files = sorted(
+        BACKUP_DIR.glob("inventory-backup-*.db"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+
+    for backup_path in backup_files:
+        filename = backup_path.name
+        size = backup_path.stat().st_size
+        created_at = datetime.fromtimestamp(
+            backup_path.stat().st_mtime
+        ).isoformat()
+
+        # 校验每个备份文件
+        validation = _validate_backup(backup_path, size)
+
+        items.append(BackupItem(
+            filename=filename,
+            relative_path=f"backups/{filename}",
+            size_bytes=size,
+            created_at=created_at,
+            integrity_check=validation["integrity_check"],
+        ))
+
+    return BackupListResponse(
+        success=True,
+        items=items,
+        count=len(items),
+        message=f"备份文件列表获取成功，共 {len(items)} 个备份文件",
     )
