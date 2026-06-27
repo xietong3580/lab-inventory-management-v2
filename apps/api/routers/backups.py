@@ -2,6 +2,7 @@
 备份 API 路由：手动触发数据库备份 + 备份文件列表
 """
 
+import re
 import sqlite3
 import shutil
 import os
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from database import BASE_DIR
@@ -97,6 +99,42 @@ def _validate_backup(backup_path: Path, expected_size: int) -> dict:
         return {"integrity_check": result, "size_bytes": size}
     except sqlite3.Error as e:
         return {"integrity_check": f"FAILED: {e}", "size_bytes": size}
+
+
+# 允许的备份文件名模式
+_BACKUP_FILENAME_PATTERN = re.compile(r"^inventory-backup-\d{4}-\d{2}-\d{2}-\d{6}\.db$")
+
+
+def _safe_validate_filename(filename: str) -> str:
+    """
+    校验备份文件名是否安全，返回 resolved_path。
+    不通过则抛出 HTTPException。
+    """
+    # 禁止路径穿越字符
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="文件名包含非法字符",
+        )
+
+    # 必须匹配 inventory-backup-YYYY-MM-DD-HHMMSS.db
+    if not _BACKUP_FILENAME_PATTERN.match(filename):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"不允许的文件名格式：{filename}",
+        )
+
+    # 解析到 BACKUP_DIR 下的绝对路径
+    resolved = (BACKUP_DIR / filename).resolve()
+
+    # 确认路径仍在 BACKUP_DIR 内（防符号链接穿越）
+    if not str(resolved).startswith(str(BACKUP_DIR.resolve())):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="非法的文件路径",
+        )
+
+    return str(resolved)
 
 
 @router.post("/manual", response_model=BackupResponse)
@@ -224,4 +262,41 @@ def list_backups(admin: str = Depends(require_admin)):
         items=items,
         count=len(items),
         message=f"备份文件列表获取成功，共 {len(items)} 个备份文件",
+    )
+
+
+@router.get("/{filename}/download")
+def download_backup(filename: str, admin: str = Depends(require_admin)):
+    """
+    下载指定备份文件（仅管理员）
+
+    安全要求：
+    - 仅允许 inventory-backup-YYYY-MM-DD-HHMMSS.db 格式
+    - 禁止路径穿越
+    - 下载前执行 SQLite integrity_check，校验失败拒绝下载
+    """
+    # 1. 安全校验文件名并获取解析后的路径
+    safe_path = _safe_validate_filename(filename)
+    backup_path = Path(safe_path)
+
+    # 2. 文件存在性检查
+    if not backup_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"备份文件不存在：{filename}",
+        )
+
+    # 3. 下载前完整性校验
+    validation = _validate_backup(backup_path, backup_path.stat().st_size)
+    if validation["integrity_check"] != "ok":
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"备份文件校验失败，拒绝下载：{validation['integrity_check']}",
+        )
+
+    # 4. 返回文件下载
+    return FileResponse(
+        path=str(backup_path),
+        filename=filename,
+        media_type="application/octet-stream",
     )
