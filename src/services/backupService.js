@@ -99,3 +99,33 @@ export async function getBackups() {
 
   return response.json();
 }
+
+/**
+ * 下载备份文件（仅管理员可用）
+ * @param {string} filename - 备份文件名
+ * @returns {Promise<Blob>} 文件 Blob，由调用方创建下载链接
+ */
+export async function downloadBackup(filename) {
+  const token = getToken();
+  if (!token) {
+    throw new Error('未登录');
+  }
+
+  const encodedFilename = encodeURIComponent(filename);
+  const response = await fetch(`${API_BASE}/backups/${encodedFilename}/download`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 403) {
+      throw new Error('需要管理员权限才能下载备份文件');
+    }
+    throw new Error(errorData.detail || `下载备份文件失败 (${response.status})`);
+  }
+
+  return response.blob();
+}

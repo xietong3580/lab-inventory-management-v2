@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { systemService } from '../services/dataService';
 import { usePermission } from '../hooks/usePermission';
 import { changePassword } from '../services/authService';
-import { createManualBackup, getBackups, formatBytes } from '../services/backupService';
+import { createManualBackup, getBackups, downloadBackup, formatBytes } from '../services/backupService';
 
 function Settings() {
   const { canWrite, adminOnlyTitle } = usePermission();
@@ -24,6 +24,9 @@ function Settings() {
   const [backupList, setBackupList] = useState([]);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [listError, setListError] = useState('');
+  // 下载相关状态
+  const [downloadingFile, setDownloadingFile] = useState(null);
+  const [downloadError, setDownloadError] = useState('');
 
   // 获取数据源模式
   useEffect(() => {
@@ -151,6 +154,29 @@ function Settings() {
       });
     } finally {
       setIsBackingUp(false);
+    }
+  };
+
+  // 下载备份文件
+  const handleDownload = async (filename) => {
+    if (downloadingFile) return; // 防止重复点击
+    setDownloadingFile(filename);
+    setDownloadError('');
+    try {
+      const blob = await downloadBackup(filename);
+      // 创建 Blob 下载链接
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setDownloadError(err.message || '下载备份文件失败');
+    } finally {
+      setDownloadingFile(null);
     }
   };
 
@@ -406,6 +432,9 @@ function Settings() {
                     {listError && !isLoadingList && (
                       <div className="text-sm text-rose-600 py-2">{listError}</div>
                     )}
+                    {downloadError && !isLoadingList && (
+                      <div className="text-sm text-rose-600 py-2">{downloadError}</div>
+                    )}
                     {!isLoadingList && !listError && backupList.length === 0 && (
                       <div className="text-sm text-slate-400 py-2">暂无备份记录</div>
                     )}
@@ -419,13 +448,23 @@ function Settings() {
                                 {formatBytes(item.size_bytes)} · {new Date(item.created_at).toLocaleString('zh-CN')}
                               </div>
                             </div>
-                            <span className={`shrink-0 px-1.5 py-0.5 rounded text-xs font-medium ${
-                              item.integrity_check === 'ok'
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : 'bg-rose-100 text-rose-700'
-                            }`}>
-                              {item.integrity_check === 'ok' ? '通过' : '异常'}
-                            </span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                onClick={() => handleDownload(item.filename)}
+                                disabled={downloadingFile === item.filename}
+                                title={downloadingFile === item.filename ? '下载中...' : '下载备份文件'}
+                                className="px-2 py-1 bg-slate-200 text-slate-600 rounded hover:bg-slate-300 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {downloadingFile === item.filename ? '下载中...' : '下载'}
+                              </button>
+                              <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                                item.integrity_check === 'ok'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : 'bg-rose-100 text-rose-700'
+                              }`}>
+                                {item.integrity_check === 'ok' ? '通过' : '异常'}
+                              </span>
+                            </div>
                           </div>
                         ))}
                       </div>
