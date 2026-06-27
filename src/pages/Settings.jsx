@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { systemService } from '../services/dataService';
 import { usePermission } from '../hooks/usePermission';
 import { changePassword } from '../services/authService';
+import { createManualBackup, formatBytes } from '../services/backupService';
 
 function Settings() {
   const { canWrite, adminOnlyTitle } = usePermission();
@@ -16,6 +17,9 @@ function Settings() {
   const [pwdError, setPwdError] = useState('');
   const [pwdSuccess, setPwdSuccess] = useState('');
   const [isChangingPwd, setIsChangingPwd] = useState(false);
+  // 备份相关状态
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const [backupResult, setBackupResult] = useState(null);
 
   // 获取数据源模式
   useEffect(() => {
@@ -97,6 +101,24 @@ function Settings() {
       setPwdError(err.message || '密码修改失败，请检查当前密码后重试');
     } finally {
       setIsChangingPwd(false);
+    }
+  };
+
+  // 执行手动备份
+  const handleBackup = async () => {
+    setIsBackingUp(true);
+    setBackupResult(null);
+
+    try {
+      const result = await createManualBackup();
+      setBackupResult(result);
+    } catch (err) {
+      setBackupResult({
+        success: false,
+        message: err.message || '备份操作执行失败',
+      });
+    } finally {
+      setIsBackingUp(false);
     }
   };
 
@@ -290,14 +312,58 @@ function Settings() {
                 <div className="font-medium text-slate-800 mb-2">数据备份</div>
                 <p className="text-sm text-slate-600 mb-3">手动触发系统数据备份</p>
                 <button
-                  disabled={!canWrite}
-                  title={!canWrite ? adminOnlyTitle : ''}
-                  className={`px-4 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors font-medium ${
-                    !canWrite ? 'opacity-50 cursor-not-allowed' : ''
+                  onClick={handleBackup}
+                  disabled={!canWrite || isBackingUp}
+                  title={!canWrite ? adminOnlyTitle : (isBackingUp ? '备份进行中...' : '')}
+                  className={`px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium ${
+                    !canWrite || isBackingUp ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 >
-                  立即备份
+                  {isBackingUp ? (
+                    <span className="flex items-center gap-2">
+                      <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      备份中...
+                    </span>
+                  ) : (
+                    '立即备份'
+                  )}
                 </button>
+                {/* 备份结果 */}
+                {backupResult && (
+                  <div className={`mt-3 p-3 rounded-md border text-sm ${
+                    backupResult.success
+                      ? 'bg-emerald-50 border-emerald-200'
+                      : 'bg-rose-50 border-rose-200'
+                  }`}>
+                    <div className={`font-medium mb-1 ${backupResult.success ? 'text-emerald-800' : 'text-rose-800'}`}>
+                      {backupResult.success ? '✅ 备份成功' : '❌ 备份失败'}
+                    </div>
+                    {backupResult.success ? (
+                      <div className="space-y-1 text-slate-700">
+                        <div className="flex gap-2">
+                          <span className="text-slate-500 shrink-0">文件：</span>
+                          <span className="font-mono text-xs break-all">{backupResult.filename}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <span className="text-slate-500 shrink-0">大小：</span>
+                          <span>{formatBytes(backupResult.size_bytes)}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <span className="text-slate-500 shrink-0">时间：</span>
+                          <span>{new Date(backupResult.created_at).toLocaleString('zh-CN')}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <span className="text-slate-500 shrink-0">校验：</span>
+                          <span className={backupResult.integrity_check === 'ok' ? 'text-emerald-700 font-medium' : 'text-rose-700'}>
+                            {backupResult.integrity_check === 'ok' ? '通过' : backupResult.integrity_check}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-rose-700">{backupResult.message}</div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="pt-4 border-t border-slate-100">
                 <div className="font-medium text-slate-800 mb-2">系统日志</div>
