@@ -34,3 +34,9 @@ dist-ssr
 apps/api/inventory.db
 **/__pycache__/
 *.pyc
+
+# Inventory database backups
+apps/api/backups/
+*.backup.db
+*.backup.sqlite
+inventory-backup-*.db
