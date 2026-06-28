@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 from database import init_db
-from routers import products, transactions, audit_logs, dashboard, users, auth, backups
+from routers import products, transactions, audit_logs, dashboard, users, auth, backups, imports
 
 # 创建 FastAPI 应用
 app = FastAPI(
@@ -39,6 +39,7 @@ app.include_router(dashboard.router, prefix="/api/dashboard", tags=["仪表盘"]
 app.include_router(users.router, prefix="/api/users", tags=["用户管理"])
 app.include_router(auth.router, prefix="/api/auth", tags=["认证"])
 app.include_router(backups.router, prefix="/api/backups", tags=["备份管理"])
+app.include_router(imports.router, prefix="/api/imports", tags=["数据导入"])
 
 @app.get("/")
 async def root():
