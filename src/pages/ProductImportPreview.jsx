@@ -173,6 +173,7 @@ function ProductImportPreview() {
         p0: Array.isArray(columns.recognized_p0) ? columns.recognized_p0 : [],
         p1: Array.isArray(columns.recognized_p1) ? columns.recognized_p1 : [],
         p2: Array.isArray(columns.recognized_p2) ? columns.recognized_p2 : [],
+        stockContext: Array.isArray(columns.recognized_stock_context) ? columns.recognized_stock_context : [],
         ignored: Array.isArray(columns.ignored) ? columns.ignored : [],
       }
     : null;
@@ -214,23 +215,24 @@ function ProductImportPreview() {
 
       {/* 安全提示区域 */}
       <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
-        <h2 className="text-sm font-semibold text-slate-700 mb-2">安全说明</h2>
+        <h2 className="text-sm font-semibold text-slate-700 mb-2">安全说明 · 库存口径</h2>
         <ul className="space-y-1.5 text-sm text-slate-600">
           <li className="flex items-start gap-2">
             <span className="text-slate-400 mt-0.5 shrink-0">•</span>
             <span>本轮仅执行 CSV 解析和字段校验，<strong>不会写入数据库</strong>，不会创建产品，不会修改库存。</span>
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-slate-400 mt-0.5 shrink-0">•</span>
+            <span className="text-amber-500 mt-0.5 shrink-0">•</span>
             <span>
-              <strong>current_stock</strong> 按本地真实库存预览。
-              异地库存、虚拟库存、总可售库存不会自动计入本地库存。
+              <strong>低库存判定依据：</strong>仅以 <strong>本地真实库存（current_stock ≤ min_stock）</strong> 为准。
+              即使异地库存、虚拟库存、总可售库存很高，也不影响低库存判断。
             </span>
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-slate-400 mt-0.5 shrink-0">•</span>
+            <span className="text-amber-500 mt-0.5 shrink-0">•</span>
             <span>
-              低库存判定以 <strong>本地真实库存（current_stock ≤ min_stock）</strong> 为准。
+              <strong>库存不自动合并：</strong>异地库存、虚拟库存、总可售库存
+              <strong>不会自动合并</strong>为本地真实库存。如需导入，请人工确认后填写正确的 current_stock 列。
             </span>
           </li>
           <li className="flex items-start gap-2">
@@ -243,10 +245,19 @@ function ProductImportPreview() {
       {/* 上传区域 */}
       <div className="mb-6 bg-white border border-slate-200 rounded-lg">
         <div className="px-6 py-4 border-b border-slate-100">
-          <h2 className="text-lg font-semibold text-slate-800">上传 CSV 文件</h2>
-          <p className="text-sm text-slate-500 mt-1">
-            选择 .csv 文件进行解析预览，文件大小建议不超过 2 MB
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">上传 CSV 文件</h2>
+              <p className="text-sm text-slate-500 mt-1">
+                选择 .csv 文件进行解析预览，文件大小建议不超过 2 MB
+              </p>
+            </div>
+            {previewResult && !apiError && (
+              <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-xs rounded border border-slate-200">
+                上次预览完成
+              </span>
+            )}
+          </div>
         </div>
         <div className="p-4 md:p-6">
           {/* 文件选择 */}
@@ -301,8 +312,15 @@ function ProductImportPreview() {
 
           {/* viewer 权限提示 */}
           {!canWrite && (
-            <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-md">
-              <span className="text-sm text-slate-500">仅管理员可进行数据导入预览</span>
+            <div className="mb-4 p-4 bg-slate-50 border border-slate-200 rounded-md flex items-start gap-3">
+              <span className="text-slate-400 mt-0.5 shrink-0 text-lg leading-none">ℹ</span>
+              <div>
+                <div className="text-sm font-medium text-slate-700">只读用户 · 无导入权限</div>
+                <div className="text-sm text-slate-500 mt-1">
+                  当前角色为只读用户（viewer），仅可查看产品数据，不能上传 CSV 或导入数据。
+                  如需导入，请联系管理员（admin）操作。
+                </div>
+              </div>
             </div>
           )}
 
@@ -370,6 +388,9 @@ function ProductImportPreview() {
                 编码: <span className="text-slate-800 font-medium">{previewResult.encoding}</span>
               </span>
             )}
+            <span className="ml-auto px-2 py-0.5 bg-slate-200 text-slate-600 text-xs rounded font-medium border border-slate-300">
+              只读预览 · 未写库
+            </span>
           </div>
 
           {/* ── 统计卡片 ── */}
@@ -572,6 +593,30 @@ function ProductImportPreview() {
                 </div>
               </div>
             </div>
+
+            {/* 库存口径参考字段（独立一行） */}
+            {fields && fields.stockContext.length > 0 && (
+              <div className="mt-4 bg-white border border-amber-200 rounded-lg">
+                <div className="px-4 py-3 border-b border-amber-100 bg-amber-50/50">
+                  <div className="flex items-center gap-2">
+                    <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded font-medium border border-amber-200">口径</span>
+                    <span className="text-sm font-medium text-slate-800">库存口径参考字段</span>
+                  </div>
+                  <span className="text-xs text-slate-500">
+                    这些字段仅用于预览参考，不写入数据库，不参与本地库存计算
+                  </span>
+                </div>
+                <div className="p-4">
+                  <div className="flex flex-wrap gap-1.5">
+                    {fields.stockContext.map((f) => (
+                      <span key={f} className="px-2 py-1 bg-amber-50 text-amber-700 text-xs rounded border border-amber-200">
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ── 库存口径提醒横幅 ── */}
@@ -672,9 +717,26 @@ function ProductImportPreview() {
 
                             {/* 本地真实库存 */}
                             <td className="px-3 py-3 whitespace-nowrap">
-                              <span className="text-sm font-medium text-slate-800">
-                                {n.current_stock !== undefined && n.current_stock !== null ? n.current_stock : '-'}
-                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm font-medium text-slate-800">
+                                  {n.current_stock !== undefined && n.current_stock !== null ? n.current_stock : '-'}
+                                </span>
+                                {(() => {
+                                  const cs = n.current_stock;
+                                  const ms = n.min_stock;
+                                  if (cs !== undefined && cs !== null && ms !== undefined && ms !== null && cs <= ms) {
+                                    return (
+                                      <span
+                                        className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded border border-amber-200 font-medium"
+                                        title={`本地库存 ${cs} ≤ 最低库存 ${ms}，导入后将处于低库存状态`}
+                                      >
+                                        低库存
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                              </div>
                             </td>
 
                             {/* 最低库存 */}
@@ -728,10 +790,14 @@ function ProductImportPreview() {
           ) : (
             /* 有 previewResult 但无 rows 时的提示 */
             <div className="mb-6 p-6 bg-white border border-slate-200 rounded-lg text-center">
+              <div className="text-slate-400 text-3xl mb-3">📋</div>
+              <div className="text-sm font-medium text-slate-600 mb-1">暂无行级预览数据</div>
               <div className="text-sm text-slate-500">
-                {previewResult?.filename
-                  ? '暂无行级预览数据，请查看上方错误或警告信息。'
-                  : '暂无行级预览数据。'}
+                {globalErrors.length > 0
+                  ? 'CSV 存在结构性错误（缺少必填字段或数据行为空），请查看上方错误信息。'
+                  : previewResult?.filename
+                    ? 'CSV 文件仅包含表头，没有数据行。请检查文件内容。'
+                    : '请确认 CSV 文件包含有效的表头行和数据行。'}
               </div>
             </div>
           )}
@@ -740,19 +806,29 @@ function ProductImportPreview() {
           <div className="mt-8 p-4 md:p-6 bg-white border border-slate-200 rounded-lg">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
-                <div className="text-sm font-medium text-slate-700">预览完成</div>
+                <div className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                  预览完成
+                  <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-xs rounded border border-slate-200 font-normal">
+                    只读模式
+                  </span>
+                </div>
                 <div className="text-xs text-slate-500 mt-1">
                   {previewResult?.filename && (
                     <span>文件: <span className="font-mono">{previewResult.filename}</span></span>
                   )}
                 </div>
               </div>
-              <button
-                disabled
-                className="px-6 py-2.5 bg-slate-100 text-slate-400 rounded-md cursor-not-allowed font-medium border border-slate-200"
-              >
-                正式导入暂未开放
-              </button>
+              <div className="flex flex-col items-end gap-1">
+                <button
+                  disabled
+                  className="px-6 py-2.5 bg-slate-100 text-slate-400 rounded-md cursor-not-allowed font-medium border border-slate-200"
+                >
+                  正式导入暂未开放
+                </button>
+                <span className="text-xs text-slate-400">
+                  请先完成预览验收，正式导入将在后续版本开放
+                </span>
+              </div>
             </div>
           </div>
         </>
@@ -761,10 +837,18 @@ function ProductImportPreview() {
       {/* 无预览结果时的空状态提示 */}
       {!previewResult && !apiError && (
         <div className="p-12 text-center bg-white border border-slate-200 rounded-lg">
-          <div className="text-slate-400 text-sm">
+          <div className="text-slate-300 text-4xl mb-3">
+            {canWrite ? '📂' : '🔒'}
+          </div>
+          <div className="text-slate-500 text-sm font-medium mb-1">
             {canWrite
               ? '选择 CSV 文件并点击「开始预览」查看解析结果'
               : '仅管理员可进行数据导入预览'}
+          </div>
+          <div className="text-slate-400 text-xs">
+            {canWrite
+              ? '预览过程不会写入数据库，可安全操作'
+              : '当前角色为只读用户，请切换至管理员账号操作'}
           </div>
         </div>
       )}
