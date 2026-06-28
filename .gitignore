@@ -40,3 +40,8 @@ apps/api/backups/
 *.backup.db
 *.backup.sqlite
 inventory-backup-*.db
+
+# Local-only CSV import samples; never commit real legacy inventory exports
+.local-import-samples/
+private-import-samples/
+local-import-samples/
