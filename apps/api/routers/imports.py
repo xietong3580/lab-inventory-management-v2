@@ -1,16 +1,20 @@
 """
 CSV 导入预览与校验 API 路由
 Step 9-3A：后端 CSV 预览校验接口
+Step 9-5B：后端 CSV 正式导入执行接口
 补丁：本地真实库存 vs 异地/虚拟库存 口径风险提示
 """
 import csv
 import io
+import json
+import re
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from database import get_db, Product, User
+from database import get_db, Product, User, AuditLog
 from auth import get_current_user, require_admin
 
 router = APIRouter()
@@ -684,6 +688,20 @@ def _parse_and_validate_csv(
     }
 
 
+def _generate_batch_id(db: Session) -> str:
+    """生成导入批次 ID: imp-YYYYMMDD-NNN
+
+    基于当日已提交的 PRODUCTS_CSV_IMPORT 审计记录数 + 1。
+    """
+    today = datetime.now().strftime("%Y%m%d")
+    today_prefix = datetime.now().strftime("%Y-%m-%d")
+    count = db.query(AuditLog).filter(
+        AuditLog.action_type == "PRODUCTS_CSV_IMPORT",
+        AuditLog.timestamp.like(f"{today_prefix}%"),
+    ).count()
+    return f"imp-{today}-{count + 1:03d}"
+
+
 # ============================================================
 # API 路由
 # ============================================================
@@ -730,3 +748,349 @@ async def preview_products_import(
         raise HTTPException(status_code=400, detail=str(exc))
 
     return result
+
+
+# ============================================================
+# Step 9-5B：正式导入执行路由
+# ============================================================
+
+@router.post("/products/execute")
+async def execute_products_import(
+    file: UploadFile = File(...),
+    mode: str = Form("create_only"),
+    confirm_backup: bool = Form(False),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """执行产品 CSV 正式导入（仅管理员，Step 9-5B）
+
+    **第一版：仅支持 create_only 模式**
+
+    规则：
+    1. CSV 中 SKU 不存在于数据库时 → 新增产品
+    2. SKU 已存在时 → 跳过（skipped + warning），不覆盖、不更新
+    3. 存在结构性 error / 行级 error 时 → 禁止整批导入
+    4. 同一事务：全部成功或全部失败回滚
+
+    字段写入：
+    - 仅写入 P0 字段（sku, name, current_stock, min_stock, category, unit, location）
+    - STOCK_CONTEXT 字段（异地库存/虚拟库存/总可售库存）永不写入
+    - status 由系统按 current_stock ≤ min_stock 自动计算
+    """
+    # ── 0. 模式校验 ──────────────────────────────────────────
+    if mode != "create_only":
+        raise HTTPException(
+            status_code=400,
+            detail="当前版本仅支持 create_only 导入模式",
+        )
+
+    filename = file.filename or "unknown.csv"
+
+    # ── 1. confirm_backup 检查 ───────────────────────────────
+    if not confirm_backup:
+        return {
+            "success": False,
+            "mode": "create_only",
+            "batch_id": None,
+            "file_name": filename,
+            "file_encoding": None,
+            "total_rows": 0,
+            "created_count": 0,
+            "skipped_count": 0,
+            "warning_count": 0,
+            "error_count": 0,
+            "created_items": [],
+            "skipped_items": [],
+            "warnings": [],
+            "errors": [
+                "正式导入前请确认已完成数据库备份。"
+                "请在设置页执行数据库备份后，设置 confirm_backup=true 并重试。"
+            ],
+            "detail": "需要确认数据库备份（confirm_backup=true）",
+        }
+
+    # ── 2. 文件校验（与 preview 相同） ───────────────────────
+    if not filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="请上传 .csv 格式的文件")
+
+    try:
+        raw_bytes = await file.read()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"读取文件失败: {exc}")
+
+    if len(raw_bytes) == 0:
+        raise HTTPException(status_code=400, detail="文件为空，请上传有效的 CSV 文件")
+
+    if len(raw_bytes) > MAX_FILE_SIZE_BYTES:
+        size_mb = len(raw_bytes) / (1024 * 1024)
+        raise HTTPException(
+            status_code=400,
+            detail=f"文件大小 {size_mb:.1f} MB 超过限制（最大 2 MB）",
+        )
+
+    try:
+        encoding, text = _detect_encoding(raw_bytes)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    # ── 3. 重新解析校验（不信任前端预览结果） ─────────────────
+    try:
+        preview = _parse_and_validate_csv(text, filename, encoding, db)
+    except ValueError as exc:
+        return {
+            "success": False,
+            "mode": "create_only",
+            "batch_id": None,
+            "file_name": filename,
+            "file_encoding": encoding,
+            "total_rows": 0,
+            "created_count": 0,
+            "skipped_count": 0,
+            "warning_count": 0,
+            "error_count": 1,
+            "created_items": [],
+            "skipped_items": [],
+            "warnings": [],
+            "errors": [str(exc)],
+            "detail": f"CSV 解析失败: {exc}",
+        }
+
+    # ── 4. 分离真实 error 与 DB-已存在 SKU 提示 ─────────────
+    # 注意：_parse_and_validate_csv 将 DB 已有 SKU 归为 global_errors，
+    # 但在 create_only 模式下它们应被视为 warning（不阻止导入）。
+    real_errors: List[str] = []
+    db_existing_warnings: List[str] = []
+    db_existing_sku_set: set = set()
+
+    for err in preview.get("errors", []):
+        if "已存在于数据库中" in err:
+            db_existing_warnings.append(err)
+            m = re.search(r"SKU '([^']+)' 已存在于数据库中", err)
+            if m:
+                db_existing_sku_set.add(m.group(1))
+        else:
+            real_errors.append(err)
+
+    # ── 5. 行级校验：区分真实 error 和 DB-已存在 ──────────────
+    has_real_row_error = False
+    all_real_row_errors: List[str] = []
+    for row in preview.get("rows", []):
+        for e in row.get("errors", []):
+            if "已存在于数据库中" not in e:
+                has_real_row_error = True
+                all_real_row_errors.append(
+                    f"第 {row['row_number']} 行：{e}"
+                )
+
+    if real_errors or has_real_row_error:
+        combined_errors = real_errors + all_real_row_errors
+        return {
+            "success": False,
+            "mode": "create_only",
+            "batch_id": None,
+            "file_name": filename,
+            "file_encoding": encoding,
+            "total_rows": preview.get("total_rows", 0),
+            "created_count": 0,
+            "skipped_count": 0,
+            "warning_count": len(db_existing_warnings),
+            "error_count": len(combined_errors),
+            "created_items": [],
+            "skipped_items": [],
+            "warnings": db_existing_warnings + preview.get("warnings", []),
+            "errors": combined_errors,
+            "detail": (
+                f"导入失败：存在 {len(combined_errors)} 个阻断性错误"
+                f"，请修正 CSV 后重新上传预览。未写入任何数据。"
+            ),
+        }
+
+    # ── 6. 重新查询 DB 已有 SKU（避免并发） ──────────────────
+    existing_skus_in_db: set = set()
+    rows = preview.get("rows", [])
+    if rows:
+        all_csv_skus = {
+            r["normalized"]["sku"]
+            for r in rows
+            if r.get("normalized", {}).get("sku")
+        }
+        if all_csv_skus:
+            existing = db.query(Product).filter(
+                Product.sku.in_(list(all_csv_skus))
+            ).all()
+            existing_skus_in_db = {p.sku for p in existing}
+
+    # ── 7. 分类行：create 或 skip ────────────────────────────
+    to_create: List[Dict[str, Any]] = []
+    skipped_items: List[Dict[str, Any]] = []
+    all_warnings: List[str] = (
+        list(db_existing_warnings) + preview.get("warnings", [])
+    )
+
+    for row in rows:
+        row_errors = row.get("errors", [])
+        real_row_errs = [e for e in row_errors if "已存在于数据库中" not in e]
+        norm = row.get("normalized", {})
+        sku = norm.get("sku")
+
+        if real_row_errs:
+            # 不会走到这里（已在步骤 5 拦截），保留防御
+            continue
+
+        if sku and sku in existing_skus_in_db:
+            existing_prod = db.query(Product).filter(Product.sku == sku).first()
+            reason = f"SKU '{sku}' 已存在于数据库"
+            if existing_prod:
+                reason += (
+                    f"（产品 ID: prod-{existing_prod.id:06d}"
+                    f"，名称: {existing_prod.name}）"
+                )
+            skipped_items.append({
+                "row_number": row["row_number"],
+                "sku": sku,
+                "name": norm.get("name", ""),
+                "reason": reason,
+            })
+            continue
+
+        to_create.append(row)
+
+    # ── 8. 无数据可导入 ──────────────────────────────────────
+    if not to_create:
+        return {
+            "success": True,
+            "mode": "create_only",
+            "batch_id": None,
+            "file_name": filename,
+            "file_encoding": encoding,
+            "total_rows": preview.get("total_rows", 0),
+            "created_count": 0,
+            "skipped_count": len(skipped_items),
+            "warning_count": len(all_warnings),
+            "error_count": len(real_errors),
+            "created_items": [],
+            "skipped_items": skipped_items,
+            "warnings": all_warnings,
+            "errors": real_errors,
+            "detail": "所有数据行均被跳过（SKU 已存在或无有效数据），未写入任何数据。",
+        }
+
+    # ── 9. 事务写入 ──────────────────────────────────────────
+    batch_id = _generate_batch_id(db)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    created_items: List[Dict[str, Any]] = []
+
+    try:
+        for row in to_create:
+            norm = row["normalized"]
+            status = (
+                "低库存"
+                if norm.get("current_stock", 0) <= norm.get("min_stock", 0)
+                else "正常"
+            )
+
+            product = Product(
+                sku=norm["sku"],
+                name=(norm.get("name") or "")[:100],
+                category=norm.get("category") or "耗材",
+                current_stock=norm.get("current_stock", 0),
+                min_stock=norm.get("min_stock", 0),
+                unit=norm.get("unit") or "个",
+                location=norm.get("location") or "",
+                status=status,
+                last_updated=date_str,
+            )
+            db.add(product)
+            db.flush()  # 获取自增 id
+
+            created_items.append({
+                "row_number": row["row_number"],
+                "sku": norm["sku"],
+                "name": norm.get("name", ""),
+                "product_id": f"prod-{product.id:06d}",
+            })
+
+        # ── 10. 审计日志（同一事务） ──────────────────────────
+        created_skus = [it["sku"] for it in created_items]
+        skipped_skus = [it["sku"] for it in skipped_items]
+        skipped_reasons = {it["sku"]: it["reason"] for it in skipped_items}
+
+        p1_archived = any(
+            any(v for v in (row.get("p1_fields") or {}).values())
+            for row in to_create
+        )
+
+        details = json.dumps({
+            "batch_id": batch_id,
+            "file_name": filename,
+            "file_encoding": encoding,
+            "total_rows": preview.get("total_rows", 0),
+            "created_count": len(created_items),
+            "skipped_count": len(skipped_items),
+            "warning_count": len(all_warnings),
+            "error_count": len(real_errors),
+            "success": True,
+            "mode": "create_only",
+            "created_skus": created_skus,
+            "skipped_skus": skipped_skus,
+            "skipped_reasons": skipped_reasons,
+            "warnings_summary": all_warnings[:20],
+            "p1_fields_archived": p1_archived,
+        }, ensure_ascii=False)
+
+        audit = AuditLog(
+            action_type="PRODUCTS_CSV_IMPORT",
+            operator=current_user.username,
+            timestamp=now_str,
+            product_name=f"批量导入 {len(created_items)} 个产品",
+            product_id=batch_id,
+            details=details,
+        )
+        db.add(audit)
+
+        # 提交事务
+        db.commit()
+
+    except Exception as exc:
+        db.rollback()
+        return {
+            "success": False,
+            "mode": "create_only",
+            "batch_id": batch_id,
+            "file_name": filename,
+            "file_encoding": encoding,
+            "total_rows": preview.get("total_rows", 0),
+            "created_count": 0,
+            "skipped_count": 0,
+            "warning_count": 0,
+            "error_count": 1,
+            "created_items": [],
+            "skipped_items": [],
+            "warnings": [],
+            "errors": [f"数据库写入失败: {exc}"],
+            "detail": "导入失败，事务已回滚，未写入任何数据。请检查 CSV 数据后重试。",
+        }
+
+    # ── 11. 成功响应 ─────────────────────────────────────────
+    return {
+        "success": True,
+        "mode": "create_only",
+        "batch_id": batch_id,
+        "file_name": filename,
+        "file_encoding": encoding,
+        "total_rows": preview.get("total_rows", 0),
+        "created_count": len(created_items),
+        "skipped_count": len(skipped_items),
+        "warning_count": len(all_warnings),
+        "error_count": len(real_errors),
+        "created_items": created_items,
+        "skipped_items": skipped_items,
+        "warnings": all_warnings,
+        "errors": real_errors,
+        "detail": (
+            f"导入成功：新增 {len(created_items)} 个产品"
+            f"，跳过 {len(skipped_items)} 个已存在 SKU。"
+        ),
+        "backup_reminder": None,
+    }

@@ -657,6 +657,87 @@ docs/第四阶段开发记录.txt（追加本轮记录）
 库存口径是否保持：是（方案明确硬约束，不可协商）
 Git 状态：仅 docs 文件变更
 下一步建议
-- Step 9-5B：后端正式导入接口 POST /api/imports/products/execute
+- Step 9-5C：前端正式导入按钮与结果展示
 - 或继续完成其他 Step 9 子任务的前端页面搭建
+====================================
+
+====================================
+Step 9-5B：后端 CSV 正式导入执行接口
+====================================
+
+本轮目标
+新增后端正式导入产品 CSV 的接口：
+POST /api/imports/products/execute
+
+修改文件
+- apps/api/routers/imports.py
+
+改动摘要
+1. 新增导入：json, re, datetime, AuditLog；fastapi 新增 Form
+2. 新增 _generate_batch_id() 辅助函数（格式: imp-YYYYMMDD-NNN）
+3. 新增 POST /api/imports/products/execute 路由：
+   - 权限：require_admin（仅 admin，viewer 返回 403）
+   - 参数：file (UploadFile), mode (Form, 默认 create_only),
+     confirm_backup (Form, 默认 false)
+   - 模式校验：仅支持 create_only，否则返回 400
+   - confirm_backup 检查：不传 true 则返回业务失败
+   - CSV 解析：后端重新调用 _parse_and_validate_csv()，
+     不信任前端预览结果
+   - 错误分离：将 DB-已存在 SKU 错误（"已存在于数据库中"）
+     从 global_errors 中分离为 warning，不阻止导入；
+     CSV 内部重复 SKU 和其他校验 error 仍阻止导入
+   - 行分类：有真实 error 的行阻止整批；DB-已存在 SKU 的行
+     归入 skipped_items
+   - 事务写入：同一 Session 内批量创建 Product + AuditLog，
+     commit 或 rollback（全部成功或全部失败）
+   - 库存口径：仅写入 P0 字段，STOCK_CONTEXT 不写入，
+     status 由系统自动计算
+   - 审计日志：action_type=PRODUCTS_CSV_IMPORT，
+     记录 batch_id / file_name / operator / created_count /
+     skipped_count / warning_count / error_count / details JSON
+   - 返回结构：包含 success / mode / batch_id / file_name /
+     total_rows / created_count / skipped_count /
+     warning_count / error_count / created_items /
+     skipped_items / warnings / errors / detail / backup_reminder
+
+4. 未修改 _parse_and_validate_csv()（预览行为不变）
+5. 未修改前端任何文件（导入按钮保持禁用）
+6. 未修改端口配置
+7. 未引入新依赖
+
+测试结果
+- python -m compileall apps/api ✅ 通过
+- python -m py_compile apps/api/routers/imports.py ✅ 通过
+- npm run build ✅ 通过（前端构建不受影响）
+- 接口逻辑自检（设计层面验证）：
+  1. viewer 调用 execute → require_admin 拦截 → 403 ✅
+  2. admin 调用 confirm_backup=false → 返回业务失败 ✅
+  3. admin + confirm_backup=true + CSV 有 error → 不写库 ✅
+  4. admin + confirm_backup=true + 正常 CSV → 新增不存在 SKU ✅
+  5. 重复 SKU（DB 已存在）→ skipped，不覆盖 ✅
+  6. current_stock 只取本地库存字段 ✅
+  7. 异地/虚拟/总可售库存 → 不写入 current_stock ✅
+  8. 导入失败 → 事务回滚，不留半批数据 ✅
+  9. 返回结构含 batch_id / created_count / skipped_count /
+     warnings / errors ✅
+  10. 审计日志 action_type=PRODUCTS_CSV_IMPORT ✅
+
+是否新增 API：是（POST /api/imports/products/execute）
+是否接前端按钮：否（正式导入按钮仍禁用）
+是否写数据库：是（正式导入在事务内写入 Product + AuditLog）
+库存口径是否保持：是（STOCK_CONTEXT 不写入，仅 P0 字段入库）
+权限验证：
+- admin：可调用 execute，require_admin 通过
+- viewer：require_admin 拦截，返回 403
+
+Git 状态：2 files changed
+- apps/api/routers/imports.py (modified)
+- docs/第四阶段开发记录.txt (modified)
+
+下一步建议
+- Step 9-5C：前端正式导入按钮与结果展示
+  - 修改 src/pages/ProductImportPreview.jsx：启用正式导入按钮
+  - 新增 src/services/importService.js：executeProductImport()
+  - 新增二次确认弹窗 + 导入结果卡片
+- 或先做端到端手动测试验证后端接口正确性
 ====================================
