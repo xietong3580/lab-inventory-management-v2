@@ -68,6 +68,11 @@ function Transactions() {
   const [reversalError, setReversalError] = useState('');
   const [detailRecord, setDetailRecord] = useState(null);
 
+  // 操作反馈状态（防重复提交 + 页面级提示）
+  const [isSaving, setIsSaving] = useState(false);
+  const [isReversing, setIsReversing] = useState(false);
+  const [actionMessage, setActionMessage] = useState(null); // { type: 'success'|'error', text: '...' }
+
   // 筛选选项
   const typeOptions = ['all', '入库', '出库'];
   const statusOptions = ['all', 'completed', 'reversed', 'pending'];
@@ -84,7 +89,7 @@ function Transactions() {
         setTransactionRecords(transactions);
       } catch (error) {
         console.error('[Transactions] 获取交易记录失败:', error);
-        setErrorTransactions('交易记录加载失败，使用降级数据');
+        setErrorTransactions('出入库记录加载失败，请刷新页面重试');
         // 保持空数组，页面仍可正常显示
       } finally {
         setLoadingTransactions(false);
@@ -277,9 +282,9 @@ function Transactions() {
   // 表单提交 - 新增交易记录
   const handleFormSubmit = async (e) => {
     e.preventDefault();
-    setFormError('');
 
-    if (!canWrite) return; // viewer 不可提交
+    if (!canWrite || isSaving) return; // viewer 不可提交，防重复提交
+
     // 基础校验
     if (!formData.productId) {
       setFormError('请选择产品');
@@ -293,6 +298,9 @@ function Transactions() {
       setFormError('请输入操作人');
       return;
     }
+
+    setIsSaving(true);
+    setFormError('');
 
     try {
       // 调用服务添加交易记录
@@ -311,11 +319,24 @@ function Transactions() {
       const updatedProducts = await productService.getAllProducts();
       setProducts(updatedProducts);
 
-      // 关闭模态框并重置表单
+      // 关闭模态框并显示成功提示
       handleCloseModal();
+      setActionMessage({
+        type: 'success',
+        text: formData.type === '入库' ? '入库记录已保存' : '出库记录已保存'
+      });
+      setTimeout(() => setActionMessage(null), 3000);
     } catch (error) {
-      setFormError(error.message || '添加交易记录失败');
+      const errMsg = error.message || '';
+      // 业务错误：库存不足等
+      if (errMsg.includes('库存不足')) {
+        setFormError('库存不足，无法出库');
+      } else {
+        setFormError('保存失败，请稍后重试');
+      }
       console.error('添加交易记录失败:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -334,11 +355,13 @@ function Transactions() {
 
   // 确认撤销交易记录
   const handleConfirmReverse = async () => {
-    if (!canWrite) return; // viewer 不可撤销
+    if (!canWrite || isReversing) return; // viewer 不可撤销，防重复点击
     if (!reversingTransactionId) return;
 
+    setIsReversing(true);
+    setReversalError('');
+
     try {
-      setReversalError('');
       // 调用撤销函数（异步）
       await transactionService.reverseTransaction(reversingTransactionId, '当前用户');
 
@@ -349,11 +372,17 @@ function Transactions() {
       const updatedProducts = await productService.getAllProducts();
       setProducts(updatedProducts);
 
-      // 关闭确认对话框
+      // 关闭确认对话框并显示成功提示
       setReversingTransactionId(null);
+      setActionMessage({ type: 'success', text: '交易已撤销' });
+      setTimeout(() => setActionMessage(null), 3000);
     } catch (error) {
-      setReversalError(error.message || '撤销交易记录失败');
+      const errMsg = error.message || '';
+      setReversalError(errMsg || '撤销交易记录失败');
+      setActionMessage({ type: 'error', text: '撤销失败，请稍后重试' });
       console.error('撤销交易记录失败:', error);
+    } finally {
+      setIsReversing(false);
     }
   };
 
@@ -552,6 +581,28 @@ function Transactions() {
           </div>
         </div>
       </div>
+
+      {/* 操作反馈提示（成功/失败） */}
+      {actionMessage && (
+        <div className={`mb-6 p-3 rounded-md border transition-opacity ${
+          actionMessage.type === 'success'
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+            : 'bg-rose-50 border-rose-200 text-rose-800'
+        }`}>
+          <div className="flex items-center">
+            {actionMessage.type === 'success' ? (
+              <svg className="w-4 h-4 mr-2 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+            )}
+            <span className="text-sm font-medium">{actionMessage.text}</span>
+          </div>
+        </div>
+      )}
 
       {/* 记录表格和卡片 */}
       <div className="bg-white border border-slate-200 rounded-lg">
@@ -987,15 +1038,25 @@ function Transactions() {
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium"
+                  disabled={isSaving}
+                  className={`px-4 py-2 border rounded-md transition-colors font-medium ${
+                    isSaving
+                      ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                  }`}
                 >
                   取消
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium"
+                  disabled={isSaving}
+                  className={`px-4 py-2 rounded-md transition-colors font-medium ${
+                    isSaving
+                      ? 'bg-slate-400 text-white cursor-not-allowed'
+                      : 'bg-slate-700 text-white hover:bg-slate-800'
+                  }`}
                 >
-                  添加记录
+                  {isSaving ? '保存中...' : '添加记录'}
                 </button>
               </div>
             </form>
@@ -1061,16 +1122,26 @@ function Transactions() {
                 <button
                   type="button"
                   onClick={handleCancelReverse}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium"
+                  disabled={isReversing}
+                  className={`px-4 py-2 border rounded-md transition-colors font-medium ${
+                    isReversing
+                      ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                  }`}
                 >
                   取消
                 </button>
                 <button
                   type="button"
                   onClick={handleConfirmReverse}
-                  className="px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-700 transition-colors font-medium"
+                  disabled={isReversing}
+                  className={`px-4 py-2 rounded-md transition-colors font-medium ${
+                    isReversing
+                      ? 'bg-rose-400 text-white cursor-not-allowed'
+                      : 'bg-rose-600 text-white hover:bg-rose-700'
+                  }`}
                 >
-                  确认撤销
+                  {isReversing ? '撤销中...' : '确认撤销'}
                 </button>
               </div>
             </div>
