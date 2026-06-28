@@ -1491,3 +1491,83 @@ Step 10-1D 正式导入验收通过：29 条 GBK CSV → batch_id=imp-20260628-0
 低库存 3 条判定正确。AuditLog 批量导入记录正常。真实库存分类规划已记录
 （4 类 + 29 库位）。旧系统兼容性验证完成。0 错误，全部链路闭环。未修改代码。
 ====================================
+
+开发记录简版
+
+功能名称：Step 10-2A：库存分类与库位联动优化
+
+本轮目标
+将产品管理中的"分类"从旧的通用产品分类（耗材/试剂/设备）优化为公司真实业务的
+"库存分类"，并在新增/编辑产品时根据库存分类联动可选库位。
+
+修改文件
+- src/pages/Products.jsx
+
+新增文件
+- src/constants/inventoryLocations.js（库存分类与库位常量 + 联动辅助函数）
+- docs/Step-10-2A-库存分类与库位联动优化记录.md（本轮验收文档）
+
+改动摘要
+
+1. src/constants/inventoryLocations.js（新增）：
+   - INVENTORY_CATEGORIES：4 类真实库存分类
+   - INVENTORY_LOCATION_OPTIONS：各分类→库位映射（2楼 24 个 / 3楼 5 个 / 刘晓冬 1 个 / 尚工 1 个）
+   - getLocationOptionsByCategory()：获取某分类可选库位
+   - getDefaultLocationByCategory()：刘晓冬/尚工默认"专用区域"，其他为空
+   - isRealInventoryCategory()：判断是否为真实库存分类
+   - buildCategoryOptions()：构建筛选下拉（真实分类优先 + 旧分类追加兼容）
+
+2. src/pages/Products.jsx（5 处改动）：
+   a. 筛选区下拉：从"全部分类/耗材/试剂/设备"改为动态构建
+      "全部库存分类/2楼库存/3楼库存/刘晓冬安捷伦库存/尚工安捷伦库存[+旧分类]"
+   b. 产品列表表头："分类"→"库存分类"
+   c. 新增/编辑弹窗：
+      - "分类"标签→"库存分类"
+      - 分类下拉改为真实库存分类+编辑中的旧分类兼容
+      - 存储位置改为条件渲染：真实分类→库位下拉，旧分类→自由文本
+   d. 库存分类→库位联动：handleFormChange 中切换分类自动设置默认库位
+   e. 默认值更新：新增产品默认分类从"耗材"→"2楼库存"
+
+兼容策略
+- 旧数据不删除，筛选下拉追加旧分类
+- 编辑旧分类产品时，分类下拉仍包含该旧分类
+- 旧分类产品存储位置保持自由文本输入
+- 数据库结构不修改（category/location 字段不变）
+
+库存分类设计
+- 2楼库存：24 库位（A1~A4 / B1~B4 / C1~C4 / D1~D4 / E1~E4 / F1~F4）
+- 3楼库存：5 库位（3-1~3-5）
+- 刘晓冬安捷伦库存：1 库位（专用区域）
+- 尚工安捷伦库存：1 库位（专用区域）
+
+库位联动规则
+切换库存分类时自动设置默认库位：
+- 2楼/3楼→清空，用户从下拉自选
+- 刘晓冬/尚工→自动设为"专用区域"
+- 旧分类→自由文本，保持原值
+
+测试结果
+- npm run build ✅ 通过
+- ESLint src/pages/Products.jsx src/constants/inventoryLocations.js ✅ 0 errors
+- Python compileall ⬚ 不适用（未修改后端）
+- 无 CSV/DB/Python 文件变更
+
+是否修改数据库：否
+是否修改后端：否
+是否影响 CSV 导入：否
+是否删除旧数据：否
+
+Git 状态：2 files changed
+- src/pages/Products.jsx (modified)
+- src/constants/inventoryLocations.js (new file)
+
+下一步建议：
+- 人工验收：筛选下拉/表头/新增弹窗联动/编辑回显/旧数据兼容
+- Step 10-2B：继续优化产品管理页其他细节，或评估 P1 字段写库优先级
+
+开发记录简版
+Step 10-2A 完成库存分类与库位联动优化：新增 inventoryLocations.js 常量文件
+（4 类真实分类 + 29 库位映射），Products.jsx 筛选/表头/弹窗/联动全面更新。
+旧数据兼容（旧分类追加/自由文本输入），不改数据库/后端/CSV 导入。
+npm run build ✅，ESLint ✅。
+====================================

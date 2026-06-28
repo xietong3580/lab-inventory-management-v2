@@ -5,6 +5,12 @@ import { getLedgerTypeConfig, formatLedgerTime } from '../utils/inventoryHistory
 import { filterProducts, hasActiveFilters } from '../utils/productFilterHelpers';
 import { exportProductsToCSV } from '../utils/exportHelpers';
 import { usePermission } from '../hooks/usePermission';
+import {
+  INVENTORY_CATEGORIES,
+  getLocationOptionsByCategory,
+  getDefaultLocationByCategory,
+  buildCategoryOptions,
+} from '../constants/inventoryLocations';
 
 // 产品状态标签组件
 function StatusBadge({ status }) {
@@ -72,7 +78,7 @@ function Products() {
   const [formData, setFormData] = useState({
     name: '',
     sku: '',
-    category: '耗材',
+    category: '2楼库存',
     currentStock: 0,
     minStock: 0,
     unit: '个',
@@ -178,7 +184,7 @@ function Products() {
       setFormData({
         name: '',
         sku: '',
-        category: '耗材',
+        category: '2楼库存',
         currentStock: 0,
         minStock: 0,
         unit: '个',
@@ -283,13 +289,18 @@ function Products() {
     }
   };
 
-  // 表单字段变化处理
+  // 表单字段变化处理（含库存分类→库位联动）
   const handleFormChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => {
+      const updates = { ...prev, [name]: value };
+      // 当库存分类变化时，自动设置为该分类的默认库位
+      // 规则：2楼/3楼→清空（用户自选），刘晓冬/尚工→"专用区域"
+      if (name === 'category') {
+        updates.location = getDefaultLocationByCategory(value);
+      }
+      return updates;
+    });
   };
 
   // 操作按钮事件处理
@@ -414,16 +425,15 @@ function Products() {
             />
           </div>
 
-          {/* 分类筛选 */}
+          {/* 库存分类筛选 */}
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
             className="px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
           >
-            <option value="all">全部分类</option>
-            <option value="耗材">耗材</option>
-            <option value="试剂">试剂</option>
-            <option value="设备">设备</option>
+            {buildCategoryOptions(allProducts).map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
 
           {/* 操作按钮 */}
@@ -552,7 +562,7 @@ function Products() {
             </div>
             <div className="text-sm text-slate-600 max-w-md mx-auto space-y-1">
               <p>• 调整搜索关键词</p>
-              <p>• 选择不同的产品分类</p>
+              <p>• 选择不同的库存分类</p>
               <p>• 调整库存状态筛选</p>
               <p>• 调整库存数量范围</p>
               <p>• 清空筛选条件以查看全部产品</p>
@@ -581,7 +591,7 @@ function Products() {
                       产品名称
                     </th>
                     <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                      分类
+                      库存分类
                     </th>
                     <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
                       库存
@@ -785,11 +795,11 @@ function Products() {
                   />
                 </div>
 
-                {/* 分类和单位 */}
+                {/* 库存分类和单位 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                      分类
+                      库存分类
                     </label>
                     <select
                       name="category"
@@ -797,9 +807,20 @@ function Products() {
                       onChange={handleFormChange}
                       className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
                     >
-                      <option value="耗材">耗材</option>
-                      <option value="试剂">试剂</option>
-                      <option value="设备">设备</option>
+                      {(() => {
+                        // 构建模态框分类选项：真实库存分类 + 编辑中的旧分类（如有）
+                        const modalCategories = [...INVENTORY_CATEGORIES];
+                        if (
+                          editingProduct &&
+                          editingProduct.category &&
+                          !INVENTORY_CATEGORIES.includes(editingProduct.category)
+                        ) {
+                          modalCategories.push(editingProduct.category);
+                        }
+                        return modalCategories.map((cat) => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ));
+                      })()}
                     </select>
                   </div>
                   <div>
@@ -851,19 +872,41 @@ function Products() {
                   </div>
                 </div>
 
-                {/* 存储位置 */}
+                {/* 存储位置（库存分类联动） */}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">
                     存储位置
                   </label>
-                  <input
-                    type="text"
-                    name="location"
-                    value={formData.location}
-                    onChange={handleFormChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
-                    placeholder="如：A区-1排-2层"
-                  />
+                  {(() => {
+                    const locationOptions = getLocationOptionsByCategory(formData.category);
+                    if (locationOptions.length > 0) {
+                      // 真实库存分类 → 显示库位下拉选择
+                      return (
+                        <select
+                          name="location"
+                          value={formData.location}
+                          onChange={handleFormChange}
+                          className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+                        >
+                          <option value="">-- 请选择库位 --</option>
+                          {locationOptions.map((loc) => (
+                            <option key={loc} value={loc}>{loc}</option>
+                          ))}
+                        </select>
+                      );
+                    }
+                    // 旧分类或无分类 → 自由文本输入
+                    return (
+                      <input
+                        type="text"
+                        name="location"
+                        value={formData.location}
+                        onChange={handleFormChange}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                        placeholder="如：A区-1排-2层"
+                      />
+                    );
+                  })()}
                 </div>
 
               </div>
