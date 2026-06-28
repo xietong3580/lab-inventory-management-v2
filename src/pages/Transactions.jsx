@@ -313,6 +313,11 @@ function Transactions() {
 
   // 选中搜索结果中的产品
   const handleSelectProduct = (product) => {
+    if (!product || !product.id) {
+      console.error('[Transactions] 产品数据异常，缺少 id 字段', product);
+      setFormError('产品数据异常，请刷新后重试');
+      return;
+    }
     setSelectedProduct(product);
     setFormData(prev => ({ ...prev, productId: product.id }));
     setProductSearchTerm('');
@@ -341,9 +346,9 @@ function Transactions() {
     }
   };
 
-  // 搜索输入框失焦：延迟关闭下拉（让 onClick 有机会触发）
+  // 搜索输入框失焦：关闭下拉（用户点击外部区域时）
   const handleProductSearchBlur = () => {
-    setTimeout(() => setShowProductDropdown(false), 150);
+    setShowProductDropdown(false);
   };
 
   // 表单提交 - 新增交易记录
@@ -1024,7 +1029,7 @@ function Transactions() {
                       onChange={handleProductSearchChange}
                       onKeyDown={handleProductSearchKeyDown}
                       onFocus={() => {
-                        if (productSearchTerm.trim() && productSearchResults.length > 0) {
+                        if (productSearchTerm.trim()) {
                           setShowProductDropdown(true);
                         }
                       }}
@@ -1055,7 +1060,10 @@ function Transactions() {
                             <button
                               key={product.id}
                               type="button"
-                              onClick={() => handleSelectProduct(product)}
+                              onMouseDown={(e) => {
+                                e.preventDefault(); // 阻止 blur 先触发，确保选中稳定
+                                handleSelectProduct(product);
+                              }}
                               className="w-full text-left px-3 py-2.5 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0"
                             >
                               <div className="flex items-center justify-between">
