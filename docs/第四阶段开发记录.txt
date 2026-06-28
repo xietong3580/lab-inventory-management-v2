@@ -741,3 +741,147 @@ Git 状态：2 files changed
   - 新增二次确认弹窗 + 导入结果卡片
 - 或先做端到端手动测试验证后端接口正确性
 ====================================
+
+====================================
+Step 9-5C：前端正式导入按钮与结果展示
+====================================
+
+本轮目标
+在 ProductImportPreview 页面接入后端正式导入接口 POST /api/imports/products/execute，
+让 admin 在满足安全条件时可执行正式导入并展示导入结果。
+
+修改文件
+- src/services/importService.js
+- src/pages/ProductImportPreview.jsx
+- docs/第四阶段开发记录.txt
+
+改动摘要
+
+1. src/services/importService.js：
+   - 新增 executeProductImport(file, options) 函数
+   - 构建 FormData（file + mode + confirm_backup）
+   - 调用 POST /api/imports/products/execute
+   - 处理 401/403/400/500 HTTP 错误并返回友好中文提示
+   - 更新 default export
+
+2. src/pages/ProductImportPreview.jsx：
+   a. 新状态变量：
+      - isExecuting（导入中 loading）
+      - executeResult（导入结果）
+      - executeError（导入错误）
+      - showConfirmDialog（确认弹窗开关）
+      - confirmChecked（备份确认勾选）
+
+   b. 正式导入按钮启用逻辑（canExecute / executeDisabledReason）：
+      - canWrite（admin）✅
+      - selectedFile 存在 ✅
+      - previewResult 存在 ✅
+      - stats.canImport === true ✅
+      - !isUploading && !isExecuting ✅
+      任一不满足 → disabled + 明确禁用原因 title
+
+   c. 正式导入按钮（两处）：
+      - 上传区域（顶部）新增可点击的「执行正式导入」按钮
+      - 底部操作区替换原来禁用的「正式导入暂未开放」按钮
+      - enabled 时 bg-slate-800 hover:bg-slate-900
+      - disabled 时 bg-slate-100 text-slate-400 cursor-not-allowed
+
+   d. 二次确认弹窗：
+      - 半透明遮罩 + 居中模态框
+      - 5 条确认事项（写库、库存口径、SKU 跳过、备份、不可撤销）
+      - 「我已确认上述信息，并已在导入前完成数据库备份」勾选框
+      - 未勾选 →「确认导入，写入数据库」按钮禁用
+      - 勾选后 → 调用 handleExecuteImport()
+      - 取消按钮关闭弹窗
+
+   e. handleExecuteImport():
+      - 关闭弹窗 → 设置 isExecuting=true
+      - 调用 executeProductImport(selectedFile, {mode:'create_only', confirmBackup:true})
+      - 成功 → setExecuteResult(result)
+      - 失败 → setExecuteError(err.message)
+      - finally → setIsExecuting(false)
+
+   f. 导入中状态：
+      - spinner +「正在正式导入，请勿关闭页面」文案
+      - 上传/预览/正式导入按钮全部禁用
+
+   g. 导入结果展示卡片：
+      - 成功：绿色横幅 + 7 格统计（总行/新增/跳过/警告/错误/模式/文件）
+      - 失败：红色横幅 + 统计 + 错误列表
+      - created_items 表格（行号/SKU/名称/产品ID，最多 20 条）
+      - skipped_items 表格（行号/SKU/名称/跳过原因，最多 20 条）
+      - errors / warnings 列表
+      - 无数据提示
+
+   h. 安全说明区域更新：
+      - 最后一条从「正式导入功能暂未开放」改为
+        「正式导入功能已开放（管理员专属）」
+
+   i. can_import 状态提示更新：
+      - false：去除「正式导入暂未开放」
+      - true + admin：绿色提示「可执行正式导入」
+      - true + viewer：灰色提示「仅管理员可执行」
+
+   j. 页面底部信息补充正式导入说明
+
+3. 未修改：
+   - 后端 execute API 业务逻辑
+   - CSV 预览口径
+   - current_stock 库存口径
+   - 预览阶段只读表达
+   - 权限系统
+   - 端口配置
+   - 无新依赖
+
+是否接前端按钮：是
+- 两处正式导入按钮已由「始终禁用」改为「条件启用」
+- viewer 按钮始终禁用，提示「仅管理员可执行正式导入」
+
+是否调用写库 API：是
+- admin + 满足条件 + 二次确认 → 调用 POST /api/imports/products/execute
+- confirm_backup=true 传给后端
+
+是否修改后端：否
+
+权限边界：
+- viewer：上传按钮禁用、正式导入按钮禁用、弹窗不触发
+- admin：预览完成后可点击，需通过二次确认弹窗
+- 后端 require_admin 冗余保护
+
+库存口径是否保持：是
+- 二次确认弹窗明确提示仅导入 current_stock
+- STOCK_CONTEXT 字段前端标记不保存
+- 低库存判断仅基于 current_stock ≤ min_stock
+- 异地/虚拟/总可售库存不会写入
+
+测试结果
+- npm run build ✅ 通过
+- python -m compileall apps/api ✅ 通过（后端未改）
+- ESLint ✅ 0 errors, 4 pre-existing warnings
+- 逻辑自检：
+  1. admin + 无预览 → 按钮禁用 ✅
+  2. admin + 预览有 error → 按钮禁用 ✅
+  3. admin + 预览成功无 error → 按钮可点击 ✅
+  4. 点击弹窗 → 5 条确认事项 + 勾选框 ✅
+  5. 未勾选 → 确认按钮禁用 ✅
+  6. 勾选后调用 execute API → handleExecuteImport ✅
+  7. viewer → 按钮禁用 + 权限提示 ✅
+  8. 导入成功 → 结果卡片 + 统计 + created/skipped 表格 ✅
+  9. 导入失败 → 红色横幅 + errors ✅
+  10. 网络错误 → executeError 提示 ✅
+
+Git 状态：3 files changed
+- src/services/importService.js (modified)
+- src/pages/ProductImportPreview.jsx (modified)
+- docs/第四阶段开发记录.txt (modified)
+
+下一步建议
+- Step 9-5D：审计日志与备份提示收口
+- 或进行端到端手动测试（需启动后端服务 + 准备测试 CSV）
+
+开发记录简版
+Step 9-5C 完成前端正式导入入口：启用条件化按钮（admin + 预览通过 + 无 error），
+新增二次确认弹窗（含备份确认勾选），调用 POST /api/imports/products/execute，
+展示导入结果卡片（含统计、新增列表、跳过列表、错误/警告）。
+未改后端，未引入新依赖，库存口径硬约束保持。npm run build ✅。
+====================================

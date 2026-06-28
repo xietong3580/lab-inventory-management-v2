@@ -2,6 +2,7 @@ import { useState, useRef, useMemo } from 'react';
 import { usePermission } from '../hooks/usePermission';
 import {
   previewProductImport,
+  executeProductImport,
   validateImportFile,
   formatFileSize,
 } from '../services/importService';
@@ -93,6 +94,13 @@ function ProductImportPreview() {
   const [previewResult, setPreviewResult] = useState(null);
   const [apiError, setApiError] = useState('');
 
+  // 正式导入相关状态
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [executeResult, setExecuteResult] = useState(null);
+  const [executeError, setExecuteError] = useState('');
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [confirmChecked, setConfirmChecked] = useState(false);
+
   const fileInputRef = useRef(null);
 
   /**
@@ -102,6 +110,8 @@ function ProductImportPreview() {
     const file = e.target.files?.[0];
     setApiError('');
     setPreviewResult(null);
+    setExecuteResult(null);
+    setExecuteError('');
 
     if (!file) {
       setSelectedFile(null);
@@ -151,8 +161,51 @@ function ProductImportPreview() {
     setFileError('');
     setApiError('');
     setPreviewResult(null);
+    setExecuteResult(null);
+    setExecuteError('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  /**
+   * 打开正式导入确认弹窗
+   */
+  const handleOpenConfirmDialog = () => {
+    setConfirmChecked(false);
+    setShowConfirmDialog(true);
+  };
+
+  /**
+   * 关闭正式导入确认弹窗
+   */
+  const handleCloseConfirmDialog = () => {
+    setShowConfirmDialog(false);
+    setConfirmChecked(false);
+  };
+
+  /**
+   * 执行正式导入
+   */
+  const handleExecuteImport = async () => {
+    if (!selectedFile) return;
+
+    setShowConfirmDialog(false);
+    setConfirmChecked(false);
+    setIsExecuting(true);
+    setExecuteError('');
+    setExecuteResult(null);
+
+    try {
+      const result = await executeProductImport(selectedFile, {
+        mode: 'create_only',
+        confirmBackup: true,
+      });
+      setExecuteResult(result);
+    } catch (err) {
+      setExecuteError(err.message || '正式导入请求失败，请检查后端服务');
+    } finally {
+      setIsExecuting(false);
     }
   };
 
@@ -191,6 +244,30 @@ function ProductImportPreview() {
     () => globalWarnings.filter((w) => !hasStockCaliberKeyword(w)),
     [globalWarnings],
   );
+
+  // ── 正式导入按钮启用条件判断（必须在 stats 之后） ──────────
+  const canExecute = useMemo(() => {
+    if (!canWrite) return false;
+    if (!selectedFile) return false;
+    if (!previewResult) return false;
+    if (!stats?.canImport) return false;
+    if (isUploading) return false;
+    if (isExecuting) return false;
+    return true;
+  }, [canWrite, selectedFile, previewResult, stats?.canImport, isUploading, isExecuting]);
+
+  /**
+   * 正式导入按钮禁用原因
+   */
+  const executeDisabledReason = useMemo(() => {
+    if (!canWrite) return '仅管理员可执行正式导入';
+    if (!selectedFile) return '请先选择 CSV 文件';
+    if (!previewResult) return '请先完成 CSV 预览';
+    if (stats && !stats.canImport) return '预览存在阻断错误，不能执行正式导入';
+    if (isUploading) return '预览解析中...';
+    if (isExecuting) return '导入中...';
+    return '';
+  }, [canWrite, selectedFile, previewResult, stats, isUploading, isExecuting]);
 
   // 检查任一行是否有 inventory_context 非空
   const hasInventoryContext = useMemo(
@@ -236,8 +313,11 @@ function ProductImportPreview() {
             </span>
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-slate-400 mt-0.5 shrink-0">•</span>
-            <span>正式导入功能暂未开放。</span>
+            <span className="text-emerald-500 mt-0.5 shrink-0">•</span>
+            <span>
+              正式导入功能已开放（管理员专属）。需先完成预览、
+              <strong>确认数据库备份</strong>后执行，仅新增不覆盖已存在 SKU。
+            </span>
           </li>
         </ul>
       </div>
@@ -354,12 +434,18 @@ function ProductImportPreview() {
               )}
             </button>
 
-            {/* 正式导入按钮 — 始终禁用 */}
+            {/* 正式导入按钮 */}
             <button
-              disabled
-              className="px-6 py-2.5 bg-slate-100 text-slate-400 rounded-md cursor-not-allowed font-medium border border-slate-200"
+              onClick={handleOpenConfirmDialog}
+              disabled={!canExecute}
+              title={executeDisabledReason || ''}
+              className={`px-6 py-2.5 rounded-md transition-colors font-medium flex items-center gap-2 ${
+                canExecute
+                  ? 'bg-slate-800 text-white hover:bg-slate-900'
+                  : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+              }`}
             >
-              正式导入暂未开放
+              {canExecute ? '执行正式导入' : '正式导入暂未开放'}
             </button>
           </div>
         </div>
@@ -428,13 +514,20 @@ function ProductImportPreview() {
                   <span className="text-sm text-rose-700">
                     当前 CSV 存在阻断错误，不能进入正式导入。
                   </span>
-                  <span className="text-sm text-rose-600 ml-1">正式导入功能暂未开放。</span>
+                  <span className="text-sm text-rose-600 ml-1">请修正错误后重新预览。</span>
                 </div>
               )}
-              {stats.canImport === true && (
+              {stats.canImport === true && canWrite && (
+                <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-md">
+                  <span className="text-sm text-emerald-700">
+                    当前 CSV 通过预览校验，确认数据库备份后可执行正式导入。
+                  </span>
+                </div>
+              )}
+              {stats.canImport === true && !canWrite && (
                 <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-md">
                   <span className="text-sm text-slate-600">
-                    当前 CSV 通过预览校验，但正式导入功能暂未开放。
+                    当前 CSV 通过预览校验，但仅管理员可执行正式导入。
                   </span>
                 </div>
               )}
@@ -820,17 +913,238 @@ function ProductImportPreview() {
               </div>
               <div className="flex flex-col items-end gap-1">
                 <button
-                  disabled
-                  className="px-6 py-2.5 bg-slate-100 text-slate-400 rounded-md cursor-not-allowed font-medium border border-slate-200"
+                  onClick={handleOpenConfirmDialog}
+                  disabled={!canExecute}
+                  title={executeDisabledReason || ''}
+                  className={`px-6 py-2.5 rounded-md transition-colors font-medium ${
+                    canExecute
+                      ? 'bg-slate-800 text-white hover:bg-slate-900'
+                      : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                  }`}
                 >
-                  正式导入暂未开放
+                  {canExecute ? '执行正式导入' : '正式导入暂未开放'}
                 </button>
-                <span className="text-xs text-slate-400">
-                  请先完成预览验收，正式导入将在后续版本开放
-                </span>
+                {!canWrite && (
+                  <span className="text-xs text-slate-400">
+                    仅管理员可执行正式导入
+                  </span>
+                )}
+                {canWrite && !stats?.canImport && stats && (
+                  <span className="text-xs text-slate-400">
+                    请修正 CSV 中的阻断错误后重新预览
+                  </span>
+                )}
+                {canWrite && stats?.canImport && (
+                  <span className="text-xs text-slate-500">
+                    预览校验通过，可执行正式导入
+                  </span>
+                )}
               </div>
             </div>
           </div>
+
+          {/* ── 正式导入中状态 ── */}
+          {isExecuting && (
+            <div className="mt-6 p-6 bg-white border border-slate-200 rounded-lg text-center">
+              <div className="inline-block w-10 h-10 border-3 border-slate-300 border-t-slate-700 rounded-full animate-spin mb-4"></div>
+              <div className="text-base font-medium text-slate-700 mb-1">正在正式导入，请勿关闭页面</div>
+              <div className="text-sm text-slate-500">
+                正在将 CSV 数据写入数据库，导入完成后将展示结果。
+              </div>
+            </div>
+          )}
+
+          {/* ── 正式导入结果展示 ── */}
+          {executeResult && !isExecuting && (
+            <div className={`mt-6 border rounded-lg overflow-hidden ${
+              executeResult.success
+                ? 'border-emerald-200'
+                : 'border-rose-200'
+            }`}>
+              {/* 结果标题栏 */}
+              <div className={`px-6 py-3 flex items-center justify-between ${
+                executeResult.success ? 'bg-emerald-50' : 'bg-rose-50'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <span className={`text-lg ${executeResult.success ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {executeResult.success ? '✓' : '✗'}
+                  </span>
+                  <div>
+                    <div className={`text-sm font-semibold ${executeResult.success ? 'text-emerald-800' : 'text-rose-800'}`}>
+                      {executeResult.success ? '导入成功' : '导入失败'}
+                    </div>
+                    {executeResult.detail && (
+                      <div className="text-xs text-slate-600 mt-0.5">{executeResult.detail}</div>
+                    )}
+                  </div>
+                </div>
+                {executeResult.batch_id && (
+                  <span className="px-2 py-0.5 bg-white border border-slate-200 text-slate-600 text-xs rounded font-mono">
+                    批次: {executeResult.batch_id}
+                  </span>
+                )}
+              </div>
+
+              {/* 统计卡片 */}
+              <div className="p-4 md:p-6 bg-white">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-4">
+                  <div className="bg-slate-50 border border-slate-200 rounded p-3 text-center">
+                    <div className="text-xs text-slate-500 mb-1">总行数</div>
+                    <div className="text-xl font-semibold text-slate-800">{executeResult.total_rows ?? 0}</div>
+                  </div>
+                  <div className="bg-emerald-50 border border-emerald-200 rounded p-3 text-center">
+                    <div className="text-xs text-emerald-600 mb-1">新增</div>
+                    <div className="text-xl font-semibold text-emerald-700">{executeResult.created_count ?? 0}</div>
+                  </div>
+                  <div className="bg-amber-50 border border-amber-200 rounded p-3 text-center">
+                    <div className="text-xs text-amber-600 mb-1">跳过</div>
+                    <div className="text-xl font-semibold text-amber-700">{executeResult.skipped_count ?? 0}</div>
+                  </div>
+                  <div className="bg-amber-50 border border-amber-200 rounded p-3 text-center">
+                    <div className="text-xs text-amber-600 mb-1">警告</div>
+                    <div className="text-xl font-semibold text-amber-700">{executeResult.warning_count ?? 0}</div>
+                  </div>
+                  <div className="bg-rose-50 border border-rose-200 rounded p-3 text-center">
+                    <div className="text-xs text-rose-600 mb-1">错误</div>
+                    <div className="text-xl font-semibold text-rose-700">{executeResult.error_count ?? 0}</div>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded p-3 text-center">
+                    <div className="text-xs text-slate-500 mb-1">模式</div>
+                    <div className="text-sm font-medium text-slate-700">{executeResult.mode ?? '-'}</div>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-200 rounded p-3 text-center">
+                    <div className="text-xs text-slate-500 mb-1">文件</div>
+                    <div className="text-xs font-medium text-slate-700 truncate" title={executeResult.file_name}>{executeResult.file_name ?? '-'}</div>
+                  </div>
+                </div>
+
+                {/* 新增产品列表 */}
+                {Array.isArray(executeResult.created_items) && executeResult.created_items.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-sm font-semibold text-slate-700 mb-2">
+                      新增产品
+                      <span className="font-normal text-slate-500 ml-2">{executeResult.created_items.length} 条</span>
+                    </h4>
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg overflow-hidden">
+                      <table className="min-w-full text-sm">
+                        <thead className="bg-emerald-100">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-emerald-700">行号</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-emerald-700">SKU</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-emerald-700">产品名称</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-emerald-700">产品 ID</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-emerald-200">
+                          {executeResult.created_items.slice(0, 20).map((item, i) => (
+                            <tr key={i} className="hover:bg-emerald-50/50">
+                              <td className="px-3 py-2 text-xs text-slate-600 font-mono">{item.row_number}</td>
+                              <td className="px-3 py-2 text-xs font-medium text-slate-800 font-mono">{item.sku}</td>
+                              <td className="px-3 py-2 text-xs text-slate-700">{item.name}</td>
+                              <td className="px-3 py-2 text-xs text-slate-600 font-mono">{item.product_id}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {executeResult.created_items.length > 20 && (
+                        <div className="px-4 py-2 bg-emerald-100/50 text-xs text-emerald-700">
+                          … 仅显示前 20 条，共 {executeResult.created_items.length} 条
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 跳过产品列表 */}
+                {Array.isArray(executeResult.skipped_items) && executeResult.skipped_items.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-sm font-semibold text-slate-700 mb-2">
+                      跳过产品
+                      <span className="font-normal text-slate-500 ml-2">{executeResult.skipped_items.length} 条</span>
+                    </h4>
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg overflow-hidden">
+                      <table className="min-w-full text-sm">
+                        <thead className="bg-amber-100">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-amber-700">行号</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-amber-700">SKU</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-amber-700">名称</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-amber-700">跳过原因</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-amber-200">
+                          {executeResult.skipped_items.slice(0, 20).map((item, i) => (
+                            <tr key={i} className="hover:bg-amber-50/50">
+                              <td className="px-3 py-2 text-xs text-slate-600 font-mono">{item.row_number}</td>
+                              <td className="px-3 py-2 text-xs font-medium text-slate-800 font-mono">{item.sku}</td>
+                              <td className="px-3 py-2 text-xs text-slate-700">{item.name}</td>
+                              <td className="px-3 py-2 text-xs text-amber-700">{item.reason}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {executeResult.skipped_items.length > 20 && (
+                        <div className="px-4 py-2 bg-amber-100/50 text-xs text-amber-700">
+                          … 仅显示前 20 条，共 {executeResult.skipped_items.length} 条
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 错误列表 */}
+                {Array.isArray(executeResult.errors) && executeResult.errors.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-sm font-semibold text-rose-700 mb-2">
+                      错误
+                      <span className="font-normal ml-2">{executeResult.errors.length} 条</span>
+                    </h4>
+                    <div className="space-y-1.5">
+                      {executeResult.errors.map((err, i) => (
+                        <div key={`exec-err-${i}`} className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded px-3 py-2">
+                          {err}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 警告列表 */}
+                {Array.isArray(executeResult.warnings) && executeResult.warnings.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-sm font-semibold text-amber-700 mb-2">
+                      警告
+                      <span className="font-normal ml-2">{executeResult.warnings.length} 条</span>
+                    </h4>
+                    <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                      {executeResult.warnings.map((warn, i) => (
+                        <div key={`exec-warn-${i}`} className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                          {warn}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 无数据提示 */}
+                {(!Array.isArray(executeResult.created_items) || executeResult.created_items.length === 0)
+                  && (!Array.isArray(executeResult.skipped_items) || executeResult.skipped_items.length === 0)
+                  && executeResult.success && (
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded text-center">
+                    <div className="text-sm text-slate-600">导入完成，无新增或跳过产品。</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── 正式导入错误（网络/鉴权等非后端业务错误） ── */}
+          {executeError && !isExecuting && (
+            <div className="mt-6 p-4 bg-rose-50 border border-rose-200 rounded-lg">
+              <div className="text-sm font-medium text-rose-800 mb-1">正式导入请求失败</div>
+              <div className="text-sm text-rose-700">{executeError}</div>
+            </div>
+          )}
         </>
       )}
 
@@ -859,8 +1173,125 @@ function ProductImportPreview() {
           提示：导入预览功能支持 UTF-8 / UTF-8 BOM 编码，并兼容 GBK / GB18030 编码的 CSV 文件。
           预览结果仅展示解析和校验信息，不会对系统数据产生任何影响。
           库存数据以本地真实库存为准，低库存预警在导入完成后由系统自动计算。
+          正式导入仅管理员可操作，需先完成数据库备份确认。
         </div>
       </div>
+
+      {/* ── 正式导入确认弹窗 ── */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* 半透明遮罩 */}
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={handleCloseConfirmDialog}
+          ></div>
+
+          {/* 弹窗内容 */}
+          <div className="relative bg-white rounded-lg shadow-xl border border-slate-300 w-full max-w-xl mx-4 max-h-[90vh] overflow-y-auto">
+            {/* 弹窗标题 */}
+            <div className="px-6 py-4 border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <span className="text-amber-500 text-xl">⚠</span>
+                <h3 className="text-lg font-semibold text-slate-800">确认正式导入</h3>
+              </div>
+              <p className="text-sm text-slate-500 mt-1">
+                即将对 CSV 解析结果执行正式导入，请确认以下事项：
+              </p>
+            </div>
+
+            {/* 弹窗内容 */}
+            <div className="px-6 py-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <span className="text-emerald-500 mt-0.5 shrink-0">✅</span>
+                <div>
+                  <div className="text-sm font-medium text-slate-700">即将写入数据库</div>
+                  <div className="text-sm text-slate-500">
+                    将新增 {stats?.valid ?? '?'} 个产品到数据库（create_only 模式）
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <span className="text-amber-500 mt-0.5 shrink-0">⚠</span>
+                <div>
+                  <div className="text-sm font-medium text-slate-700">仅导入本地真实库存（current_stock）</div>
+                  <div className="text-sm text-slate-500">
+                    异地库存、虚拟库存、总可售库存不会写入，也不会计入低库存判断。
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <span className="text-amber-500 mt-0.5 shrink-0">⚠</span>
+                <div>
+                  <div className="text-sm font-medium text-slate-700">SKU 已存在的产品将被跳过</div>
+                  <div className="text-sm text-slate-500">
+                    不会覆盖已有产品的任何字段（库存、名称、分类等），仅以 skipped 记录。
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <span className="text-amber-500 mt-0.5 shrink-0">⚠</span>
+                <div>
+                  <div className="text-sm font-medium text-slate-700">建议已在设置页完成数据库备份</div>
+                  <div className="text-sm text-slate-500">
+                    备份文件可在 设置 → 备份管理 → 下载。导入后无法撤销单条记录，
+                    如需回滚需使用备份文件恢复整个数据库。
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <span className="text-rose-500 mt-0.5 shrink-0">⚠</span>
+                <div>
+                  <div className="text-sm font-medium text-slate-700">导入后无法撤销单条记录</div>
+                  <div className="text-sm text-slate-500">
+                    如需回滚，需使用备份文件恢复整个数据库。
+                  </div>
+                </div>
+              </div>
+
+              {/* 确认勾选框 */}
+              <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-md">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={confirmChecked}
+                    onChange={(e) => setConfirmChecked(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded border-slate-300 text-slate-700 focus:ring-slate-500"
+                  />
+                  <span className="text-sm text-slate-700">
+                    我已确认上述信息，并已在导入前完成数据库备份
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {/* 弹窗底部按钮 */}
+            <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-end gap-3">
+              <button
+                onClick={handleCloseConfirmDialog}
+                className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-md hover:bg-slate-50 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleExecuteImport}
+                disabled={!confirmChecked}
+                title={!confirmChecked ? '请先确认已完成数据库备份' : ''}
+                className={`px-6 py-2 text-sm font-medium rounded-md transition-colors ${
+                  confirmChecked
+                    ? 'bg-slate-800 text-white hover:bg-slate-900'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                确认导入，写入数据库
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

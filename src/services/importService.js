@@ -146,8 +146,80 @@ export async function previewProductImport(file) {
   return response.json();
 }
 
+/**
+ * 执行产品 CSV 正式导入
+ *
+ * 向后端 POST /api/imports/products/execute 上传 CSV 文件并执行导入。
+ * 后端会重新解析校验 CSV，不信任前端预览结果。
+ * 仅 create_only 模式：新增不存在 SKU，跳过已存在 SKU。
+ *
+ * @param {File} file - CSV 文件
+ * @param {Object} options
+ * @param {string} options.mode - 导入模式，当前固定 "create_only"
+ * @param {boolean} options.confirmBackup - 是否已确认数据库备份
+ * @returns {Promise<{
+ *   success: boolean,
+ *   mode: string,
+ *   batch_id: string|null,
+ *   file_name: string,
+ *   file_encoding: string,
+ *   total_rows: number,
+ *   created_count: number,
+ *   skipped_count: number,
+ *   warning_count: number,
+ *   error_count: number,
+ *   created_items: Array<{row_number:number, sku:string, name:string, product_id:string}>,
+ *   skipped_items: Array<{row_number:number, sku:string, name:string, reason:string}>,
+ *   warnings: string[],
+ *   errors: string[],
+ *   detail: string|null,
+ *   backup_reminder: string|null
+ * }>}
+ */
+export async function executeProductImport(file, options = {}) {
+  const token = getToken();
+  if (!token) {
+    throw new Error('未登录');
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('mode', options.mode || 'create_only');
+  formData.append('confirm_backup', options.confirmBackup === true ? 'true' : 'false');
+
+  const response = await fetch(`${API_BASE}/imports/products/execute`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('鉴权失败，请重新登录');
+    }
+    if (response.status === 403) {
+      throw new Error('当前角色无正式导入权限，仅管理员可执行导入');
+    }
+    if (response.status === 400) {
+      throw new Error(data.detail || '请求参数有误');
+    }
+    if (response.status === 500) {
+      throw new Error(data.detail || '服务器内部错误，请稍后重试');
+    }
+    throw new Error(data.detail || `导入执行失败 (${response.status})`);
+  }
+
+  return data;
+}
+
 export default {
   previewProductImport,
+  executeProductImport,
   validateImportFile,
   formatFileSize,
   MAX_FILE_SIZE,
