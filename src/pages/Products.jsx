@@ -80,6 +80,13 @@ function Products() {
   const [selectedProductForLedger, setSelectedProductForLedger] = useState(null);
   const [ledgerData, setLedgerData] = useState([]);
   const [isLoadingLedger, setIsLoadingLedger] = useState(false);
+
+  // 操作反馈状态
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const [deletingId, setDeletingId] = useState(null); // 正在删除的产品 ID
+  const [actionMessage, setActionMessage] = useState(null); // { type: 'success'|'error', text: '...' }
+
   const [formData, setFormData] = useState({
     name: '',
     sku: '',
@@ -236,17 +243,20 @@ function Products() {
   const handleFormSubmit = async (e) => {
     e.preventDefault();
 
-    if (!canWrite) return; // viewer 不可提交
+    if (!canWrite || isSaving) return; // viewer 不可提交，防重复提交
 
     // 轻量必填校验
     if (!formData.name.trim()) {
-      alert('产品名称不能为空');
+      setSaveError('产品名称不能为空，请填写后保存');
       return;
     }
     if (!formData.sku.trim()) {
-      alert('SKU不能为空');
+      setSaveError('SKU 不能为空，请填写后保存');
       return;
     }
+
+    setIsSaving(true);
+    setSaveError(null);
 
     try {
       if (editingProduct) {
@@ -292,49 +302,73 @@ function Products() {
         setAllProducts([...allProducts, newProduct]);
       }
 
+      // 保存成功
+      setIsSaving(false);
       handleCloseModal();
+      setActionMessage({ type: 'success', text: editingProduct ? '产品已更新' : '产品已添加' });
+      // 3 秒后自动清除成功提示
+      setTimeout(() => setActionMessage(null), 3000);
     } catch (error) {
       console.error('保存产品失败:', error);
-      alert(`操作失败: ${error.message}`);
-      // 降级使用原同步方法
-      if (editingProduct) {
-        const updates = {
-          ...formData,
-          currentStock: Number(formData.currentStock) || 0,
-          minStock: Number(formData.minStock) || 0,
-          location: formData.location.trim(),
-          brand: formData.brand.trim(),
-          specification: formData.specification.trim(),
-          supplier: formData.supplier.trim(),
-          notes: formData.notes.trim(),
-          lastUpdated: getToday()
-        };
-        const updatedProduct = updateProduct(editingProduct.id, updates);
-        if (updatedProduct) {
-          updatedProduct.status = calculateProductStatus(updatedProduct);
-          setAllProducts(allProducts.map(p =>
-            p.id === editingProduct.id ? updatedProduct : p
-          ));
-        }
+      setIsSaving(false);
+      // 根据错误类型给出友好提示
+      const errMsg = error.message || '';
+      if (errMsg.includes('SKU') || errMsg.includes('sku') || errMsg.includes('已存在') || errMsg.includes('重复')) {
+        setSaveError('SKU 已存在，请检查货号');
       } else {
-        const newProductData = {
-          sku: formData.sku.trim(),
-          name: formData.name.trim(),
-          category: formData.category,
-          currentStock: Number(formData.currentStock) || 0,
-          minStock: Number(formData.minStock) || 0,
-          unit: formData.unit,
-          location: formData.location.trim(),
-          brand: formData.brand.trim(),
-          specification: formData.specification.trim(),
-          supplier: formData.supplier.trim(),
-          notes: formData.notes.trim(),
-          lastUpdated: getToday()
-        };
-        const newProduct = addProduct(newProductData);
-        newProduct.status = calculateProductStatus(newProduct);
-        setAllProducts([...allProducts, newProduct]);
-        handleCloseModal();
+        setSaveError('保存失败，请稍后重试');
+      }
+      // 降级使用原同步方法，保持向后兼容
+      try {
+        if (editingProduct) {
+          const updates = {
+            ...formData,
+            currentStock: Number(formData.currentStock) || 0,
+            minStock: Number(formData.minStock) || 0,
+            location: formData.location.trim(),
+            brand: formData.brand.trim(),
+            specification: formData.specification.trim(),
+            supplier: formData.supplier.trim(),
+            notes: formData.notes.trim(),
+            lastUpdated: getToday()
+          };
+          const updatedProduct = updateProduct(editingProduct.id, updates);
+          if (updatedProduct) {
+            updatedProduct.status = calculateProductStatus(updatedProduct);
+            setAllProducts(allProducts.map(p =>
+              p.id === editingProduct.id ? updatedProduct : p
+            ));
+            setSaveError(null);
+            handleCloseModal();
+            setActionMessage({ type: 'success', text: '产品已更新' });
+            setTimeout(() => setActionMessage(null), 3000);
+          }
+        } else {
+          const newProductData = {
+            sku: formData.sku.trim(),
+            name: formData.name.trim(),
+            category: formData.category,
+            currentStock: Number(formData.currentStock) || 0,
+            minStock: Number(formData.minStock) || 0,
+            unit: formData.unit,
+            location: formData.location.trim(),
+            brand: formData.brand.trim(),
+            specification: formData.specification.trim(),
+            supplier: formData.supplier.trim(),
+            notes: formData.notes.trim(),
+            lastUpdated: getToday()
+          };
+          const newProduct = addProduct(newProductData);
+          newProduct.status = calculateProductStatus(newProduct);
+          setAllProducts([...allProducts, newProduct]);
+          setSaveError(null);
+          handleCloseModal();
+          setActionMessage({ type: 'success', text: '产品已添加' });
+          setTimeout(() => setActionMessage(null), 3000);
+        }
+      } catch (fallbackError) {
+        console.error('降级保存也失败:', fallbackError);
+        // 保持 saveError 的提示
       }
     }
   };
@@ -366,7 +400,7 @@ function Products() {
   };
 
   const handleDeleteProduct = async (productId) => {
-    if (!canWrite) return; // viewer 不可删除
+    if (!canWrite || deletingId) return; // viewer 不可删除，防重复点击
     const product = allProducts.find(p => p.id === productId);
     if (!product) return;
 
@@ -374,20 +408,32 @@ function Products() {
       return;
     }
 
+    setDeletingId(productId);
     try {
       const success = await dataProductService.deleteProduct(productId);
       if (success) {
         setAllProducts(allProducts.filter(p => p.id !== productId));
+        setActionMessage({ type: 'success', text: `已删除「${product.name}」` });
+        setTimeout(() => setActionMessage(null), 3000);
       }
     } catch (error) {
       console.error('删除产品失败:', error);
       // 降级使用原同步方法
-      const fallbackSuccess = deleteProduct(productId);
-      if (fallbackSuccess) {
-        setAllProducts(allProducts.filter(p => p.id !== productId));
-      } else {
-        alert(`删除失败: ${error.message}`);
+      try {
+        const fallbackSuccess = deleteProduct(productId);
+        if (fallbackSuccess) {
+          setAllProducts(allProducts.filter(p => p.id !== productId));
+          setActionMessage({ type: 'success', text: `已删除「${product.name}」` });
+          setTimeout(() => setActionMessage(null), 3000);
+        } else {
+          setActionMessage({ type: 'error', text: '删除失败，请稍后重试' });
+        }
+      } catch (fallbackErr) {
+        console.error('降级删除也失败:', fallbackErr);
+        setActionMessage({ type: 'error', text: '删除失败，请稍后重试' });
       }
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -652,6 +698,28 @@ function Products() {
         </div>
       )}
 
+      {/* 操作反馈提示（成功/失败） */}
+      {actionMessage && (
+        <div className={`mb-6 p-3 rounded-md border transition-opacity ${
+          actionMessage.type === 'success'
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+            : 'bg-rose-50 border-rose-200 text-rose-800'
+        }`}>
+          <div className="flex items-center">
+            {actionMessage.type === 'success' ? (
+              <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+            )}
+            <span className="text-sm font-medium">{actionMessage.text}</span>
+          </div>
+        </div>
+      )}
+
       {/* 产品表格 */}
       <div className="bg-white border border-slate-200 rounded-lg">
         {allProducts.length === 0 ? (
@@ -772,15 +840,17 @@ function Products() {
                           </button>
                           <button
                             onClick={() => handleDeleteProduct(product.id)}
-                            disabled={!canWrite}
+                            disabled={!canWrite || deletingId === product.id}
                             title={!canWrite ? adminOnlyTitle : ''}
                             className={`px-3 py-1.5 text-sm rounded transition-colors ${
                               !canWrite
                                 ? 'bg-rose-50 text-rose-300 cursor-not-allowed'
-                                : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+                                : deletingId === product.id
+                                  ? 'bg-rose-100 text-rose-400 cursor-wait'
+                                  : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
                             }`}
                           >
-                            删除
+                            {deletingId === product.id ? '删除中...' : '删除'}
                           </button>
                         </div>
                       </td>
@@ -1080,20 +1150,42 @@ function Products() {
 
               </div>
 
+              {/* 保存错误提示 */}
+              {saveError && (
+                <div className="mx-6 mt-3 p-3 bg-rose-50 border border-rose-200 rounded-md">
+                  <div className="flex items-start">
+                    <svg className="w-4 h-4 text-rose-600 mt-0.5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    <div className="text-sm text-rose-700">{saveError}</div>
+                  </div>
+                </div>
+              )}
+
               {/* 模态框底部按钮 */}
               <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium"
+                  disabled={isSaving}
+                  className={`px-4 py-2 border rounded-md transition-colors font-medium ${
+                    isSaving
+                      ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                  }`}
                 >
                   取消
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium"
+                  disabled={isSaving}
+                  className={`px-4 py-2 rounded-md transition-colors font-medium ${
+                    isSaving
+                      ? 'bg-slate-400 text-white cursor-not-allowed'
+                      : 'bg-slate-700 text-white hover:bg-slate-800'
+                  }`}
                 >
-                  {editingProduct ? '更新产品' : '添加产品'}
+                  {isSaving ? '保存中...' : editingProduct ? '更新产品' : '添加产品'}
                 </button>
               </div>
             </form>
