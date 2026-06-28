@@ -82,7 +82,11 @@ function Products() {
     currentStock: 0,
     minStock: 0,
     unit: '个',
-    location: ''
+    location: '',
+    brand: '',
+    specification: '',
+    supplier: '',
+    notes: ''
   });
 
   // 辅助函数：获取当前日期字符串
@@ -177,7 +181,11 @@ function Products() {
         currentStock: product.currentStock,
         minStock: product.minStock,
         unit: product.unit,
-        location: product.location
+        location: product.location || '',
+        brand: product.brand || '',
+        specification: product.specification || '',
+        supplier: product.supplier || '',
+        notes: product.notes || ''
       });
     } else {
       // 新增模式：重置表单
@@ -188,7 +196,11 @@ function Products() {
         currentStock: 0,
         minStock: 0,
         unit: '个',
-        location: ''
+        location: '',
+        brand: '',
+        specification: '',
+        supplier: '',
+        notes: ''
       });
     }
     setIsModalOpen(true);
@@ -223,6 +235,11 @@ function Products() {
           ...formData,
           currentStock: Number(formData.currentStock) || 0,
           minStock: Number(formData.minStock) || 0,
+          location: formData.location.trim(),
+          brand: formData.brand.trim(),
+          specification: formData.specification.trim(),
+          supplier: formData.supplier.trim(),
+          notes: formData.notes.trim(),
           lastUpdated: getToday()
         };
         const updatedProduct = await dataProductService.updateProduct(editingProduct.id, updates);
@@ -243,6 +260,10 @@ function Products() {
           minStock: Number(formData.minStock) || 0,
           unit: formData.unit,
           location: formData.location.trim(),
+          brand: formData.brand.trim(),
+          specification: formData.specification.trim(),
+          supplier: formData.supplier.trim(),
+          notes: formData.notes.trim(),
           lastUpdated: getToday()
         };
         const newProduct = await dataProductService.addProduct(newProductData);
@@ -261,6 +282,11 @@ function Products() {
           ...formData,
           currentStock: Number(formData.currentStock) || 0,
           minStock: Number(formData.minStock) || 0,
+          location: formData.location.trim(),
+          brand: formData.brand.trim(),
+          specification: formData.specification.trim(),
+          supplier: formData.supplier.trim(),
+          notes: formData.notes.trim(),
           lastUpdated: getToday()
         };
         const updatedProduct = updateProduct(editingProduct.id, updates);
@@ -279,6 +305,10 @@ function Products() {
           minStock: Number(formData.minStock) || 0,
           unit: formData.unit,
           location: formData.location.trim(),
+          brand: formData.brand.trim(),
+          specification: formData.specification.trim(),
+          supplier: formData.supplier.trim(),
+          notes: formData.notes.trim(),
           lastUpdated: getToday()
         };
         const newProduct = addProduct(newProductData);
@@ -907,6 +937,64 @@ function Products() {
                       />
                     );
                   })()}
+                </div>
+
+                {/* P1 扩展字段（Step 10-2B） */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      品牌
+                    </label>
+                    <input
+                      type="text"
+                      name="brand"
+                      value={formData.brand}
+                      onChange={handleFormChange}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      placeholder="如：安捷伦"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      规格
+                    </label>
+                    <input
+                      type="text"
+                      name="specification"
+                      value={formData.specification}
+                      onChange={handleFormChange}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      placeholder="如：1.5×100mm"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      供应商
+                    </label>
+                    <input
+                      type="text"
+                      name="supplier"
+                      value={formData.supplier}
+                      onChange={handleFormChange}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      placeholder="如：上海某某化工"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      备注
+                    </label>
+                    <input
+                      type="text"
+                      name="notes"
+                      value={formData.notes}
+                      onChange={handleFormChange}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      placeholder="产品备注说明"
+                    />
+                  </div>
                 </div>
 
               </div>

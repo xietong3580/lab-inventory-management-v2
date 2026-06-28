@@ -93,6 +93,11 @@ P1_FIELD_ALIASES: Dict[str, List[str]] = {
         "附注", "说明",
         "comment",
     ],
+    "supplier": [
+        "supplier", "vendor",
+        "供应商", "供货商", "供应单位",
+        "厂商",
+    ],
     "image_url": [
         "image", "image_url",
         "图片", "产品图片",
@@ -498,8 +503,8 @@ def _parse_and_validate_csv(
                 p1_data[canonical] = v
                 if v:
                     row_warnings.append(
-                        f"P1 字段 '{_field_display(canonical)}' "
-                        f"当前系统暂不保存，将在导入报告中保留"
+                        f"P1 扩展字段 '{_field_display(canonical)}' "
+                        f"将写入数据库"
                     )
             elif prio == "P2":
                 v = raw_val.strip() if raw_val else None
@@ -659,10 +664,9 @@ def _parse_and_validate_csv(
 
     if recognized_p1:
         global_warnings.append(
-            f"识别到 {len(recognized_p1)} 个 P1 字段"
+            f"识别到 {len(recognized_p1)} 个 P1 扩展字段"
             f"（{', '.join(recognized_p1)}），"
-            f"当前系统暂不保存。原始数据将在每行 p1_fields 中保留，"
-            f"待产品模型扩展后可重新导入。"
+            f"将在正式导入时写入数据库。"
         )
 
     if recognized_p2:
@@ -988,6 +992,8 @@ async def execute_products_import(
                 else "正常"
             )
 
+            # 提取 P1 字段值
+            p1 = row.get("p1_fields") or {}
             product = Product(
                 sku=norm["sku"],
                 name=(norm.get("name") or "")[:100],
@@ -998,6 +1004,11 @@ async def execute_products_import(
                 location=norm.get("location") or "",
                 status=status,
                 last_updated=date_str,
+                # P1 扩展字段（Step 10-2B）
+                brand=(p1.get("brand") or None),
+                specification=(p1.get("specification") or None),
+                supplier=(p1.get("supplier") or None),
+                notes=(p1.get("notes") or None),
             )
             db.add(product)
             db.flush()  # 获取自增 id

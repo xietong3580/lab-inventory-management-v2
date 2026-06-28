@@ -15,6 +15,11 @@ class ProductBase(BaseModel):
     minStock: int = 0
     unit: str = "个"
     location: Optional[str] = ""
+    # P1 扩展字段（Step 10-2B）
+    brand: Optional[str] = ""
+    specification: Optional[str] = ""
+    supplier: Optional[str] = ""
+    notes: Optional[str] = ""
 
 class ProductCreate(ProductBase):
     """创建产品请求模型"""
@@ -29,6 +34,11 @@ class ProductUpdate(BaseModel):
     minStock: Optional[int] = None
     unit: Optional[str] = None
     location: Optional[str] = None
+    # P1 扩展字段（Step 10-2B）
+    brand: Optional[str] = None
+    specification: Optional[str] = None
+    supplier: Optional[str] = None
+    notes: Optional[str] = None
 
 class ProductResponse(ProductBase):
     """产品响应模型"""

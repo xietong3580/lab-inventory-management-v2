@@ -70,6 +70,11 @@ const FIELD_MAPPING = {
   unit: 'unit',
   location: 'location',
   last_updated: 'lastUpdated',
+  // P1 扩展字段（Step 10-2B）
+  brand: 'brand',
+  specification: 'specification',
+  supplier: 'supplier',
+  // notes 映射保持为 notes（与 Transaction notes 共享）
   // 交易记录字段映射
   transaction_id: 'id',
   product_id: 'productId',

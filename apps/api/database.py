@@ -32,6 +32,7 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     print(f"数据库已初始化: {DATABASE_URL}")
     migrate_users()
+    migrate_products()
 
 def migrate_users():
     """迁移 users 表：检查并逐列添加缺失字段（安全迁移，不删除数据）"""
@@ -59,6 +60,36 @@ def migrate_users():
     conn.close()
 
 
+def migrate_products():
+    """迁移 products 表：安全添加 P1 扩展字段（Step 10-2B）"""
+    import sqlite3
+    import os
+
+    db_path = os.path.join(BASE_DIR, 'inventory.db')
+    if not os.path.exists(db_path):
+        return
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.execute("PRAGMA table_info(products)")
+    existing_columns = {row[1] for row in cursor.fetchall()}
+
+    # P1 扩展字段（Step 10-2B）
+    new_columns = [
+        ("brand", "VARCHAR(100)"),
+        ("specification", "VARCHAR(200)"),
+        ("supplier", "VARCHAR(100)"),
+        ("notes", "TEXT"),
+    ]
+
+    for col_name, col_type in new_columns:
+        if col_name not in existing_columns:
+            conn.execute(f"ALTER TABLE products ADD COLUMN {col_name} {col_type}")
+            print(f"  [迁移] products 表已添加列: {col_name} ({col_type})")
+
+    conn.commit()
+    conn.close()
+
+
 # 模型定义
 class Product(Base):
     """产品模型"""
@@ -74,6 +105,12 @@ class Product(Base):
     location = Column(String(100), nullable=True)
     status = Column(String(20), nullable=False, default="正常")  # 正常/低库存
     last_updated = Column(String(20), nullable=True)  # YYYY-MM-DD 格式
+
+    # P1 扩展字段（Step 10-2B）
+    brand = Column(String(100), nullable=True)
+    specification = Column(String(200), nullable=True)
+    supplier = Column(String(100), nullable=True)
+    notes = Column(Text, nullable=True)
 
     # 额外字段
     created_at = Column(DateTime, default=datetime.now)
@@ -94,6 +131,11 @@ class Product(Base):
             "location": self.location or "",
             "status": status,
             "lastUpdated": self.last_updated or "",
+            # P1 扩展字段（Step 10-2B）
+            "brand": self.brand or "",
+            "specification": self.specification or "",
+            "supplier": self.supplier or "",
+            "notes": self.notes or "",
         }
 
 class Transaction(Base):

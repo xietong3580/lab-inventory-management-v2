@@ -132,7 +132,11 @@ export const addProduct = (productData) => {
         currentStock: newProduct.currentStock,
         minStock: newProduct.minStock,
         unit: newProduct.unit,
-        location: newProduct.location || ''
+        location: newProduct.location || '',
+        brand: newProduct.brand || '',
+        specification: newProduct.specification || '',
+        supplier: newProduct.supplier || '',
+        notes: newProduct.notes || ''
       }
     }
   );
@@ -189,7 +193,11 @@ export const updateProduct = (id, updates) => {
         currentStock: oldProduct.currentStock,
         minStock: oldProduct.minStock,
         unit: oldProduct.unit,
-        location: oldProduct.location || ''
+        location: oldProduct.location || '',
+        brand: oldProduct.brand || '',
+        specification: oldProduct.specification || '',
+        supplier: oldProduct.supplier || '',
+        notes: oldProduct.notes || ''
       },
       newProduct: {
         name: updatedProduct.name,
@@ -198,7 +206,11 @@ export const updateProduct = (id, updates) => {
         currentStock: updatedProduct.currentStock,
         minStock: updatedProduct.minStock,
         unit: updatedProduct.unit,
-        location: updatedProduct.location || ''
+        location: updatedProduct.location || '',
+        brand: updatedProduct.brand || '',
+        specification: updatedProduct.specification || '',
+        supplier: updatedProduct.supplier || '',
+        notes: updatedProduct.notes || ''
       },
       changedFields,
       updateSummary: Object.keys(changedFields).length > 0
@@ -246,6 +258,10 @@ export const deleteProduct = (id) => {
             minStock: productToDelete.minStock,
             unit: productToDelete.unit,
             location: productToDelete.location || '',
+            brand: productToDelete.brand || '',
+            specification: productToDelete.specification || '',
+            supplier: productToDelete.supplier || '',
+            notes: productToDelete.notes || '',
             lastUpdated: productToDelete.lastUpdated || ''
           },
           deletionTime: getCurrentDateTimeWithSeconds()

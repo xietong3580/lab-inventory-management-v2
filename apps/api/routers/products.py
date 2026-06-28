@@ -76,7 +76,12 @@ def create_product(product_data: ProductCreate, db: Session = Depends(get_db), c
         unit=product_data.unit,
         location=product_data.location,
         status=status,
-        last_updated=datetime.now().strftime("%Y-%m-%d")
+        last_updated=datetime.now().strftime("%Y-%m-%d"),
+        # P1 扩展字段（Step 10-2B）
+        brand=product_data.brand or None,
+        specification=product_data.specification or None,
+        supplier=product_data.supplier or None,
+        notes=product_data.notes or None,
     )
 
     db.add(db_product)
@@ -128,7 +133,12 @@ def update_product(
         "name": "name",
         "category": "category",
         "unit": "unit",
-        "location": "location"
+        "location": "location",
+        # P1 扩展字段（Step 10-2B）
+        "brand": "brand",
+        "specification": "specification",
+        "supplier": "supplier",
+        "notes": "notes",
     }
 
     for frontend_key, backend_key in field_mapping.items():
