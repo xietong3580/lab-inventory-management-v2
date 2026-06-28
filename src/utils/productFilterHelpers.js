@@ -1,6 +1,65 @@
 // 产品筛选工具函数
 
 /**
+ * 关键词搜索产品（SKU 优先级排序）
+ *
+ * 搜索优先级：
+ *   SKU 完全匹配 > SKU 开头匹配 > SKU 包含匹配 > 产品名称包含匹配 > 品牌包含匹配
+ *   specification / supplier 作为低优先级辅助匹配
+ *   notes 不参与搜索
+ *
+ * @param {Array} products - 产品数组
+ * @param {string} keyword - 搜索关键词（货号/SKU/产品名称/品牌）
+ * @returns {Array} 匹配的产品数组（按匹配度降序）
+ */
+export const searchProducts = (products, keyword) => {
+  if (!keyword || !keyword.trim()) return [];
+
+  const searchTerm = keyword.trim().toLowerCase();
+  const scored = [];
+
+  for (const product of products) {
+    const sku = (product.sku || '').toLowerCase();
+    const name = (product.name || '').toLowerCase();
+    const brand = (product.brand || '').toLowerCase();
+    let score = 0;
+
+    // SKU 完全匹配（最高优先级）
+    if (sku === searchTerm) {
+      score = 100;
+    } else if (sku.startsWith(searchTerm)) {
+      // SKU 开头匹配
+      score = 80;
+    } else if (sku.includes(searchTerm)) {
+      // SKU 包含匹配
+      score = 60;
+    } else if (name.includes(searchTerm)) {
+      // 产品名称包含匹配
+      score = 40;
+    } else if (brand.includes(searchTerm)) {
+      // 品牌包含匹配
+      score = 20;
+    }
+
+    // 辅助低优先级匹配（specification / supplier）
+    if (score === 0) {
+      const spec = (product.specification || '').toLowerCase();
+      const supplier = (product.supplier || '').toLowerCase();
+      if (spec.includes(searchTerm) || supplier.includes(searchTerm)) {
+        score = 10;
+      }
+    }
+
+    if (score > 0) {
+      scored.push({ product, score });
+    }
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map(item => item.product);
+};
+
+/**
  * 筛选产品列表（含 SKU 优先级搜索、库位筛选、品牌筛选）
  *
  * 搜索优先级：
@@ -71,50 +130,9 @@ export const filterProducts = (
     filtered = filtered.filter(product => product.brand === brand);
   }
 
-  // 6. 按关键词搜索（支持 SKU 优先级排序）
+  // 6. 按关键词搜索（复用 searchProducts 评分排序）
   if (keyword.trim()) {
-    const searchTerm = keyword.trim().toLowerCase();
-
-    // 对每个匹配的产品计算匹配分数
-    const scored = [];
-
-    for (const product of filtered) {
-      const sku = (product.sku || '').toLowerCase();
-      const name = (product.name || '').toLowerCase();
-      let score = 0;
-
-      // SKU 完全匹配（最高优先级）
-      if (sku === searchTerm) {
-        score = 100;
-      } else if (sku.startsWith(searchTerm)) {
-        // SKU 开头匹配
-        score = 80;
-      } else if (sku.includes(searchTerm)) {
-        // SKU 包含匹配
-        score = 60;
-      } else if (name.includes(searchTerm)) {
-        // 产品名称包含匹配
-        score = 40;
-      }
-
-      // 辅助字段可选匹配（优先级低于 SKU 和名称）
-      if (score === 0) {
-        const brand = (product.brand || '').toLowerCase();
-        const spec = (product.specification || '').toLowerCase();
-        const supplier = (product.supplier || '').toLowerCase();
-        if (brand.includes(searchTerm) || spec.includes(searchTerm) || supplier.includes(searchTerm)) {
-          score = 20;
-        }
-      }
-
-      if (score > 0) {
-        scored.push({ product, score });
-      }
-    }
-
-    // 按分数降序排列，然后返回产品数组
-    scored.sort((a, b) => b.score - a.score);
-    return scored.map(item => item.product);
+    return searchProducts(filtered, keyword);
   }
 
   // 无搜索关键词时：按最近更新/新增靠前排列

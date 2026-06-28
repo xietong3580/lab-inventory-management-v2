@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { transactionService, productService } from '../services/dataService';
 import { exportTransactionsToCSV } from '../utils/exportHelpers';
+import { searchProducts } from '../utils/productFilterHelpers';
 import { usePermission } from '../hooks/usePermission';
 
 // 类型标签组件
@@ -72,6 +73,12 @@ function Transactions() {
   const [isSaving, setIsSaving] = useState(false);
   const [isReversing, setIsReversing] = useState(false);
   const [actionMessage, setActionMessage] = useState(null); // { type: 'success'|'error', text: '...' }
+
+  // 产品搜索选择器状态
+  const [productSearchTerm, setProductSearchTerm] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState(null); // 完整产品对象
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const productSearchRef = useRef(null); // 搜索输入框 ref，用于失焦处理
 
   // 筛选选项
   const typeOptions = ['all', '入库', '出库'];
@@ -213,6 +220,12 @@ function Transactions() {
     setCurrentPage(1);
   }, [selectedTimeRange, selectedType, selectedStatus, searchTerm, dateRange]);
 
+  // 产品搜索匹配结果（出入库弹窗内使用）
+  const productSearchResults = useMemo(() => {
+    if (!productSearchTerm.trim()) return [];
+    return searchProducts(products, productSearchTerm);
+  }, [products, productSearchTerm]);
+
   // 分页计算
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -252,12 +265,18 @@ function Transactions() {
       notes: ''
     });
     setFormError('');
+    setProductSearchTerm('');
+    setSelectedProduct(null);
+    setShowProductDropdown(false);
     setIsModalOpen(true);
   };
 
   // 关闭新增记录模态框
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setProductSearchTerm('');
+    setSelectedProduct(null);
+    setShowProductDropdown(false);
   };
 
   // 打开交易详情弹窗（只读，admin 和 viewer 均可使用）
@@ -277,6 +296,54 @@ function Transactions() {
       ...prev,
       [name]: value
     }));
+  };
+
+  // 产品搜索输入变化
+  const handleProductSearchChange = (e) => {
+    const value = e.target.value;
+    setProductSearchTerm(value);
+    // 用户开始输入时清除之前选中、显示下拉
+    if (selectedProduct) {
+      setSelectedProduct(null);
+      setFormData(prev => ({ ...prev, productId: '' }));
+    }
+    setShowProductDropdown(true);
+    setFormError('');
+  };
+
+  // 选中搜索结果中的产品
+  const handleSelectProduct = (product) => {
+    setSelectedProduct(product);
+    setFormData(prev => ({ ...prev, productId: product.id }));
+    setProductSearchTerm('');
+    setShowProductDropdown(false);
+    setFormError('');
+  };
+
+  // 清除已选产品（小 x 按钮）
+  const handleClearSelectedProduct = () => {
+    setSelectedProduct(null);
+    setFormData(prev => ({ ...prev, productId: '' }));
+    setProductSearchTerm('');
+  };
+
+  // 产品搜索键盘处理
+  const handleProductSearchKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      // Esc：关闭下拉
+      setShowProductDropdown(false);
+      return;
+    }
+    if (e.key === 'Enter' && productSearchResults.length > 0) {
+      // Enter：选中排序第一的结果
+      e.preventDefault();
+      handleSelectProduct(productSearchResults[0]);
+    }
+  };
+
+  // 搜索输入框失焦：延迟关闭下拉（让 onClick 有机会触发）
+  const handleProductSearchBlur = () => {
+    setTimeout(() => setShowProductDropdown(false), 150);
   };
 
   // 表单提交 - 新增交易记录
@@ -400,12 +467,6 @@ function Transactions() {
       return timestamp;
     }
   };
-
-  // 获取产品选择选项
-  const productOptions = products.map(product => ({
-    value: product.id,
-    label: `${product.name} (${product.sku}) - 当前库存: ${product.currentStock} ${product.unit}`
-  }));
 
   return (
     <div className="p-4 md:p-6">
@@ -949,24 +1010,134 @@ function Transactions() {
                   </div>
                 )}
 
-                {/* 产品选择 */}
+                {/* 产品搜索选择器 */}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">
                     产品 *
                   </label>
-                  <select
-                    name="productId"
-                    value={formData.productId}
-                    onChange={handleFormChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
-                  >
-                    <option value="">请选择产品</option>
-                    {productOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  {/* 搜索输入框 */}
+                  <div className="relative">
+                    <input
+                      ref={productSearchRef}
+                      type="text"
+                      value={selectedProduct ? `${selectedProduct.name} (${selectedProduct.sku || ''})` : productSearchTerm}
+                      onChange={handleProductSearchChange}
+                      onKeyDown={handleProductSearchKeyDown}
+                      onFocus={() => {
+                        if (productSearchTerm.trim() && productSearchResults.length > 0) {
+                          setShowProductDropdown(true);
+                        }
+                      }}
+                      onBlur={handleProductSearchBlur}
+                      placeholder="输入货号 / SKU / 产品名称 / 品牌"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white pr-8"
+                      disabled={isSaving}
+                    />
+                    {/* 清除按钮 */}
+                    {selectedProduct && !isSaving && (
+                      <button
+                        type="button"
+                        onClick={handleClearSelectedProduct}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        title="清除已选产品"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+
+                    {/* 搜索结果下拉列表 */}
+                    {showProductDropdown && productSearchTerm.trim() && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-64 overflow-y-auto">
+                        {productSearchResults.length > 0 ? (
+                          productSearchResults.map((product) => (
+                            <button
+                              key={product.id}
+                              type="button"
+                              onClick={() => handleSelectProduct(product)}
+                              className="w-full text-left px-3 py-2.5 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="text-sm font-medium text-slate-800">
+                                    {product.name}
+                                    <span className="text-xs text-slate-500 ml-1.5">({product.sku || '-'})</span>
+                                  </div>
+                                  <div className="text-xs text-slate-500 mt-0.5">
+                                    当前库存：{product.currentStock} {product.unit}
+                                    {product.location ? `｜库位：${product.location}` : ''}
+                                    {product.category ? `｜${product.category}` : ''}
+                                  </div>
+                                </div>
+                                <span className={`shrink-0 ml-3 px-1.5 py-0.5 rounded text-xs font-medium ${
+                                  (product.status === '低库存' || product.currentStock <= product.minStock)
+                                    ? 'bg-amber-50 text-amber-700'
+                                    : 'bg-emerald-50 text-emerald-700'
+                                }`}>
+                                  {product.currentStock <= product.minStock ? '低库存' : '正常'}
+                                </span>
+                              </div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-3 py-3 text-sm text-slate-500 text-center">
+                            未找到匹配产品
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 已选产品信息卡 */}
+                  {selectedProduct && (
+                    <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-md">
+                      <div className="text-xs text-slate-500 mb-2">已选产品</div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                        <div>
+                          <span className="text-slate-500">当前库存：</span>
+                          <span className={`font-medium ${
+                            selectedProduct.currentStock <= selectedProduct.minStock
+                              ? 'text-amber-700'
+                              : 'text-slate-800'
+                          }`}>
+                            {selectedProduct.currentStock} {selectedProduct.unit}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">库存分类：</span>
+                          <span className="font-medium text-slate-800">{selectedProduct.category || '-'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">存储位置：</span>
+                          <span className="font-medium text-slate-800">{selectedProduct.location || '-'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">库存状态：</span>
+                          <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                            selectedProduct.currentStock <= selectedProduct.minStock
+                              ? 'bg-amber-50 text-amber-700'
+                              : 'bg-emerald-50 text-emerald-700'
+                          }`}>
+                            {selectedProduct.currentStock <= selectedProduct.minStock ? '低库存' : '正常'}
+                          </span>
+                        </div>
+                      </div>
+                      {/* 出库操作库存不足即时提示 */}
+                      {formData.type === '出库' && selectedProduct.currentStock < Number(formData.quantity) && (
+                        <div className="mt-2 pt-2 border-t border-slate-200">
+                          <div className="flex items-start">
+                            <svg className="w-4 h-4 text-rose-500 mt-0.5 mr-1.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                            </svg>
+                            <span className="text-xs text-rose-700">
+                              库存不足，当前库存 {selectedProduct.currentStock} {selectedProduct.unit}，无法满足出库数量
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* 交易类型和数量 */}
