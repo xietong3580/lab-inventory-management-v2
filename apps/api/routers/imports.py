@@ -7,7 +7,6 @@ Step 9-5B：后端 CSV 正式导入执行接口
 import csv
 import io
 import json
-import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -591,6 +590,10 @@ def _parse_and_validate_csv(
                     row_results[ri]["errors"].append(msg)
 
     # ── 9. 数据库已有 SKU 检查（只读查询）───────────────────
+    # Step 9-5E-fix：DB 已有 SKU 不是阻断 error，
+    # create_only 模式下正式导入时将直接 skipped，不覆盖原数据。
+    # 预览阶段标记为 warning，不阻断正式导入按钮。
+    db_existing_msgs: List[str] = []
     if csv_skus:
         existing = db.query(Product).filter(
             Product.sku.in_(list(csv_skus.keys()))
@@ -602,22 +605,32 @@ def _parse_and_validate_csv(
             if prod is not None:
                 msg = (
                     f"SKU '{sku}' 已存在于数据库中"
-                    f"（产品 ID: prod-{prod.id:06d}，名称: {prod.name}）"
+                    f"（产品 ID: prod-{prod.id:06d}，名称: {prod.name}），"
+                    f"正式导入时将跳过，不会覆盖原数据。"
                 )
-                global_errors.append(msg)
+                db_existing_msgs.append(msg)
                 for rn in row_nums:
                     ri = rn - 2
-                    if ri < len(row_results) and msg not in row_results[ri]["errors"]:
-                        row_results[ri]["errors"].append(msg)
+                    if ri < len(row_results) and msg not in row_results[ri]["warnings"]:
+                        row_results[ri]["warnings"].append(msg)
+                        # 如果该行原本 status=='valid' 且现在有 warning，
+                        # 将状态更新为 'warning'
+                        if row_results[ri]["status"] == "valid":
+                            row_results[ri]["status"] = "warning"
 
     # ── 10. 最终统计 ────────────────────────────────────────
     total = len(row_results)
+    # 注意：DB 已有 SKU 已从 error 移到 warning，err_cnt 只统计真正的阻断错误
     err_cnt = sum(1 for r in row_results if r["errors"])
     warn_cnt = sum(1 for r in row_results if r["warnings"] and not r["errors"])
     valid_cnt = total - err_cnt
 
     # ── 11. 全局提示 ────────────────────────────────────────
     global_warnings: List[str] = []
+
+    # 将 DB 已有 SKU 提示追加到全局 warnings（不阻断导入）
+    if db_existing_msgs:
+        global_warnings.extend(db_existing_msgs)
 
     # 库存口径确认 warning（仅当使用通用库存字段时）
     if not stock_caliber_is_explicit and "current_stock" in field_headers:
@@ -855,32 +868,20 @@ async def execute_products_import(
             "detail": f"CSV 解析失败: {exc}",
         }
 
-    # ── 4. 分离真实 error 与 DB-已存在 SKU 提示 ─────────────
-    # 注意：_parse_and_validate_csv 将 DB 已有 SKU 归为 global_errors，
-    # 但在 create_only 模式下它们应被视为 warning（不阻止导入）。
-    real_errors: List[str] = []
-    db_existing_warnings: List[str] = []
-    db_existing_sku_set: set = set()
+    # ── 4. 判断是否有真实阻断错误 ─────────────────────────────
+    # Step 9-5E-fix：_parse_and_validate_csv 已将 DB 已有 SKU 归为 warning，
+    # 不再出现在 global_errors 或行级 errors 中。
+    # 这里只需要检查是否还存在真正的阻断错误。
+    real_errors: List[str] = list(preview.get("errors", []))
 
-    for err in preview.get("errors", []):
-        if "已存在于数据库中" in err:
-            db_existing_warnings.append(err)
-            m = re.search(r"SKU '([^']+)' 已存在于数据库中", err)
-            if m:
-                db_existing_sku_set.add(m.group(1))
-        else:
-            real_errors.append(err)
-
-    # ── 5. 行级校验：区分真实 error 和 DB-已存在 ──────────────
     has_real_row_error = False
     all_real_row_errors: List[str] = []
     for row in preview.get("rows", []):
         for e in row.get("errors", []):
-            if "已存在于数据库中" not in e:
-                has_real_row_error = True
-                all_real_row_errors.append(
-                    f"第 {row['row_number']} 行：{e}"
-                )
+            has_real_row_error = True
+            all_real_row_errors.append(
+                f"第 {row['row_number']} 行：{e}"
+            )
 
     if real_errors or has_real_row_error:
         combined_errors = real_errors + all_real_row_errors
@@ -893,11 +894,11 @@ async def execute_products_import(
             "total_rows": preview.get("total_rows", 0),
             "created_count": 0,
             "skipped_count": 0,
-            "warning_count": len(db_existing_warnings),
+            "warning_count": len(preview.get("warnings", [])),
             "error_count": len(combined_errors),
             "created_items": [],
             "skipped_items": [],
-            "warnings": db_existing_warnings + preview.get("warnings", []),
+            "warnings": preview.get("warnings", []),
             "errors": combined_errors,
             "detail": (
                 f"导入失败：存在 {len(combined_errors)} 个阻断性错误"
@@ -923,18 +924,15 @@ async def execute_products_import(
     # ── 7. 分类行：create 或 skip ────────────────────────────
     to_create: List[Dict[str, Any]] = []
     skipped_items: List[Dict[str, Any]] = []
-    all_warnings: List[str] = (
-        list(db_existing_warnings) + preview.get("warnings", [])
-    )
+    all_warnings: List[str] = list(preview.get("warnings", []))
 
     for row in rows:
         row_errors = row.get("errors", [])
-        real_row_errs = [e for e in row_errors if "已存在于数据库中" not in e]
         norm = row.get("normalized", {})
         sku = norm.get("sku")
 
-        if real_row_errs:
-            # 不会走到这里（已在步骤 5 拦截），保留防御
+        if row_errors:
+            # 不会走到这里（已在步骤 4 拦截），保留防御
             continue
 
         if sku and sku in existing_skus_in_db:

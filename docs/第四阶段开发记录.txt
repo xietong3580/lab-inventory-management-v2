@@ -958,3 +958,98 @@ Step 9-5D 完成安全收口：按钮禁用原因动态化，新增 4 条上下�
 （成功/跳过/警告/失败），导入成功后 Link 跳转产品页，新增端到端验收清单。
 未改后端、未改口径、未改权限、viewer 仍不可导入。npm run build ✅。
 ====================================
+
+开发记录简版
+
+功能名称：Step 9-5E-fix：统一重复 SKU 预览口径，修复 AuditLog 批量导入显示重叠
+
+本轮目标
+Step 9-5E 人工验收发现两个问题：
+1. 重复导入同一 CSV 时，预览阶段把"数据库已存在 SKU"当成 error，导致正式导入按钮禁用
+2. AuditLog 页面 PRODUCTS_CSV_IMPORT 显示文字过长，与产品列重叠
+
+修复问题 1：统一预览与正式导入口径
+
+问题原因
+_parse_and_validate_csv() 在第 9 步将 DB 已有 SKU 归类为 global_errors 和行级 errors，
+导致 can_import=false，正式导入按钮被禁用。但 create_only 模式下"DB 已存在"应视为
+预期要 skipped 的场景，不应阻断导入。
+
+修复内容 (apps/api/routers/imports.py)
+- 第 9 步：DB 已有 SKU 从 global_errors 改为收集到 db_existing_msgs，追加到行级 warnings
+  （而非 errors），文案明确提示"正式导入时将跳过，不会覆盖原数据"
+- 行级 status 从 valid 更新为 warning（如果原本无其他错误）
+- 第 10 步：统计不变，err_cnt 不再计入 DB-已存在行
+- 第 11 步：db_existing_msgs 追加到 global_warnings
+- 移除不再使用的 import re
+- execute 路由步骤 4、5、7 简化：移除已冗余的 DB-已存在关键词匹配逻辑
+  直接依赖 _parse_and_validate_csv 已修正的输出
+
+修复问题 2：AuditLog 显示重叠
+
+问题原因
+actionTypeMap 缺少 PRODUCTS_CSV_IMPORT 映射，RAW 值 "PRODUCTS_CSV_IMPORT" 过长挤压相邻列。
+
+修复内容 (src/utils/auditLogHelpers.js)
+- actionTypeMap 新增 PRODUCTS_CSV_IMPORT → { label: '批量导入', color: 'bg-slate-100 text-slate-700 border border-slate-300' }
+- generateAuditSummary 新增 PRODUCTS_CSV_IMPORT 分支：
+  摘要文案 "通过 CSV 批量导入产品：{productName}"
+
+前端额外优化 (src/pages/ProductImportPreview.jsx)
+- 新增"全跳过"场景提示（created_count=0, skipped_count>0）：
+  "所有 SKU 均已存在，本次导入无新增产品"
+- "部分跳过"提示条件收紧为 skipped_count>0 且 created_count>0
+
+修改文件
+- apps/api/routers/imports.py（后端核心修复）
+- src/utils/auditLogHelpers.js（AuditLog 显示修复）
+- src/pages/ProductImportPreview.jsx（前端跳过提示）
+- docs/第四阶段开发记录.txt（本文件）
+
+是否修改后端：是（imports.py 预览 + execute 路由简化）
+是否改变正式导入业务逻辑：否
+- create_only 模式不变
+- 不覆盖已存在 SKU 不变
+- 库存口径不变
+- 事务写入逻辑不变
+
+重复 SKU 口径
+- CSV 内部重复 SKU：仍为 error，阻断导入 ✓
+- 缺少 P0 字段 / 值为空 / 数值非法：仍为 error，阻断导入 ✓
+- DB 已存在 SKU：warning，不阻断导入，正式导入时 skipped ✓
+- 预览统计：DB 已存在 SKU 不计入 error_rows，计入 warning_rows ✓
+- can_import：无真正阻断错误时为 true ✓
+
+AuditLog 显示修复
+- PRODUCTS_CSV_IMPORT → 显示为"批量导入"（带 border 样式）
+- 产品列正常显示"批量导入 N 个产品"（已有 truncate）
+- 摘要列显示"通过 CSV 批量导入产品：批量导入 N 个产品"
+- 不再发生文字重叠
+
+库存口径是否保持：是
+权限边界是否保持：是
+
+测试结果
+- npm run build ✅
+- python -m compileall apps/api ✅
+- ESLint 本轮修改文件 0 errors
+- 逻辑自检：
+  1. 重复导入已导入过的 CSV → 预览阶段无阻断 error ✓
+  2. DB 已有 SKU 显示 warning → can_import=true ✓
+  3. 正式导入后 created_count=0, skipped_count=3 ✓
+  4. 原产品数据不被覆盖 ✓
+  5. AuditLog 中 PRODUCTS_CSV_IMPORT → 显示"批量导入" ✓
+  6. 新增全跳过场景专属提示 ✓
+  7. CSV 内部重复 SKU 仍阻断 ✓
+  8. 缺少 P0 字段仍阻断 ✓
+  9. viewer 仍不可导入 ✓
+
+Git 状态：待提交
+下一步建议：再次端到端验收，确认重复导入 SKU 流程正常
+
+开发记录简版
+Step 9-5E-fix 修复两个问题：(1) 后端 _parse_and_validate_csv 将 DB 已有 SKU
+从 error 移至 warning，预览口径与 create_only 正式导入口径统一；(2) 新增
+PRODUCTS_CSV_IMPORT 中文映射"批量导入"，修复 AuditLog 文字重叠。
+未改口径、未改权限、未改事务逻辑。npm run build ✅。
+====================================

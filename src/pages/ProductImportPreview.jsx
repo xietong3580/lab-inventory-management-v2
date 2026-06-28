@@ -1035,7 +1035,19 @@ function ProductImportPreview() {
                   </div>
                 )}
 
-                {executeResult.skipped_count > 0 && (
+                {executeResult.success && executeResult.created_count === 0 && executeResult.skipped_count > 0 && (
+                  <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                    <div className="text-sm text-amber-700 flex items-start gap-2">
+                      <span className="text-amber-500 mt-0.5 shrink-0">⚠</span>
+                      <span>
+                        <strong>所有 SKU 均已存在，本次导入无新增产品。</strong>
+                        {' '}共 {executeResult.skipped_count} 条均已跳过，原产品数据保持不变。
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {executeResult.skipped_count > 0 && executeResult.created_count > 0 && (
                   <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
                     <div className="text-sm text-amber-700 flex items-start gap-2">
                       <span className="text-amber-500 mt-0.5 shrink-0">⚠</span>

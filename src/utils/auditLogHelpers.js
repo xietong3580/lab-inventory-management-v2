@@ -7,7 +7,8 @@ export const actionTypeMap = {
   PRODUCT_DELETE: { label: '删除产品', color: 'bg-rose-50 text-rose-700' },
   TRANSACTION_ADD: { label: '出入库', color: 'bg-slate-50 text-slate-700' },
   TRANSACTION_REVERSE: { label: '撤销交易', color: 'bg-amber-50 text-amber-700' },
-  SYSTEM_RESET: { label: '系统重置', color: 'bg-violet-50 text-violet-700' }
+  SYSTEM_RESET: { label: '系统重置', color: 'bg-violet-50 text-violet-700' },
+  PRODUCTS_CSV_IMPORT: { label: '批量导入', color: 'bg-slate-100 text-slate-700 border border-slate-300' }
 };
 
 /**
@@ -67,6 +68,10 @@ export const generateAuditSummary = (log, compact = false) => {
       return compact ? `撤销交易` : `撤销交易「${productName || '未知产品'}」相关记录`;
     case 'SYSTEM_RESET':
       return `系统数据已重置`;
+    case 'PRODUCTS_CSV_IMPORT':
+      return compact
+        ? `通过 CSV 批量导入 ${log.productName || '产品'}`
+        : `通过 CSV 批量导入产品：「${log.productName || '未知'}」`;
     default:
       return `${actionLabel}操作`;
   }
