@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { productService as dataProductService } from '../services/dataService';
 import { getProductsWithCalculatedStatus, calculateProductStatus, updateProduct, addProduct, deleteProduct } from '../services/productService';
 import { getLedgerTypeConfig, formatLedgerTime } from '../utils/inventoryHistoryHelpers';
@@ -58,6 +58,7 @@ function Products() {
   const [selectedBrand, setSelectedBrand] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+  const searchInputRef = useRef(null);
 
   // 是否有活跃筛选条件
   const activeFilters = hasActiveFilters({
@@ -120,6 +121,13 @@ function Products() {
     loadProducts();
   }, []);
 
+  // 页面加载完成后自动聚焦搜索框
+  useEffect(() => {
+    if (!isModalOpen && !ledgerModalOpen && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [isModalOpen, ledgerModalOpen]);
+
   // 当产品数据、搜索词或分类变化时，重新筛选
   useEffect(() => {
     const filtered = filterProducts(
@@ -166,6 +174,10 @@ function Products() {
     setMinStock('');
     setMaxStock('');
     setCurrentPage(1);
+    // 重置后自动聚焦搜索框，方便继续查下一个产品
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 0);
   };
 
   const handleExport = () => {
@@ -454,10 +466,17 @@ function Products() {
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
           {/* 搜索框 */}
           <input
+            ref={searchInputRef}
             type="text"
             placeholder="搜索货号 / SKU / 产品名称"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                setCurrentPage(1);
+              }
+            }}
             className="w-full sm:w-64 px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
           />
 

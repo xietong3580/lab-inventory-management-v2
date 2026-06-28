@@ -117,7 +117,29 @@ export const filterProducts = (
     return scored.map(item => item.product);
   }
 
+  // 无搜索关键词时：按最近更新/新增靠前排列
+  sortProductsByRecent(filtered);
+
   return filtered;
+};
+
+/**
+ * 按最近更新/新增靠前排序（原地排序）
+ *
+ * 优先使用 updatedAt，其次 createdAt。
+ * 如果字段都不存在，保持原有顺序，避免异常。
+ *
+ * @param {Array} products - 产品数组
+ */
+const sortProductsByRecent = (products) => {
+  products.sort((a, b) => {
+    const aTime = a.updatedAt || a.createdAt || '';
+    const bTime = b.updatedAt || b.createdAt || '';
+    if (!aTime && !bTime) return 0;
+    if (!aTime) return 1;
+    if (!bTime) return -1;
+    return (bTime > aTime ? 1 : bTime < aTime ? -1 : 0);
+  });
 };
 
 /**
