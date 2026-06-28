@@ -320,7 +320,8 @@ function Transactions() {
     }
     setSelectedProduct(product);
     setFormData(prev => ({ ...prev, productId: product.id }));
-    setProductSearchTerm('');
+    // 更新搜索词为已选产品显示文本，确保信息卡和输入框双重保障
+    setProductSearchTerm(`${product.name} (${product.sku || ''})`);
     setShowProductDropdown(false);
     setFormError('');
   };
@@ -357,9 +358,13 @@ function Transactions() {
 
     if (!canWrite || isSaving) return; // viewer 不可提交，防重复提交
 
-    // 基础校验
+    // 基础校验 — 区分"未操作"与"输入了但未选中"
     if (!formData.productId) {
-      setFormError('请选择产品');
+      if (productSearchTerm.trim()) {
+        setFormError('请先从搜索结果中选择产品');
+      } else {
+        setFormError('请选择产品');
+      }
       return;
     }
     if (!formData.quantity || formData.quantity <= 0) {
