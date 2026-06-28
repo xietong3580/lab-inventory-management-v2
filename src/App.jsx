@@ -9,6 +9,7 @@ import Alerts from './pages/Alerts';
 import Users from './pages/Users';
 import AuditLog from './pages/AuditLog';
 import Settings from './pages/Settings';
+import ProductImportPreview from './pages/ProductImportPreview';
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
             <Route path="users" element={<Users />} />
             <Route path="audit-log" element={<AuditLog />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="import-preview" element={<ProductImportPreview />} />
           </Route>
 
           {/* 默认重定向到登录页 */}

@@ -12,6 +12,7 @@ function Sidebar({ closeSidebar }) {
     { id: 'alerts', label: '低库存预警', path: '/alerts' },
     { id: 'users', label: '用户管理', path: '/users' },
     { id: 'audit-log', label: '操作日志', path: '/audit-log' },
+    { id: 'import-preview', label: '导入预览', path: '/import-preview' },
     { id: 'settings', label: '系统设置', path: '/settings' },
   ];
 
