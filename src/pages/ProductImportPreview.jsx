@@ -1,15 +1,13 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { usePermission } from '../hooks/usePermission';
 import {
   previewProductImport,
   validateImportFile,
   formatFileSize,
-  MAX_FILE_SIZE,
 } from '../services/importService';
 
 /**
  * 行状态标签组件
- * 保持项目黑白灰风格，仅做低调区分
  */
 function RowStatusBadge({ status }) {
   const config = {
@@ -27,22 +25,60 @@ function RowStatusBadge({ status }) {
 }
 
 /**
- * 库存口径提示标签
+ * 库存口径上下文展示组件
+ * 显示 inventory_context 中所有有值的字段
  */
-function InventoryContextBadge({ context }) {
-  if (!context) return <span className="text-xs text-slate-400">-</span>;
+const INVENTORY_CONTEXT_FIELDS = [
+  { key: 'remote_stock', label: '异地库存' },
+  { key: 'virtual_stock', label: '虚拟库存' },
+  { key: 'available_stock', label: '可售库存' },
+  { key: 'total_stock', label: '总库存' },
+  { key: 'stock_note', label: '库存说明' },
+  { key: 'stock_source', label: '库存来源' },
+  { key: 'stock_type', label: '库存类型' },
+  { key: 'stock_location', label: '库存地点' },
+];
 
-  const parts = [];
-  if (context.stock_source) parts.push(context.stock_source);
-  if (context.stock_type) parts.push(context.stock_type);
+function InventoryContextCell({ context }) {
+  if (!context || typeof context !== 'object') {
+    return <span className="text-xs text-slate-400">-</span>;
+  }
 
-  if (parts.length === 0) return <span className="text-xs text-slate-400">-</span>;
+  const entries = INVENTORY_CONTEXT_FIELDS
+    .map(({ key, label }) => {
+      const val = context[key];
+      if (val === undefined || val === null || val === '') return null;
+      return { key, label, value: String(val) };
+    })
+    .filter(Boolean);
+
+  if (entries.length === 0) {
+    return <span className="text-xs text-slate-400">-</span>;
+  }
 
   return (
-    <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-xs rounded border border-slate-200">
-      {parts.join(' · ')}
-    </span>
+    <div className="space-y-0.5">
+      {entries.map(({ key, label, value }) => (
+        <div key={key} className="text-xs" title={`${label}: ${value}`}>
+          <span className="text-slate-500">{label}</span>
+          <span className="text-slate-800 ml-1">{value}</span>
+        </div>
+      ))}
+    </div>
   );
+}
+
+/**
+ * 判断 warning 文本是否包含库存口径相关关键词
+ */
+const STOCK_CALIBER_KEYWORDS = [
+  '库存口径', '异地', '虚拟', '总可售', '本地真实库存', 'current_stock',
+  '库存字段', '库存来源', '库存说明', '库存类型', '库存地点',
+  '不保存该字段', '不能自动', '暂不保存', '仅供预览',
+];
+
+function hasStockCaliberKeyword(text) {
+  return STOCK_CALIBER_KEYWORDS.some((kw) => text.includes(kw));
 }
 
 function ProductImportPreview() {
@@ -57,7 +93,6 @@ function ProductImportPreview() {
   const [previewResult, setPreviewResult] = useState(null);
   const [apiError, setApiError] = useState('');
 
-  // 文件输入 ref
   const fileInputRef = useRef(null);
 
   /**
@@ -121,28 +156,51 @@ function ProductImportPreview() {
     }
   };
 
-  // 从预览结果中提取数据
-  const preview = previewResult?.preview;
-  const stats = preview
+  // ── 从 previewResult（顶层字段）提取数据 ──────────────────
+  const stats = previewResult && previewResult.total_rows !== undefined
     ? {
-        total: preview.total_rows ?? 0,
-        valid: preview.valid_rows ?? 0,
-        error: preview.error_rows ?? 0,
-        warning: preview.warning_rows ?? 0,
-        canImport: preview.can_import ?? false,
+        total: previewResult.total_rows ?? 0,
+        valid: previewResult.valid_rows ?? 0,
+        error: previewResult.error_rows ?? 0,
+        warning: previewResult.warning_rows ?? 0,
+        canImport: previewResult.can_import ?? false,
       }
     : null;
 
-  const fields = preview
+  const columns = previewResult?.columns ?? null;
+  const fields = columns
     ? {
-        p0: preview.recognized_p0 ?? [],
-        p1: preview.recognized_p1 ?? [],
-        p2: preview.recognized_p2 ?? [],
-        ignored: preview.ignored ?? [],
+        p0: Array.isArray(columns.recognized_p0) ? columns.recognized_p0 : [],
+        p1: Array.isArray(columns.recognized_p1) ? columns.recognized_p1 : [],
+        p2: Array.isArray(columns.recognized_p2) ? columns.recognized_p2 : [],
+        ignored: Array.isArray(columns.ignored) ? columns.ignored : [],
       }
     : null;
 
-  const rows = preview?.rows ?? [];
+  const rows = Array.isArray(previewResult?.rows) ? previewResult.rows : [];
+  const globalErrors = Array.isArray(previewResult?.errors) ? previewResult.errors : [];
+  const globalWarnings = Array.isArray(previewResult?.warnings) ? previewResult.warnings : [];
+
+  // 库存口径相关 warning 过滤
+  const stockCaliberWarnings = useMemo(
+    () => globalWarnings.filter(hasStockCaliberKeyword),
+    [globalWarnings],
+  );
+  const otherGlobalWarnings = useMemo(
+    () => globalWarnings.filter((w) => !hasStockCaliberKeyword(w)),
+    [globalWarnings],
+  );
+
+  // 检查任一行是否有 inventory_context 非空
+  const hasInventoryContext = useMemo(
+    () => rows.some(
+      (r) => r.inventory_context && typeof r.inventory_context === 'object'
+        && Object.keys(r.inventory_context).some(
+          (k) => r.inventory_context[k] !== null && r.inventory_context[k] !== ''
+        ),
+    ),
+    [rows],
+  );
 
   return (
     <div className="p-4 md:p-6">
@@ -278,7 +336,7 @@ function ProductImportPreview() {
               )}
             </button>
 
-            {/* 正式导入按钮 — 禁用，不绑定任何导入请求 */}
+            {/* 正式导入按钮 — 始终禁用 */}
             <button
               disabled
               className="px-6 py-2.5 bg-slate-100 text-slate-400 rounded-md cursor-not-allowed font-medium border border-slate-200"
@@ -297,10 +355,24 @@ function ProductImportPreview() {
         </div>
       )}
 
-      {/* 预览结果 */}
+      {/* ================================================================ */}
+      {/* 预览结果 — 当 previewResult 存在且无 API 错误时始终展示 */}
+      {/* ================================================================ */}
       {previewResult && !apiError && (
         <>
-          {/* 统计卡片 */}
+          {/* 文件信息横幅 */}
+          <div className="mb-6 p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+            <span className="text-slate-500">
+              文件: <span className="text-slate-800 font-medium font-mono">{previewResult.filename ?? '-'}</span>
+            </span>
+            {previewResult.encoding && (
+              <span className="text-slate-500">
+                编码: <span className="text-slate-800 font-medium">{previewResult.encoding}</span>
+              </span>
+            )}
+          </div>
+
+          {/* ── 统计卡片 ── */}
           {stats && (
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-slate-800 mb-3">预览统计</h2>
@@ -328,115 +400,182 @@ function ProductImportPreview() {
                   </div>
                 </div>
               </div>
+
+              {/* can_import 状态提示 */}
+              {stats.canImport === false && (
+                <div className="mt-3 p-3 bg-rose-50 border border-rose-200 rounded-md">
+                  <span className="text-sm text-rose-700">
+                    当前 CSV 存在阻断错误，不能进入正式导入。
+                  </span>
+                  <span className="text-sm text-rose-600 ml-1">正式导入功能暂未开放。</span>
+                </div>
+              )}
+              {stats.canImport === true && (
+                <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-md">
+                  <span className="text-sm text-slate-600">
+                    当前 CSV 通过预览校验，但正式导入功能暂未开放。
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
-          {/* 字段识别 */}
-          {fields && (
+          {/* ── 全局错误 ── */}
+          {globalErrors.length > 0 && (
             <div className="mb-6">
-              <h2 className="text-lg font-semibold text-slate-800 mb-3">字段识别结果</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* P0: 当前可落库字段 */}
-                <div className="bg-white border border-slate-200 rounded-lg">
-                  <div className="px-4 py-3 border-b border-slate-100">
-                    <div className="flex items-center gap-2">
-                      <span className="px-1.5 py-0.5 bg-slate-700 text-white text-xs rounded font-medium">P0</span>
-                      <span className="text-sm font-medium text-slate-800">可落库字段</span>
-                    </div>
-                    <span className="text-xs text-slate-500">当前阶段可直接写入数据库</span>
+              <h2 className="text-lg font-semibold text-slate-800 mb-3">
+                全局错误
+                <span className="text-sm font-normal text-slate-500 ml-2">{globalErrors.length} 条</span>
+              </h2>
+              <div className="bg-white border border-rose-200 rounded-lg p-4 space-y-1.5">
+                {globalErrors.map((err, i) => (
+                  <div key={i} className="text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded px-3 py-2">
+                    {err}
                   </div>
-                  <div className="p-4">
-                    {fields.p0.length > 0 ? (
-                      <div className="flex flex-wrap gap-1.5">
-                        {fields.p0.map((f) => (
-                          <span key={f} className="px-2 py-1 bg-slate-100 text-slate-700 text-xs rounded border border-slate-200">
-                            {f}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-400">无</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* P1: 已识别暂不保存 */}
-                <div className="bg-white border border-slate-200 rounded-lg">
-                  <div className="px-4 py-3 border-b border-slate-100">
-                    <div className="flex items-center gap-2">
-                      <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded font-medium border border-amber-200">P1</span>
-                      <span className="text-sm font-medium text-slate-800">暂不保存字段</span>
-                    </div>
-                    <span className="text-xs text-slate-500">已识别但当前阶段不写入</span>
-                  </div>
-                  <div className="p-4">
-                    {fields.p1.length > 0 ? (
-                      <div className="flex flex-wrap gap-1.5">
-                        {fields.p1.map((f) => (
-                          <span key={f} className="px-2 py-1 bg-amber-50 text-amber-700 text-xs rounded border border-amber-200">
-                            {f}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-400">无</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* P2: 仅供参照 */}
-                <div className="bg-white border border-slate-200 rounded-lg">
-                  <div className="px-4 py-3 border-b border-slate-100">
-                    <div className="flex items-center gap-2">
-                      <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-xs rounded font-medium border border-slate-300">P2</span>
-                      <span className="text-sm font-medium text-slate-800">仅供参照字段</span>
-                    </div>
-                    <span className="text-xs text-slate-500">仅用于人工核对，不自动处理</span>
-                  </div>
-                  <div className="p-4">
-                    {fields.p2.length > 0 ? (
-                      <div className="flex flex-wrap gap-1.5">
-                        {fields.p2.map((f) => (
-                          <span key={f} className="px-2 py-1 bg-slate-50 text-slate-600 text-xs rounded border border-slate-200">
-                            {f}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-400">无</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* 忽略字段 */}
-                <div className="bg-white border border-slate-200 rounded-lg">
-                  <div className="px-4 py-3 border-b border-slate-100">
-                    <div className="flex items-center gap-2">
-                      <span className="px-1.5 py-0.5 bg-slate-50 text-slate-500 text-xs rounded font-medium border border-slate-300">-</span>
-                      <span className="text-sm font-medium text-slate-800">忽略字段</span>
-                    </div>
-                    <span className="text-xs text-slate-500">未识别的 CSV 列</span>
-                  </div>
-                  <div className="p-4">
-                    {fields.ignored.length > 0 ? (
-                      <div className="flex flex-wrap gap-1.5">
-                        {fields.ignored.map((f) => (
-                          <span key={f} className="px-2 py-1 bg-slate-50 text-slate-500 text-xs rounded border border-slate-200 line-through">
-                            {f}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-400">无</span>
-                    )}
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* 库存口径提示 */}
-          {rows.some((r) => r.inventory_context && Object.keys(r.inventory_context).length > 0) && (
+          {/* ── 库存口径相关警告（醒目但克制） ── */}
+          {stockCaliberWarnings.length > 0 && (
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <h3 className="text-sm font-semibold text-amber-800 mb-2">
+                库存口径警告
+                <span className="font-normal ml-2">{stockCaliberWarnings.length} 条</span>
+              </h3>
+              <ul className="space-y-1.5">
+                {stockCaliberWarnings.map((w, i) => (
+                  <li key={i} className="text-sm text-amber-700 flex items-start gap-2">
+                    <span className="text-amber-500 mt-0.5 shrink-0">⚠</span>
+                    <span>{w}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* ── 其他全局警告 ── */}
+          {otherGlobalWarnings.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-slate-800 mb-3">
+                全局警告
+                <span className="text-sm font-normal text-slate-500 ml-2">{otherGlobalWarnings.length} 条</span>
+              </h2>
+              <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-1.5">
+                {otherGlobalWarnings.map((w, i) => (
+                  <div key={i} className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded px-3 py-2">
+                    {w}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── 字段识别 ── */}
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold text-slate-800 mb-3">字段识别结果</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* P0: 当前可落库字段 */}
+              <div className="bg-white border border-slate-200 rounded-lg">
+                <div className="px-4 py-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="px-1.5 py-0.5 bg-slate-700 text-white text-xs rounded font-medium">P0</span>
+                    <span className="text-sm font-medium text-slate-800">可落库字段</span>
+                  </div>
+                  <span className="text-xs text-slate-500">当前阶段可直接写入数据库</span>
+                </div>
+                <div className="p-4">
+                  {fields && fields.p0.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {fields.p0.map((f) => (
+                        <span key={f} className="px-2 py-1 bg-slate-100 text-slate-700 text-xs rounded border border-slate-200">
+                          {f}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-400">无</span>
+                  )}
+                </div>
+              </div>
+
+              {/* P1: 已识别暂不保存 */}
+              <div className="bg-white border border-slate-200 rounded-lg">
+                <div className="px-4 py-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded font-medium border border-amber-200">P1</span>
+                    <span className="text-sm font-medium text-slate-800">暂不保存字段</span>
+                  </div>
+                  <span className="text-xs text-slate-500">已识别但当前阶段不写入</span>
+                </div>
+                <div className="p-4">
+                  {fields && fields.p1.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {fields.p1.map((f) => (
+                        <span key={f} className="px-2 py-1 bg-amber-50 text-amber-700 text-xs rounded border border-amber-200">
+                          {f}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-400">无</span>
+                  )}
+                </div>
+              </div>
+
+              {/* P2: 仅供参照 */}
+              <div className="bg-white border border-slate-200 rounded-lg">
+                <div className="px-4 py-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-xs rounded font-medium border border-slate-300">P2</span>
+                    <span className="text-sm font-medium text-slate-800">仅供参照字段</span>
+                  </div>
+                  <span className="text-xs text-slate-500">仅用于人工核对，不自动处理</span>
+                </div>
+                <div className="p-4">
+                  {fields && fields.p2.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {fields.p2.map((f) => (
+                        <span key={f} className="px-2 py-1 bg-slate-50 text-slate-600 text-xs rounded border border-slate-200">
+                          {f}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-400">无</span>
+                  )}
+                </div>
+              </div>
+
+              {/* 忽略字段 */}
+              <div className="bg-white border border-slate-200 rounded-lg">
+                <div className="px-4 py-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="px-1.5 py-0.5 bg-slate-50 text-slate-500 text-xs rounded font-medium border border-slate-300">-</span>
+                    <span className="text-sm font-medium text-slate-800">忽略字段</span>
+                  </div>
+                  <span className="text-xs text-slate-500">未识别的 CSV 列</span>
+                </div>
+                <div className="p-4">
+                  {fields && fields.ignored.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {fields.ignored.map((f) => (
+                        <span key={f} className="px-2 py-1 bg-slate-50 text-slate-500 text-xs rounded border border-slate-200 line-through">
+                          {f}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-400">无</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── 库存口径提醒横幅 ── */}
+          {hasInventoryContext && (
             <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
               <h3 className="text-sm font-semibold text-amber-800 mb-2">库存口径提醒</h3>
               <p className="text-sm text-amber-700">
@@ -447,8 +586,8 @@ function ProductImportPreview() {
             </div>
           )}
 
-          {/* 行级预览表格 */}
-          {rows.length > 0 && (
+          {/* ── 行级预览 ── */}
+          {rows.length > 0 ? (
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-slate-800 mb-3">
                 行级预览
@@ -534,20 +673,14 @@ function ProductImportPreview() {
                             {/* 本地真实库存 */}
                             <td className="px-3 py-3 whitespace-nowrap">
                               <span className="text-sm font-medium text-slate-800">
-                                {n.current_stock !== undefined ? n.current_stock : '-'}
+                                {n.current_stock !== undefined && n.current_stock !== null ? n.current_stock : '-'}
                               </span>
-                              {ctx.remote_stock !== undefined && (
-                                <div className="text-xs text-slate-400 mt-0.5">异地: {ctx.remote_stock}</div>
-                              )}
-                              {ctx.available_stock !== undefined && (
-                                <div className="text-xs text-slate-400">可售: {ctx.available_stock}</div>
-                              )}
                             </td>
 
                             {/* 最低库存 */}
                             <td className="px-3 py-3 whitespace-nowrap">
                               <span className="text-sm text-slate-700">
-                                {n.min_stock !== undefined ? n.min_stock : '-'}
+                                {n.min_stock !== undefined && n.min_stock !== null ? n.min_stock : '-'}
                               </span>
                             </td>
 
@@ -561,30 +694,25 @@ function ProductImportPreview() {
                               <span className="text-sm text-slate-700">{n.location ?? '-'}</span>
                             </td>
 
-                            {/* 库存口径 */}
+                            {/* 库存口径 — 展示所有 inventory_context 字段 */}
                             <td className="px-3 py-3">
-                              <InventoryContextBadge context={ctx} />
-                              {ctx.stock_note && (
-                                <div className="text-xs text-slate-500 mt-0.5 max-w-[200px] truncate" title={ctx.stock_note}>
-                                  {ctx.stock_note}
-                                </div>
-                              )}
+                              <InventoryContextCell context={ctx} />
                             </td>
 
                             {/* 错误/警告 */}
                             <td className="px-3 py-3">
                               <div className="space-y-1">
-                                {row.errors?.map((err, i) => (
+                                {Array.isArray(row.errors) && row.errors.map((err, i) => (
                                   <div key={`e-${i}`} className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded px-2 py-0.5">
                                     {err}
                                   </div>
                                 ))}
-                                {row.warnings?.map((warn, i) => (
+                                {Array.isArray(row.warnings) && row.warnings.map((warn, i) => (
                                   <div key={`w-${i}`} className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-0.5">
                                     {warn}
                                   </div>
                                 ))}
-                                {(!row.errors || row.errors.length === 0) && (!row.warnings || row.warnings.length === 0) && (
+                                {(!Array.isArray(row.errors) || row.errors.length === 0) && (!Array.isArray(row.warnings) || row.warnings.length === 0) && (
                                   <span className="text-xs text-slate-400">-</span>
                                 )}
                               </div>
@@ -597,9 +725,18 @@ function ProductImportPreview() {
                 </div>
               </div>
             </div>
+          ) : (
+            /* 有 previewResult 但无 rows 时的提示 */
+            <div className="mb-6 p-6 bg-white border border-slate-200 rounded-lg text-center">
+              <div className="text-sm text-slate-500">
+                {previewResult?.filename
+                  ? '暂无行级预览数据，请查看上方错误或警告信息。'
+                  : '暂无行级预览数据。'}
+              </div>
+            </div>
           )}
 
-          {/* 底部操作区 */}
+          {/* ── 底部操作区 ── */}
           <div className="mt-8 p-4 md:p-6 bg-white border border-slate-200 rounded-lg">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
@@ -635,7 +772,7 @@ function ProductImportPreview() {
       {/* 底部信息 */}
       <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
         <div className="text-sm text-slate-600">
-          提示：导入预览功能当前仅支持 CSV 格式文件（UTF-8 编码）。
+          提示：导入预览功能支持 UTF-8 / UTF-8 BOM 编码，并兼容 GBK / GB18030 编码的 CSV 文件。
           预览结果仅展示解析和校验信息，不会对系统数据产生任何影响。
           库存数据以本地真实库存为准，低库存预警在导入完成后由系统自动计算。
         </div>
