@@ -70,8 +70,8 @@ export const generateAuditSummary = (log, compact = false) => {
       return `系统数据已重置`;
     case 'PRODUCTS_CSV_IMPORT':
       return compact
-        ? `通过 CSV 批量导入 ${log.productName || '产品'}`
-        : `通过 CSV 批量导入产品：「${log.productName || '未知'}」`;
+        ? `通过 CSV ${log.productName || '批量导入产品'}`
+        : `通过 CSV ${log.productName || '批量导入产品'}`;
     default:
       return `${actionLabel}操作`;
   }
