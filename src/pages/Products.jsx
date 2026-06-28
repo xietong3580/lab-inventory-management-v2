@@ -54,6 +54,8 @@ function Products() {
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [minStock, setMinStock] = useState('');
   const [maxStock, setMaxStock] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState('all');
+  const [selectedBrand, setSelectedBrand] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
@@ -63,7 +65,9 @@ function Products() {
     category: selectedCategory,
     status: selectedStatus,
     minStock,
-    maxStock
+    maxStock,
+    location: selectedLocation,
+    brand: selectedBrand
   });
 
   // 模态框和表单相关状态
@@ -124,7 +128,9 @@ function Products() {
       selectedCategory,
       selectedStatus,
       minStock,
-      maxStock
+      maxStock,
+      selectedLocation,
+      selectedBrand
     );
     setFilteredProducts(filtered);
     // 如果筛选后当前页超出范围，重置到第一页
@@ -132,12 +138,12 @@ function Products() {
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(1);
     }
-  }, [allProducts, searchTerm, selectedCategory, selectedStatus, minStock, maxStock, currentPage, itemsPerPage]);
+  }, [allProducts, searchTerm, selectedCategory, selectedStatus, minStock, maxStock, selectedLocation, selectedBrand, currentPage, itemsPerPage]);
 
   // 当筛选条件变化时，重置到第一页（提供更及时的响应）
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedCategory, selectedStatus, minStock, maxStock]);
+  }, [searchTerm, selectedCategory, selectedStatus, minStock, maxStock, selectedLocation, selectedBrand]);
 
   // 分页计算
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -154,6 +160,8 @@ function Products() {
   const handleReset = () => {
     setSearchTerm('');
     setSelectedCategory('all');
+    setSelectedLocation('all');
+    setSelectedBrand('all');
     setSelectedStatus('all');
     setMinStock('');
     setMaxStock('');
@@ -442,28 +450,80 @@ function Products() {
           </button>
         </div>
 
-        {/* 第二行：搜索与筛选 */}
+        {/* 第二行：搜索与主筛选 */}
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
           {/* 搜索框 */}
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="搜索产品名称或 SKU..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full sm:w-64 px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
-            />
-          </div>
+          <input
+            type="text"
+            placeholder="搜索货号 / SKU / 产品名称"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full sm:w-64 px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+          />
+
+          {/* 品牌筛选 */}
+          <select
+            value={selectedBrand}
+            onChange={(e) => setSelectedBrand(e.target.value)}
+            className="px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+          >
+            <option value="all">全部品牌</option>
+            {(() => {
+              const brands = [...new Set(
+                allProducts
+                  .map(p => p.brand)
+                  .filter(b => b && b.trim() !== '')
+              )].sort();
+              return brands.map(b => (
+                <option key={b} value={b}>{b}</option>
+              ));
+            })()}
+          </select>
 
           {/* 库存分类筛选 */}
           <select
             value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
+            onChange={(e) => {
+              const newCat = e.target.value;
+              setSelectedCategory(newCat);
+              // 切换库存分类时，如果当前库位不属于新分类，自动重置为"全部库位"
+              if (newCat !== 'all' && selectedLocation !== 'all') {
+                const validLocations = getLocationOptionsByCategory(newCat);
+                if (validLocations.length > 0 && !validLocations.includes(selectedLocation)) {
+                  setSelectedLocation('all');
+                }
+              }
+            }}
             className="px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
           >
             {buildCategoryOptions(allProducts).map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
+          </select>
+
+          {/* 库位筛选（随库存分类联动） */}
+          <select
+            value={selectedLocation}
+            onChange={(e) => setSelectedLocation(e.target.value)}
+            className="px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+          >
+            <option value="all">全部库位</option>
+            {(() => {
+              if (selectedCategory === 'all') {
+                // 全部库存分类：展示所有产品中出现的全部库位
+                const allLocations = [...new Set(
+                  allProducts
+                    .map(p => p.location)
+                    .filter(l => l && l.trim() !== '')
+                )].sort();
+                return allLocations.map(loc => (
+                  <option key={loc} value={loc}>{loc}</option>
+                ));
+              }
+              return getLocationOptionsByCategory(selectedCategory).map(loc => (
+                <option key={loc} value={loc}>{loc}</option>
+              ));
+            })()}
           </select>
 
           {/* 操作按钮 */}
@@ -479,7 +539,7 @@ function Products() {
                 onClick={handleReset}
                 className="px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 transition-colors w-full sm:w-auto"
               >
-                清空筛选
+                重置筛选
               </button>
             )}
           </div>
@@ -586,16 +646,18 @@ function Products() {
         ) : filteredProducts.length === 0 ? (
           // 筛选无结果
           <div className="py-12 text-center">
-            <div className="text-slate-500 mb-2">未找到匹配的记录</div>
+            <div className="text-slate-500 mb-2">未找到匹配的产品</div>
             <div className="text-sm text-slate-500 max-w-md mx-auto mb-4">
               当前筛选条件下未找到匹配的产品。请尝试：
             </div>
             <div className="text-sm text-slate-600 max-w-md mx-auto space-y-1">
-              <p>• 调整搜索关键词</p>
+              <p>• 调整搜索关键词（货号 / SKU / 产品名称）</p>
+              <p>• 选择不同的品牌</p>
               <p>• 选择不同的库存分类</p>
+              <p>• 选择不同的存储位置 / 库位</p>
               <p>• 调整库存状态筛选</p>
               <p>• 调整库存数量范围</p>
-              <p>• 清空筛选条件以查看全部产品</p>
+              <p>• 点击"重置筛选"查看全部产品</p>
             </div>
             {activeFilters && (
               <button
