@@ -33,6 +33,7 @@ def init_db():
     print(f"数据库已初始化: {DATABASE_URL}")
     migrate_users()
     migrate_products()
+    migrate_transactions()
 
 def migrate_users():
     """迁移 users 表：检查并逐列添加缺失字段（安全迁移，不删除数据）"""
@@ -85,6 +86,35 @@ def migrate_products():
         if col_name not in existing_columns:
             conn.execute(f"ALTER TABLE products ADD COLUMN {col_name} {col_type}")
             print(f"  [迁移] products 表已添加列: {col_name} ({col_type})")
+
+    conn.commit()
+    conn.close()
+
+
+def migrate_transactions():
+    """迁移 transactions 表：安全添加 product_id 字段（Step 10-4D）
+    使用 ALTER TABLE ADD COLUMN，不删表不丢数据。
+    如果列已存在则跳过。"""
+    import sqlite3
+    import os
+
+    db_path = os.path.join(BASE_DIR, 'inventory.db')
+    if not os.path.exists(db_path):
+        return
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.execute("PRAGMA table_info(transactions)")
+    existing_columns = {row[1] for row in cursor.fetchall()}
+
+    # product_id：关联产品 ID，允许为空以兼容历史交易
+    new_columns = [
+        ("product_id", "INTEGER"),
+    ]
+
+    for col_name, col_type in new_columns:
+        if col_name not in existing_columns:
+            conn.execute(f"ALTER TABLE transactions ADD COLUMN {col_name} {col_type}")
+            print(f"  [迁移] transactions 表已添加列: {col_name} ({col_type})")
 
     conn.commit()
     conn.close()

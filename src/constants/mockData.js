@@ -332,6 +332,7 @@ export const products = [
 export const transactionRecords = [
   {
     id: 'txn-001',
+    productId: 'prod-001',
     productName: '离心管 50mL',
     type: '出库',
     quantity: 120,
@@ -343,6 +344,7 @@ export const transactionRecords = [
   },
   {
     id: 'txn-002',
+    productId: 'prod-002',
     productName: '移液器吸头 (10µL)',
     type: '入库',
     quantity: 500,
@@ -354,6 +356,7 @@ export const transactionRecords = [
   },
   {
     id: 'txn-003',
+    productId: 'prod-003',
     productName: 'PCR 板 (96孔)',
     type: '出库',
     quantity: 25,
@@ -365,6 +368,7 @@ export const transactionRecords = [
   },
   {
     id: 'txn-004',
+    productId: 'prod-004',
     productName: '细胞培养瓶 (25cm²)',
     type: '入库',
     quantity: 80,
@@ -376,6 +380,7 @@ export const transactionRecords = [
   },
   {
     id: 'txn-005',
+    productId: 'prod-005',
     productName: '血清 (胎牛)',
     type: '出库',
     quantity: 8,
@@ -387,6 +392,7 @@ export const transactionRecords = [
   },
   {
     id: 'txn-006',
+    productId: 'prod-006',
     productName: '酶标板',
     type: '入库',
     quantity: 50,
@@ -398,6 +404,7 @@ export const transactionRecords = [
   },
   {
     id: 'txn-007',
+    productId: 'prod-007',
     productName: '冻存管 (2mL)',
     type: '出库',
     quantity: 60,
@@ -409,6 +416,7 @@ export const transactionRecords = [
   },
   {
     id: 'txn-008',
+    productId: 'prod-008',
     productName: '细胞培养基 (DMEM)',
     type: '入库',
     quantity: 30,
@@ -420,6 +428,7 @@ export const transactionRecords = [
   },
   {
     id: 'txn-009',
+    productId: 'prod-009',
     productName: '离心管 15mL',
     type: '出库',
     quantity: 45,
@@ -431,6 +440,7 @@ export const transactionRecords = [
   },
   {
     id: 'txn-010',
+    productId: 'prod-010',
     productName: '冻存盒 (9格)',
     type: '入库',
     quantity: 20,
@@ -442,6 +452,7 @@ export const transactionRecords = [
   },
   {
     id: 'txn-011',
+    productId: 'prod-011',
     productName: '移液器吸头 (200µL)',
     type: '出库',
     quantity: 150,
@@ -453,6 +464,7 @@ export const transactionRecords = [
   },
   {
     id: 'txn-012',
+    productId: 'prod-012',
     productName: 'PCR 板 (384孔)',
     type: '入库',
     quantity: 40,
@@ -464,6 +476,7 @@ export const transactionRecords = [
   },
   {
     id: 'txn-013',
+    productId: 'prod-001',
     productName: '离心管 50mL',
     type: '入库',
     quantity: 200,
@@ -475,6 +488,7 @@ export const transactionRecords = [
   },
   {
     id: 'txn-014',
+    productId: 'prod-005',
     productName: '血清 (胎牛)',
     type: '出库',
     quantity: 5,
@@ -486,6 +500,7 @@ export const transactionRecords = [
   },
   {
     id: 'txn-015',
+    productId: 'prod-006',
     productName: '酶标板',
     type: '出库',
     quantity: 15,
@@ -497,6 +512,7 @@ export const transactionRecords = [
   },
   {
     id: 'txn-016',
+    productId: 'prod-007',
     productName: '冻存管 (2mL)',
     type: '入库',
     quantity: 100,
@@ -508,6 +524,7 @@ export const transactionRecords = [
   },
   {
     id: 'txn-017',
+    productId: 'prod-008',
     productName: '细胞培养基 (DMEM)',
     type: '出库',
     quantity: 12,
@@ -519,6 +536,7 @@ export const transactionRecords = [
   },
   {
     id: 'txn-018',
+    productId: 'prod-009',
     productName: '离心管 15mL',
     type: '入库',
     quantity: 80,
@@ -530,6 +548,7 @@ export const transactionRecords = [
   },
   {
     id: 'txn-019',
+    productId: 'prod-010',
     productName: '冻存盒 (9格)',
     type: '出库',
     quantity: 8,
@@ -541,6 +560,7 @@ export const transactionRecords = [
   },
   {
     id: 'txn-020',
+    productId: 'prod-002',
     productName: '移液器吸头 (10µL)',
     type: '出库',
     quantity: 200,

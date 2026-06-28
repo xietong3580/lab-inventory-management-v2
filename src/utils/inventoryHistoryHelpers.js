@@ -238,9 +238,9 @@ export const getProductInventoryHistory = (transactions, auditLogs, productId, p
     return [];
   }
 
-  // 1. 过滤出该产品的交易记录
+  // 1. 过滤出该产品的交易记录（优先 productId 匹配，兼容旧数据 productName）
   const productTransactions = transactions.filter(tx =>
-    tx.productName === productName
+    (tx.productId && tx.productId === productId) || (tx.productName === productName)
   );
 
   // 2. 过滤出该产品的审计日志

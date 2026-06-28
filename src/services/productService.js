@@ -421,9 +421,10 @@ export const addTransaction = (transactionData) => {
     throw new Error('更新产品库存失败');
   }
 
-  // 6. 创建交易记录
+  // 6. 创建交易记录（绑定 productId，避免撤销时依赖 productName 查找）
   const newTransaction = {
     id: `txn-${Date.now()}`,
+    productId: product.id,
     productName: product.name,
     type,
     quantity,
@@ -496,14 +497,29 @@ export const reverseTransaction = (transactionId, reversedBy = '系统') => {
     throw new Error(`只能撤销状态为"已完成"的交易记录。当前状态: ${transaction.status} (ID: ${transactionId})`);
   }
 
-  // 3. 查找对应产品
-  const product = getProductByName(transaction.productName);
+  // 3. 查找对应产品（优先 productId，fallback productName）
+  let product = null;
+  if (transaction.productId) {
+    product = getProductById(transaction.productId);
+    if (!product) {
+      throw new Error(
+        `关联产品不存在，无法撤销交易。\n` +
+        `产品 ID: ${transaction.productId}，产品名称: ${transaction.productName}\n` +
+        `可能原因：产品已被删除或 ID 不匹配。\n` +
+        `请检查产品管理页面确认产品状态。`
+      );
+    }
+  }
+  // 旧交易记录没有 productId，fallback 到 productName
   if (!product) {
-    throw new Error(
-      `无法找到对应产品：交易记录中的产品"${transaction.productName}"不存在。\n` +
-      `可能原因：产品已被删除，或产品名称不匹配。\n` +
-      `请检查产品管理页面确认产品状态。`
-    );
+    product = getProductByName(transaction.productName);
+    if (!product) {
+      throw new Error(
+        `无法找到对应产品：交易记录中的产品"${transaction.productName}"不存在。\n` +
+        `可能原因：产品已被删除，或产品名称不匹配。\n` +
+        `请检查产品管理页面确认产品状态。`
+      );
+    }
   }
 
   // 4. 计算回滚库存量
