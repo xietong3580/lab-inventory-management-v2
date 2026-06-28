@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { usePermission } from '../hooks/usePermission';
 import {
   previewProductImport,
@@ -445,7 +446,7 @@ function ProductImportPreview() {
                   : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
               }`}
             >
-              {canExecute ? '执行正式导入' : '正式导入暂未开放'}
+              {canExecute ? '执行正式导入' : (executeDisabledReason || '暂不可导入')}
             </button>
           </div>
         </div>
@@ -922,7 +923,7 @@ function ProductImportPreview() {
                       : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
                   }`}
                 >
-                  {canExecute ? '执行正式导入' : '正式导入暂未开放'}
+                  {canExecute ? '执行正式导入' : (executeDisabledReason || '暂不可导入')}
                 </button>
                 {!canWrite && (
                   <span className="text-xs text-slate-400">
@@ -1017,6 +1018,57 @@ function ProductImportPreview() {
                     <div className="text-xs font-medium text-slate-700 truncate" title={executeResult.file_name}>{executeResult.file_name ?? '-'}</div>
                   </div>
                 </div>
+
+                {/* ── 导入结果提示 ── */}
+                {executeResult.success && executeResult.created_count > 0 && (
+                  <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-md">
+                    <div className="text-sm text-emerald-700 flex items-start gap-2">
+                      <span className="text-emerald-500 mt-0.5 shrink-0">✓</span>
+                      <span>
+                        导入已完成，可前往{' '}
+                        <Link to="/products" className="text-emerald-800 underline font-medium hover:text-emerald-900">
+                          产品管理页面
+                        </Link>{' '}
+                        查看新增产品。
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {executeResult.skipped_count > 0 && (
+                  <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                    <div className="text-sm text-amber-700 flex items-start gap-2">
+                      <span className="text-amber-500 mt-0.5 shrink-0">⚠</span>
+                      <span>
+                        <strong>部分 SKU 已存在，系统已跳过，未覆盖原数据。</strong>
+                        {' '}共跳过 {executeResult.skipped_count} 条，原产品数据保持不变。下方「跳过产品」表格可查看明细。
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {executeResult.success && executeResult.warning_count > 0 && (
+                  <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                    <div className="text-sm text-amber-700 flex items-start gap-2">
+                      <span className="text-amber-500 mt-0.5 shrink-0">⚠</span>
+                      <span>
+                        导入完成但存在警告，请核对下方 warning 列表。
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {(!executeResult.success || executeResult.error_count > 0) && (
+                  <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-md">
+                    <div className="text-sm text-rose-700 flex items-start gap-2">
+                      <span className="text-rose-500 mt-0.5 shrink-0">✗</span>
+                      <span>
+                        <strong>导入未完成，系统未写入任何新增产品或已回滚。</strong>
+                        {' '}请查看下方错误详情，修正 CSV 后重新预览并导入。
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* 新增产品列表 */}
                 {Array.isArray(executeResult.created_items) && executeResult.created_items.length > 0 && (

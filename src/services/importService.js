@@ -1,10 +1,10 @@
 /**
  * 导入服务
- * 处理产品 CSV 导入预览 API 调用
+ * 处理产品 CSV 导入预览与正式导入 API 调用
  *
- * 本轮仅实现预览，不执行正式导入。
- * 后端接口: POST /api/imports/products/preview
- * 只做 CSV 解析和校验 — 不写数据库、不创建产品、不修改库存。
+ * 后端接口:
+ * - POST /api/imports/products/preview   — 预览（解析+校验，不写库）
+ * - POST /api/imports/products/execute   — 正式导入（create_only 模式）
  */
 
 import { getToken } from './authService';
