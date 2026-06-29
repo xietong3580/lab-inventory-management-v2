@@ -8,7 +8,7 @@ const STORAGE_KEYS = {
   USER: 'auth_user',
 };
 
-const API_BASE = 'http://localhost:8001/api';
+const API_BASE = '/api';
 
 /**
  * 登录

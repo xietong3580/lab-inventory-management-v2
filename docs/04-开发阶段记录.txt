@@ -402,3 +402,61 @@ Step 4 已完成，登录页面 UI 就绪，可以进入 Step 5（开发仪表�
 - 进入完成前检查
 - 整理第一阶段成果文档
 - 决定第二阶段是接真实 API，还是继续补细节
+
+==============================
+日期：2026-06-29
+阶段：第六阶段（真实数据底座）
+当前任务：执行 Step 10-5A（备份与导出前安全检查底座）
+对应清单：docs/core-regression-checklist.md
+
+本轮目标：
+为正式替换旧系统前补齐最小数据安全底座：
+1. 新增后端"备份前安全检查"能力（GET /api/maintenance/preflight）
+2. 新增后端"创建 SQLite 数据库备份"能力（POST /api/maintenance/backups）
+3. 在 Settings 页面增加轻量入口（数据安全检查 + 创建数据库备份按钮含二次确认）
+4. 只做备份不做恢复，只做检查不自动清理数据
+
+修改文件：
+- apps/api/routers/maintenance.py（新建）
+- apps/api/main.py
+- src/services/backupService.js
+- src/pages/Settings.jsx
+- docs/04-开发阶段记录.txt（本记录）
+
+改动摘要：
+- 后端：新建 maintenance router，包含两个接口：
+  - GET /api/maintenance/preflight：只读检查数据库完整性、备份目录可写性、
+    核心表计数、负库存、缺 product_id、孤立 product_id、重复 SKU，返回 ok/warning/error
+  - POST /api/maintenance/backups：使用 SQLite backup API 创建数据库物理副本，
+    备份至 apps/api/backups/ 目录，仅管理员可操作
+- 后端：main.py 注册新 router，prefix /api/maintenance, tags 系统维护
+- 前端：backupService.js 新增 runPreflightCheck() 和 createMaintenanceBackup()
+- 前端：Settings 系统维护卡片新增"数据安全检查"区域（运行检查按钮 + 检查结果展示）
+  和"创建数据库备份"按钮（含二次确认对话框）
+- 权限：preflight 所有登录用户可查看，backup 仅 admin 可操作，viewer 按钮 disabled
+- 安全：备份目录已在 .gitignore 中（apps/api/backups/），新 .sqlite 备份文件不会进入版本控制
+- 不压缩、不做恢复、不删除旧备份、不自动清理数据
+- 不改核心出入库、撤销、台账、导入逻辑
+
+🔧 补充修复：前端 API 地址统一（同轮发现）
+- 发现历史代码中 4 个 service 文件写死 localhost:8001，导致后端在 8000 时前端 Failed to fetch
+- 修改：
+  - vite.config.js 新增 server.proxy["/api"] → http://127.0.0.1:8000
+  - authService.js / backupService.js / importService.js / dataService.js 的 API_BASE/BASE_URL 从 http://localhost:8001/api 改为 /api
+- 新增 scripts/check-api-config.cjs：扫描 src/ 防回退检查，禁止业务代码写死 localhost/127.0.0.1 地址
+- package.json 新增 "check:api-config" 脚本
+- 不属于 maintenance 改动，历史遗留问题，本轮修复
+
+验收结果：
+- npm run build 通过
+- python -m compileall apps/api 通过（含新文件 maintenance.py）
+- ESLint 无新增错误
+- git status 无 .db / .sqlite / .csv 数据文件
+- 修改范围仅限 4 个文件（1 新建 + 3 修改），符合小范围稳定改动要求
+
+下一步：
+- 启动后端（uvicorn apps.api.main:app --port 8001）
+- 启动前端（npm run dev）
+- 人工验收：Settings → 运行安全检查 → 查看结果 → 创建备份确认 → 验证备份文件
+- 核心回归：按 docs/core-regression-checklist.md 逐项检查
+- 若验收通过，本地 commit（不 push）

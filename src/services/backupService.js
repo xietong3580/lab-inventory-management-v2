@@ -5,7 +5,7 @@
 
 import { getToken } from './authService';
 
-const API_BASE = 'http://localhost:8001/api';
+const API_BASE = '/api';
 
 /**
  * 格式化字节数为可读大小
@@ -128,4 +128,82 @@ export async function downloadBackup(filename) {
   }
 
   return response.blob();
+}
+
+/**
+ * 运行备份前安全检查（所有登录用户可访问）
+ * @returns {Promise<{
+ *   database_exists: boolean,
+ *   database_readable: boolean,
+ *   backup_dir_exists: boolean,
+ *   backup_dir_writable: boolean,
+ *   products_count: number,
+ *   transactions_count: number,
+ *   audit_logs_count: number,
+ *   negative_stock_count: number,
+ *   transactions_missing_product_id_count: number,
+ *   transactions_orphan_product_id_count: number,
+ *   duplicate_sku_count: number,
+ *   status: 'ok' | 'warning' | 'error',
+ *   warnings: string[],
+ *   errors: string[]
+ * }>}
+ */
+export async function runPreflightCheck() {
+  const token = getToken();
+  if (!token) {
+    throw new Error('未登录');
+  }
+
+  const response = await fetch(`${API_BASE}/maintenance/preflight`, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `安全检查请求失败 (${response.status})`);
+  }
+
+  return response.json();
+}
+
+/**
+ * 创建数据库物理备份（仅管理员可用）
+ * @returns {Promise<{
+ *   success: boolean,
+ *   filename: string,
+ *   path: string,
+ *   size_bytes: number,
+ *   created_at: string,
+ *   message: string
+ * }>}
+ */
+export async function createMaintenanceBackup() {
+  const token = getToken();
+  if (!token) {
+    throw new Error('未登录');
+  }
+
+  const response = await fetch(`${API_BASE}/maintenance/backups`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 403) {
+      throw new Error('需要管理员权限才能创建备份');
+    }
+    throw new Error(errorData.detail || `创建备份请求失败 (${response.status})`);
+  }
+
+  return response.json();
 }

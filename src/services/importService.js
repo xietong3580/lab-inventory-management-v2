@@ -9,7 +9,7 @@
 
 import { getToken } from './authService';
 
-const API_BASE = 'http://localhost:8001/api';
+const API_BASE = '/api';
 
 /**
  * 文件大小限制（字节）

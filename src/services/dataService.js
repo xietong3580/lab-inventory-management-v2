@@ -14,7 +14,7 @@ let currentMode = DATA_SOURCE_MODE.API; // 暂时设置为API模式进行测试
 
 // API 基础配置
 const API_CONFIG = {
-  BASE_URL: 'http://localhost:8001/api',
+  BASE_URL: '/api',
   TIMEOUT: 10000,
   DEFAULT_HEADERS: {
     'Content-Type': 'application/json',

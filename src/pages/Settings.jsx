@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { systemService } from '../services/dataService';
 import { usePermission } from '../hooks/usePermission';
 import { changePassword } from '../services/authService';
-import { createManualBackup, getBackups, downloadBackup, formatBytes } from '../services/backupService';
+import { createManualBackup, getBackups, downloadBackup, formatBytes, runPreflightCheck, createMaintenanceBackup } from '../services/backupService';
 
 function Settings() {
   const { canWrite, adminOnlyTitle } = usePermission();
@@ -27,6 +27,14 @@ function Settings() {
   // 下载相关状态
   const [downloadingFile, setDownloadingFile] = useState(null);
   const [downloadError, setDownloadError] = useState('');
+  // 安全检查相关状态
+  const [preflightResult, setPreflightResult] = useState(null);
+  const [isCheckingPreflight, setIsCheckingPreflight] = useState(false);
+  const [preflightError, setPreflightError] = useState('');
+  // 维护备份相关状态
+  const [showBackupConfirm, setShowBackupConfirm] = useState(false);
+  const [isMaintenanceBackup, setIsMaintenanceBackup] = useState(false);
+  const [maintBackupResult, setMaintBackupResult] = useState(null);
 
   // 获取数据源模式
   useEffect(() => {
@@ -177,6 +185,53 @@ function Settings() {
       setDownloadError(err.message || '下载备份文件失败');
     } finally {
       setDownloadingFile(null);
+    }
+  };
+
+  // 运行安全检查
+  const handlePreflightCheck = async () => {
+    setIsCheckingPreflight(true);
+    setPreflightResult(null);
+    setPreflightError('');
+    try {
+      const result = await runPreflightCheck();
+      setPreflightResult(result);
+    } catch (err) {
+      setPreflightError(err.message || '安全检查请求失败');
+    } finally {
+      setIsCheckingPreflight(false);
+    }
+  };
+
+  // 打开维护备份确认
+  const handleOpenMaintenanceBackupConfirm = () => {
+    setShowBackupConfirm(true);
+    setMaintBackupResult(null);
+  };
+
+  // 关闭维护备份确认
+  const handleCloseMaintenanceBackupConfirm = () => {
+    setShowBackupConfirm(false);
+    setMaintBackupResult(null);
+  };
+
+  // 确认创建维护备份
+  const handleConfirmMaintenanceBackup = async () => {
+    setIsMaintenanceBackup(true);
+    setMaintBackupResult(null);
+    try {
+      const result = await createMaintenanceBackup();
+      setMaintBackupResult(result);
+      if (result.success) {
+        loadBackupList();
+      }
+    } catch (err) {
+      setMaintBackupResult({
+        success: false,
+        message: err.message || '创建备份失败',
+      });
+    } finally {
+      setIsMaintenanceBackup(false);
     }
   };
 
@@ -366,7 +421,179 @@ function Settings() {
           </div>
           <div className="p-4 md:p-6">
             <div className="space-y-4">
+              {/* ── 数据安全与备份 ── */}
               <div>
+                <div className="font-medium text-slate-800 mb-2">数据安全检查</div>
+                <p className="text-sm text-slate-600 mb-3">在创建备份或导出数据前，先检查数据库完整性</p>
+                <button
+                  onClick={handlePreflightCheck}
+                  disabled={isCheckingPreflight}
+                  className={`px-4 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors font-medium ${
+                    isCheckingPreflight ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {isCheckingPreflight ? (
+                    <span className="flex items-center gap-2">
+                      <span className="inline-block w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></span>
+                      检查中...
+                    </span>
+                  ) : (
+                    '运行安全检查'
+                  )}
+                </button>
+                {/* 检查错误 */}
+                {preflightError && (
+                  <div className="mt-3 p-3 rounded-md border text-sm bg-rose-50 border-rose-200">
+                    <span className="text-rose-700">{preflightError}</span>
+                  </div>
+                )}
+                {/* 检查结果 */}
+                {preflightResult && (
+                  <div className={`mt-3 p-3 rounded-md border text-sm ${
+                    preflightResult.status === 'ok'
+                      ? 'bg-emerald-50 border-emerald-200'
+                      : preflightResult.status === 'warning'
+                      ? 'bg-amber-50 border-amber-200'
+                      : 'bg-rose-50 border-rose-200'
+                  }`}>
+                    <div className={`font-medium mb-2 ${
+                      preflightResult.status === 'ok'
+                        ? 'text-emerald-800'
+                        : preflightResult.status === 'warning'
+                        ? 'text-amber-800'
+                        : 'text-rose-800'
+                    }`}>
+                      {preflightResult.status === 'ok' && '✅ 检查通过'}
+                      {preflightResult.status === 'warning' && '⚠️ 存在警告，请确认后再导出/备份'}
+                      {preflightResult.status === 'error' && '❌ 存在错误，请先处理'}
+                    </div>
+                    <div className="space-y-1.5 text-slate-700">
+                      {/* 数据库状态 */}
+                      <div className="flex gap-2">
+                        <span className="text-slate-500 shrink-0">数据库：</span>
+                        <span>
+                          {preflightResult.database_exists && preflightResult.database_readable
+                            ? '正常'
+                            : preflightResult.database_exists
+                            ? '文件存在但不可读'
+                            : '文件不存在'}
+                        </span>
+                      </div>
+                      {/* 备份目录状态 */}
+                      <div className="flex gap-2">
+                        <span className="text-slate-500 shrink-0">备份目录：</span>
+                        <span className={preflightResult.backup_dir_writable ? 'text-emerald-700' : 'text-rose-700'}>
+                          {preflightResult.backup_dir_writable ? '可写' : '不可写'}
+                        </span>
+                      </div>
+                      {/* 数据统计 */}
+                      <div className="flex gap-2">
+                        <span className="text-slate-500 shrink-0">产品数量：</span>
+                        <span>{preflightResult.products_count}</span>
+                        <span className="text-slate-400 mx-1">|</span>
+                        <span className="text-slate-500">交易数量：</span>
+                        <span>{preflightResult.transactions_count}</span>
+                        <span className="text-slate-400 mx-1">|</span>
+                        <span className="text-slate-500">审计日志：</span>
+                        <span>{preflightResult.audit_logs_count}</span>
+                      </div>
+                      {/* 异常项 */}
+                      {(preflightResult.negative_stock_count > 0 ||
+                        preflightResult.transactions_missing_product_id_count > 0 ||
+                        preflightResult.transactions_orphan_product_id_count > 0 ||
+                        preflightResult.duplicate_sku_count > 0) && (
+                        <div className="flex gap-2 mt-1">
+                          <span className="text-slate-500 shrink-0">异常项：</span>
+                          <span className="text-rose-700">
+                            {[
+                              preflightResult.negative_stock_count > 0 && `负库存 ${preflightResult.negative_stock_count}`,
+                              preflightResult.transactions_missing_product_id_count > 0 && `缺productId ${preflightResult.transactions_missing_product_id_count}`,
+                              preflightResult.transactions_orphan_product_id_count > 0 && `孤立productId ${preflightResult.transactions_orphan_product_id_count}`,
+                              preflightResult.duplicate_sku_count > 0 && `重复SKU ${preflightResult.duplicate_sku_count}`,
+                            ].filter(Boolean).join(' · ')}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    {/* Warnings */}
+                    {preflightResult.warnings.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-amber-200">
+                        <div className="text-xs font-medium text-amber-700 mb-1">警告信息：</div>
+                        <ul className="text-xs text-amber-700 space-y-0.5 list-disc list-inside">
+                          {preflightResult.warnings.map((w, i) => (
+                            <li key={i}>{w}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {/* Errors */}
+                    {preflightResult.errors.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-rose-200">
+                        <div className="text-xs font-medium text-rose-700 mb-1">错误信息：</div>
+                        <ul className="text-xs text-rose-700 space-y-0.5 list-disc list-inside">
+                          {preflightResult.errors.map((e, i) => (
+                            <li key={i}>{e}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* 创建数据库备份按钮（含二次确认） */}
+                <div className="mt-3">
+                  <button
+                    onClick={handleOpenMaintenanceBackupConfirm}
+                    disabled={!canWrite || isMaintenanceBackup}
+                    title={!canWrite ? adminOnlyTitle : (isMaintenanceBackup ? '备份进行中...' : '创建数据库物理备份文件')}
+                    className={`px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium ${
+                      !canWrite || isMaintenanceBackup ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {isMaintenanceBackup ? (
+                      <span className="flex items-center gap-2">
+                        <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        备份中...
+                      </span>
+                    ) : (
+                      '创建数据库备份'
+                    )}
+                  </button>
+                  {!canWrite && (
+                    <span className="ml-2 text-xs text-slate-400">仅管理员可操作</span>
+                  )}
+                </div>
+                {/* 维护备份结果 */}
+                {maintBackupResult && (
+                  <div className={`mt-3 p-3 rounded-md border text-sm ${
+                    maintBackupResult.success
+                      ? 'bg-emerald-50 border-emerald-200'
+                      : 'bg-rose-50 border-rose-200'
+                  }`}>
+                    <div className={`font-medium mb-1 ${maintBackupResult.success ? 'text-emerald-800' : 'text-rose-800'}`}>
+                      {maintBackupResult.success ? '✅ 备份成功' : '❌ 备份失败'}
+                    </div>
+                    {maintBackupResult.success ? (
+                      <div className="space-y-1 text-slate-700">
+                        <div className="flex gap-2">
+                          <span className="text-slate-500 shrink-0">文件：</span>
+                          <span className="font-mono text-xs break-all">{maintBackupResult.filename}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <span className="text-slate-500 shrink-0">大小：</span>
+                          <span>{formatBytes(maintBackupResult.size_bytes)}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <span className="text-slate-500 shrink-0">时间：</span>
+                          <span>{new Date(maintBackupResult.created_at).toLocaleString('zh-CN')}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-rose-700">{maintBackupResult.message}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="pt-4 border-t border-slate-100">
                 <div className="font-medium text-slate-800 mb-2">数据备份</div>
                 <p className="text-sm text-slate-600 mb-3">手动触发系统数据备份</p>
                 <button
@@ -633,6 +860,94 @@ function Settings() {
           </div>
         </div>
       </div>
+
+      {/* 维护备份确认对话框 */}
+      {showBackupConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="px-6 py-4 border-b border-slate-200">
+              <h2 className="text-xl font-semibold text-slate-800">
+                确认创建数据库备份
+              </h2>
+            </div>
+            <div className="p-4 md:p-6">
+              <div className="mb-6">
+                <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-md mb-4">
+                  <div className="flex items-start">
+                    <div className="shrink-0 mr-3 mt-0.5">
+                      <div className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center">
+                        <span className="text-xs font-bold text-amber-600">!</span>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-amber-800 mb-1">操作确认</div>
+                      <div className="text-sm text-amber-700">
+                        将对当前 SQLite 数据库创建完整物理副本。备份文件将保存在服务器 backups 目录下，不会影响当前运行的系统。
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="text-sm text-slate-700 mb-4">
+                  <p className="font-medium text-slate-800 mb-2">操作说明：</p>
+                  <ul className="space-y-2 pl-5">
+                    <li className="flex items-start">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-500 mt-1.5 mr-2"></span>
+                      <span>仅创建备份文件，不会修改任何业务数据</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-500 mt-1.5 mr-2"></span>
+                      <span>备份文件格式：inventory_backup_YYYYMMDD_HHMMSS.sqlite</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 mr-2"></span>
+                      <span>此操作不可逆，备份文件需手动管理</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* 操作结果提示 */}
+              {maintBackupResult && showBackupConfirm && (
+                <div className={`mb-4 p-3.5 rounded-md border ${maintBackupResult.success ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
+                  <div className="text-sm font-medium mb-1">
+                    {maintBackupResult.success ? '✅ 备份创建成功' : '❌ 备份创建失败'}
+                  </div>
+                  <div className={`text-sm ${maintBackupResult.success ? 'text-emerald-700' : 'text-rose-700'}`}>
+                    {maintBackupResult.message}
+                  </div>
+                </div>
+              )}
+
+              {/* 操作按钮 */}
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={handleCloseMaintenanceBackupConfirm}
+                  disabled={isMaintenanceBackup}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmMaintenanceBackup}
+                  disabled={isMaintenanceBackup || maintBackupResult?.success}
+                  className="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isMaintenanceBackup ? (
+                    <>
+                      <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      备份中...
+                    </>
+                  ) : (
+                    '确认备份'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 重置确认对话框 */}
       {showResetConfirm && (
