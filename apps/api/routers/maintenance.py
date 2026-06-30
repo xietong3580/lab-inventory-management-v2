@@ -53,6 +53,29 @@ class MaintenanceBackupResponse(BaseModel):
     message: str
 
 
+class ResetPreviewItem(BaseModel):
+    key: str
+    name: str
+    count: int
+    description: str
+
+
+class ResetPreviewSummary(BaseModel):
+    products: int
+    transactions: int
+    ledger_records: int
+    audit_logs: int
+    low_stock_products: int
+
+
+class ResetPreviewResponse(BaseModel):
+    success: bool
+    summary: ResetPreviewSummary
+    will_clear: List[ResetPreviewItem]
+    will_keep: List[ResetPreviewItem]
+    warnings: List[str]
+
+
 # ═══════════════════════════════════════════════════════════
 # 辅助函数
 # ═══════════════════════════════════════════════════════════
@@ -291,4 +314,127 @@ def create_backup(admin=Depends(require_admin)):
         size_bytes=size_bytes,
         created_at=created_at,
         message=f"备份成功：{filename}（{size_bytes:,} 字节）",
+    )
+
+
+@router.get("/reset-preview", response_model=ResetPreviewResponse)
+def reset_preview(user=Depends(get_current_user)):
+    """
+    正式导入前测试业务数据清空预览（只读，所有登录用户可访问）。
+
+    返回当前若执行清空测试业务数据时的预期影响范围。
+    本接口**只读**，不删除、不修改任何数据。
+
+    计数逻辑：
+    - products: 当前产品总数
+    - transactions: 出入库记录总数（台账由交易记录前端派生，无独立表）
+    - ledger_records: 同 transactions 计数（台账来源于交易记录，清空交易后台账同步消失）
+    - audit_logs: 审计日志总数（表可能不存在，安全返回 0）
+    - low_stock_products: 低库存产品数（current_stock <= min_stock）
+    """
+    warnings: List[str] = [
+        "本接口仅用于预览，不会删除或修改任何数据。",
+        "正式清空测试业务数据前必须先创建数据库备份。",
+        "后续正式数据应以旧系统导出的真实产品库存数据为准。",
+    ]
+
+    # ── 安全计数（每项独立 try/except，单点失败不影响其他项） ──
+
+    # 产品数
+    products_count = 0
+    low_stock_count = 0
+    try:
+        if DB_PATH.exists():
+            conn = sqlite3.connect(str(DB_PATH))
+            products_count = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
+            low_stock_count = conn.execute(
+                "SELECT COUNT(*) FROM products WHERE current_stock <= min_stock"
+            ).fetchone()[0]
+            conn.close()
+    except sqlite3.Error as e:
+        warnings.append(f"产品表查询异常（不影响其他统计）：{e}")
+
+    # 交易记录数（台账来源）
+    transactions_count = 0
+    try:
+        if DB_PATH.exists():
+            conn = sqlite3.connect(str(DB_PATH))
+            if _table_exists(conn, "transactions"):
+                transactions_count = conn.execute(
+                    "SELECT COUNT(*) FROM transactions"
+                ).fetchone()[0]
+            conn.close()
+    except sqlite3.Error as e:
+        warnings.append(f"交易表查询异常（不影响其他统计）：{e}")
+
+    # 审计日志数
+    audit_logs_count = 0
+    try:
+        if DB_PATH.exists():
+            conn = sqlite3.connect(str(DB_PATH))
+            if _table_exists(conn, "audit_logs"):
+                audit_logs_count = conn.execute(
+                    "SELECT COUNT(*) FROM audit_logs"
+                ).fetchone()[0]
+            conn.close()
+    except sqlite3.Error as e:
+        warnings.append(f"审计日志表查询异常（不影响其他统计）：{e}")
+
+    # ── 组装返回 ──
+    return ResetPreviewResponse(
+        success=True,
+        summary=ResetPreviewSummary(
+            products=products_count,
+            transactions=transactions_count,
+            ledger_records=transactions_count,  # 台账由交易记录派生，无独立表
+            audit_logs=audit_logs_count,
+            low_stock_products=low_stock_count,
+        ),
+        will_clear=[
+            ResetPreviewItem(
+                key="products",
+                name="产品数据",
+                count=products_count,
+                description="当前系统中的产品与库存数据，正式导入旧系统数据前应清空。",
+            ),
+            ResetPreviewItem(
+                key="transactions",
+                name="出入库记录",
+                count=transactions_count,
+                description="当前测试出入库记录，不能污染正式库存。",
+            ),
+            ResetPreviewItem(
+                key="ledger_records",
+                name="库存台账",
+                count=transactions_count,
+                description="测试台账记录（由交易记录派生），正式数据导入后应重新生成。",
+            ),
+            ResetPreviewItem(
+                key="audit_logs",
+                name="审计日志",
+                count=audit_logs_count,
+                description="当前开发和验收期间产生的测试操作日志。",
+            ),
+        ],
+        will_keep=[
+            ResetPreviewItem(
+                key="users",
+                name="用户账号",
+                count=0,
+                description="admin/viewer 等登录账号不属于业务测试数据，不在本清空范围内。",
+            ),
+            ResetPreviewItem(
+                key="settings",
+                name="系统设置",
+                count=0,
+                description="系统配置不在本清空范围内。",
+            ),
+            ResetPreviewItem(
+                key="backups",
+                name="备份文件",
+                count=0,
+                description="备份文件用于回滚和追溯，不应自动删除。",
+            ),
+        ],
+        warnings=warnings,
     )

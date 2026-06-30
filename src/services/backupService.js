@@ -207,3 +207,41 @@ export async function createMaintenanceBackup() {
 
   return response.json();
 }
+
+/**
+ * 获取正式导入前测试业务数据清空预览（所有登录用户可访问，只读）
+ * @returns {Promise<{
+ *   success: boolean,
+ *   summary: {
+ *     products: number,
+ *     transactions: number,
+ *     ledger_records: number,
+ *     audit_logs: number,
+ *     low_stock_products: number
+ *   },
+ *   will_clear: Array<{ key: string, name: string, count: number, description: string }>,
+ *   will_keep: Array<{ key: string, name: string, count: number, description: string }>,
+ *   warnings: string[]
+ * }>}
+ */
+export async function getResetPreview() {
+  const token = getToken();
+  if (!token) {
+    throw new Error('未登录');
+  }
+
+  const response = await fetch(`${API_BASE}/maintenance/reset-preview`, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `清空预览请求失败 (${response.status})`);
+  }
+
+  return response.json();
+}

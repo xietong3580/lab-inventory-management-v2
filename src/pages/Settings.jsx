@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { systemService } from '../services/dataService';
 import { usePermission } from '../hooks/usePermission';
 import { changePassword } from '../services/authService';
-import { createManualBackup, getBackups, downloadBackup, formatBytes, runPreflightCheck, createMaintenanceBackup } from '../services/backupService';
+import { createManualBackup, getBackups, downloadBackup, formatBytes, runPreflightCheck, createMaintenanceBackup, getResetPreview } from '../services/backupService';
 
 function Settings() {
   const { canWrite, adminOnlyTitle } = usePermission();
@@ -35,6 +35,10 @@ function Settings() {
   const [showBackupConfirm, setShowBackupConfirm] = useState(false);
   const [isMaintenanceBackup, setIsMaintenanceBackup] = useState(false);
   const [maintBackupResult, setMaintBackupResult] = useState(null);
+  // 清空预览相关状态
+  const [resetPreviewResult, setResetPreviewResult] = useState(null);
+  const [isLoadingResetPreview, setIsLoadingResetPreview] = useState(false);
+  const [resetPreviewError, setResetPreviewError] = useState('');
 
   // 获取数据源模式
   useEffect(() => {
@@ -232,6 +236,21 @@ function Settings() {
       });
     } finally {
       setIsMaintenanceBackup(false);
+    }
+  };
+
+  // 查看清空预览
+  const handleResetPreview = async () => {
+    setIsLoadingResetPreview(true);
+    setResetPreviewResult(null);
+    setResetPreviewError('');
+    try {
+      const result = await getResetPreview();
+      setResetPreviewResult(result);
+    } catch (err) {
+      setResetPreviewError(err.message || '清空预览请求失败');
+    } finally {
+      setIsLoadingResetPreview(false);
     }
   };
 
@@ -589,6 +608,92 @@ function Settings() {
                       </div>
                     ) : (
                       <div className="text-rose-700">{maintBackupResult.message}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+              {/* ── 正式导入前清空预览 ── */}
+              <div className="pt-4 border-t border-slate-100">
+                <div className="font-medium text-slate-800 mb-2">正式导入前清空预览</div>
+                <p className="text-sm text-slate-600 mb-3">
+                  当前系统内产品、库存、出入库和日志均视为测试业务数据。正式导入旧系统真实数据前，应先备份并按流程清空测试业务数据。本功能仅预览数量，不会删除或修改任何数据。
+                </p>
+                <button
+                  onClick={handleResetPreview}
+                  disabled={isLoadingResetPreview}
+                  className={`px-4 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors font-medium ${
+                    isLoadingResetPreview ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {isLoadingResetPreview ? (
+                    <span className="flex items-center gap-2">
+                      <span className="inline-block w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></span>
+                      加载中...
+                    </span>
+                  ) : (
+                    '查看清空预览'
+                  )}
+                </button>
+                {/* 清空预览错误 */}
+                {resetPreviewError && (
+                  <div className="mt-3 p-3 rounded-md border text-sm bg-rose-50 border-rose-200">
+                    <span className="text-rose-700">{resetPreviewError}</span>
+                  </div>
+                )}
+                {/* 清空预览结果 */}
+                {resetPreviewResult && resetPreviewResult.success && (
+                  <div className="mt-3 space-y-3">
+                    {/* 将清空的数据 */}
+                    <div>
+                      <div className="text-sm font-medium text-rose-700 mb-2">将清空的数据</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {resetPreviewResult.will_clear.map((item) => (
+                          <div key={item.key} className="p-3 rounded-md border border-rose-200 bg-rose-50">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-sm font-medium text-slate-800">{item.name}</span>
+                              <span className="text-lg font-semibold text-rose-700">{item.count}</span>
+                            </div>
+                            <div className="text-xs text-slate-500">{item.description}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {/* 将保留的数据 */}
+                    <div>
+                      <div className="text-sm font-medium text-emerald-700 mb-2">将保留的数据</div>
+                      <div className="space-y-2">
+                        {resetPreviewResult.will_keep.map((item) => (
+                          <div key={item.key} className="flex items-start gap-2 text-sm text-slate-600">
+                            <span className="text-emerald-500 mt-0.5">✓</span>
+                            <span>
+                              <span className="font-medium text-slate-700">{item.name}</span>
+                              &nbsp;— {item.description}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {/* 概要统计 */}
+                    <div className="p-3 rounded-md border border-slate-200 bg-slate-50">
+                      <div className="text-xs text-slate-500 mb-1">数据概要</div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700">
+                        <span>产品 {resetPreviewResult.summary.products}</span>
+                        <span>出入库 {resetPreviewResult.summary.transactions}</span>
+                        <span>台账 {resetPreviewResult.summary.ledger_records}</span>
+                        <span>审计日志 {resetPreviewResult.summary.audit_logs}</span>
+                        <span>低库存 {resetPreviewResult.summary.low_stock_products}</span>
+                      </div>
+                    </div>
+                    {/* 警告提示 */}
+                    {resetPreviewResult.warnings && resetPreviewResult.warnings.length > 0 && (
+                      <div className="p-3 rounded-md border bg-amber-50 border-amber-200">
+                        <div className="text-xs font-medium text-amber-700 mb-1">提示</div>
+                        <ul className="text-xs text-amber-700 space-y-0.5 list-disc list-inside">
+                          {resetPreviewResult.warnings.map((w, i) => (
+                            <li key={i}>{w}</li>
+                          ))}
+                        </ul>
+                      </div>
                     )}
                   </div>
                 )}
