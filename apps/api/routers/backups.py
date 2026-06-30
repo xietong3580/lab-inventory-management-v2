@@ -101,8 +101,13 @@ def _validate_backup(backup_path: Path, expected_size: int) -> dict:
         return {"integrity_check": f"FAILED: {e}", "size_bytes": size}
 
 
-# 允许的备份文件名模式
-_BACKUP_FILENAME_PATTERN = re.compile(r"^inventory-backup-\d{4}-\d{2}-\d{2}-\d{6}\.db$")
+# 允许的备份文件名模式（兼容 .db 旧格式与 .sqlite maintenance 格式）
+_BACKUP_FILENAME_PATTERN = re.compile(
+    r"^inventory-backup-\d{4}-\d{2}-\d{2}-\d{6}\.db$"
+)
+_MAINTENANCE_BACKUP_FILENAME_PATTERN = re.compile(
+    r"^inventory_backup_\d{8}_\d{6}\.sqlite$"
+)
 
 
 def _safe_validate_filename(filename: str) -> str:
@@ -117,8 +122,9 @@ def _safe_validate_filename(filename: str) -> str:
             detail="文件名包含非法字符",
         )
 
-    # 必须匹配 inventory-backup-YYYY-MM-DD-HHMMSS.db
-    if not _BACKUP_FILENAME_PATTERN.match(filename):
+    # 必须匹配 backup-YYYY-MM-DD-HHMMSS.db 或 backup_YYYYMMDD_HHMMSS.sqlite
+    if not (_BACKUP_FILENAME_PATTERN.match(filename) or
+            _MAINTENANCE_BACKUP_FILENAME_PATTERN.match(filename)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"不允许的文件名格式：{filename}",
@@ -232,9 +238,11 @@ def list_backups(admin: str = Depends(require_admin)):
             message="备份目录尚未创建，无备份文件",
         )
 
-    # 扫描备份目录中的 inventory-backup-*.db 文件
+    # 扫描备份目录中的 .db 和 .sqlite 备份文件，按修改时间倒序
+    db_files = list(BACKUP_DIR.glob("inventory-backup-*.db"))
+    sqlite_files = list(BACKUP_DIR.glob("inventory_backup_*.sqlite"))
     backup_files = sorted(
-        BACKUP_DIR.glob("inventory-backup-*.db"),
+        db_files + sqlite_files,
         key=lambda p: p.stat().st_mtime,
         reverse=True,
     )
