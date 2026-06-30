@@ -94,6 +94,7 @@ function Products() {
   const [preflightError, setPreflightError] = useState('');
   const [showPreflightModal, setShowPreflightModal] = useState(false);
   const [isBackupBeforeExport, setIsBackupBeforeExport] = useState(false);
+  const [backupExportError, setBackupExportError] = useState('');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -204,6 +205,7 @@ function Products() {
     setIsPreflightChecking(true);
     setPreflightResult(null);
     setPreflightError('');
+    setBackupExportError('');
     try {
       const result = await runPreflightCheck();
       setPreflightResult(result);
@@ -224,15 +226,26 @@ function Products() {
   // 创建备份后再导出（仅 admin 可用）
   const handleBackupThenExport = async () => {
     setIsBackupBeforeExport(true);
+    setBackupExportError('');
     try {
-      await createMaintenanceBackup();
+      const result = await createMaintenanceBackup();
+      if (!result || !result.success) {
+        // 接口返回了非成功的响应
+        setBackupExportError(
+          result?.message || '数据库备份失败，接口返回异常状态，已取消导出。请先在系统设置中确认备份功能正常。'
+        );
+        return;
+      }
+      // 备份成功 → 继续导出
+      setShowPreflightModal(false);
+      exportProductsToCSV(filteredProducts, 'products-export');
     } catch (err) {
-      console.error('创建备份失败:', err);
+      setBackupExportError(
+        err.message || '数据库备份失败，已取消导出。请先在系统设置中确认备份功能正常。'
+      );
     } finally {
       setIsBackupBeforeExport(false);
     }
-    setShowPreflightModal(false);
-    exportProductsToCSV(filteredProducts, 'products-export');
   };
 
   // 打开模态框（新增或编辑）
@@ -1088,6 +1101,18 @@ function Products() {
               {preflightError && !isPreflightChecking && (
                 <div className="p-3 rounded-md border bg-amber-50 border-amber-200 text-sm text-amber-700">
                   安全检查未完成，仍可继续导出，但建议确认数据状态后再操作。
+                </div>
+              )}
+
+              {/* 备份失败错误提示 */}
+              {backupExportError && (
+                <div className="p-3 rounded-md border bg-rose-50 border-rose-200">
+                  <div className="flex items-start">
+                    <svg className="w-4 h-4 text-rose-600 mt-0.5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    <div className="text-sm text-rose-700">{backupExportError}</div>
+                  </div>
                 </div>
               )}
             </div>
