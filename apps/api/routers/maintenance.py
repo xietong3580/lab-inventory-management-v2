@@ -1,8 +1,10 @@
 """
-维护 API 路由：备份前安全检查 + 数据库物理备份
+维护 API 路由：备份前安全检查 + 数据库物理备份 + 测试业务数据清空
 
-- GET  /api/maintenance/preflight  备份前安全检查（所有登录用户可访问，只读）
-- POST /api/maintenance/backups   创建 SQLite 数据库物理副本（仅管理员）
+- GET  /api/maintenance/preflight           备份前安全检查（所有登录用户可访问，只读）
+- POST /api/maintenance/backups            创建 SQLite 数据库物理副本（仅管理员）
+- GET  /api/maintenance/reset-preview      测试业务数据清空预览（所有登录用户可访问，只读）
+- POST /api/maintenance/reset-business-data 清空测试业务数据（仅管理员，需确认短语）
 """
 
 import sqlite3
@@ -73,6 +75,34 @@ class ResetPreviewResponse(BaseModel):
     summary: ResetPreviewSummary
     will_clear: List[ResetPreviewItem]
     will_keep: List[ResetPreviewItem]
+    warnings: List[str]
+
+
+class ResetBusinessDataRequest(BaseModel):
+    confirmation: str
+
+
+class ResetBusinessDataBackup(BaseModel):
+    filename: str
+    size_bytes: int
+    created_at: str
+
+
+class ResetBusinessDataCounts(BaseModel):
+    products: int
+    transactions: int
+    ledger_records: int
+    audit_logs: int
+    low_stock_products: int
+
+
+class ResetBusinessDataResponse(BaseModel):
+    success: bool
+    message: str
+    backup: ResetBusinessDataBackup
+    before: ResetBusinessDataCounts
+    after: ResetBusinessDataCounts
+    preflight: PreflightResponse
     warnings: List[str]
 
 
@@ -437,4 +467,279 @@ def reset_preview(user=Depends(get_current_user)):
             ),
         ],
         warnings=warnings,
+    )
+
+
+# ── 清空计数辅助函数 ──────────────────────────────────────
+
+def _count_business_data(conn: sqlite3.Connection) -> dict:
+    """统计当前业务数据量（只读，不修改任何数据）。"""
+    counts = {
+        "products": 0,
+        "transactions": 0,
+        "ledger_records": 0,
+        "audit_logs": 0,
+        "low_stock_products": 0,
+    }
+    try:
+        counts["products"] = conn.execute(
+            "SELECT COUNT(*) FROM products"
+        ).fetchone()[0]
+    except sqlite3.Error:
+        pass
+
+    try:
+        if _table_exists(conn, "transactions"):
+            counts["transactions"] = conn.execute(
+                "SELECT COUNT(*) FROM transactions"
+            ).fetchone()[0]
+    except sqlite3.Error:
+        pass
+
+    # 台账由交易记录派生，无独立表
+    counts["ledger_records"] = counts["transactions"]
+
+    try:
+        if _table_exists(conn, "audit_logs"):
+            counts["audit_logs"] = conn.execute(
+                "SELECT COUNT(*) FROM audit_logs"
+            ).fetchone()[0]
+    except sqlite3.Error:
+        pass
+
+    try:
+        counts["low_stock_products"] = conn.execute(
+            "SELECT COUNT(*) FROM products WHERE current_stock <= min_stock"
+        ).fetchone()[0]
+    except sqlite3.Error:
+        pass
+
+    return counts
+
+
+# ═══════════════════════════════════════════════════════════
+
+@router.post("/reset-business-data", response_model=ResetBusinessDataResponse)
+def reset_business_data(req: ResetBusinessDataRequest, admin=Depends(require_admin)):
+    """
+    清空测试业务数据（仅管理员，需确认短语完全匹配）。
+
+    安全流程：
+    1. 校验 admin 权限（由 require_admin 保证）
+    2. 校验 confirmation 短语必须为「清空测试业务数据」
+    3. 统计清空前数据量（before_counts）
+    4. 自动创建数据库备份
+    5. 确认备份文件真实存在且大小 > 0
+    6. 在数据库事务中按安全顺序清空测试业务数据
+    7. 统计清空后数据量（after_counts）
+    8. 运行 preflight 检查数据完整性
+    9. 返回完整清空结果
+
+    清空范围：products / transactions / audit_logs
+    保留范围：users / settings / 备份文件
+    """
+    CONFIRMATION_PHRASE = "清空测试业务数据"
+
+    # ── 1. 校验 confirmation 短语 ──
+    if req.confirmation != CONFIRMATION_PHRASE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="确认短语不匹配，操作已拒绝。请输入「清空测试业务数据」。",
+        )
+
+    # ── 2. 数据库文件存在检查 ──
+    if not DB_PATH.exists():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="数据库文件不存在，无法执行清空操作",
+        )
+
+    # ── 3. 统计清空前数据量 ──
+    try:
+        conn = sqlite3.connect(str(DB_PATH))
+        before_counts = _count_business_data(conn)
+        conn.close()
+    except sqlite3.Error as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"清空前数据统计失败：{e}",
+        )
+
+    # ── 4. 创建数据库备份 ──
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_filename = f"inventory_backup_{timestamp}.sqlite"
+    backup_path = BACKUP_DIR / backup_filename
+    backup_created_at = datetime.now().isoformat()
+
+    try:
+        src_conn = sqlite3.connect(str(DB_PATH))
+        dst_conn = sqlite3.connect(str(backup_path))
+        src_conn.backup(dst_conn)
+        src_conn.close()
+        dst_conn.close()
+    except sqlite3.Error as e:
+        if backup_path.exists():
+            backup_path.unlink()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"备份创建失败，清空操作已中止：{e}",
+        )
+
+    # ── 5. 确认备份文件真实存在且大小 > 0 ──
+    if not backup_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="备份文件创建后未找到，清空操作已中止",
+        )
+    backup_size = backup_path.stat().st_size
+    if backup_size == 0:
+        backup_path.unlink()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="备份文件大小为 0，清空操作已中止",
+        )
+
+    # ── 6. 在事务中按安全顺序清空测试业务数据 ──
+    try:
+        conn = sqlite3.connect(str(DB_PATH))
+        conn.execute("PRAGMA foreign_keys = OFF")
+        conn.execute("BEGIN TRANSACTION")
+
+        # 6a. 审计日志（子表，先清空）
+        if _table_exists(conn, "audit_logs"):
+            conn.execute("DELETE FROM audit_logs")
+
+        # 6b. 出入库记录（引用 products，次清空）
+        if _table_exists(conn, "transactions"):
+            conn.execute("DELETE FROM transactions")
+
+        # 6c. 产品数据（最后清空）
+        conn.execute("DELETE FROM products")
+
+        conn.execute("COMMIT")
+        conn.close()
+    except sqlite3.Error as e:
+        try:
+            conn.execute("ROLLBACK")
+            conn.close()
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"清空操作失败，事务已回滚：{e}",
+        )
+
+    # ── 7. 统计清空后数据量 ──
+    try:
+        conn = sqlite3.connect(str(DB_PATH))
+        after_counts = _count_business_data(conn)
+        conn.close()
+    except sqlite3.Error as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"清空后数据统计失败：{e}",
+        )
+
+    # ── 8. 运行 preflight 检查 ──
+    preflight_warnings: List[str] = []
+    preflight_errors: List[str] = []
+    preflight_status = "ok"
+
+    try:
+        conn = sqlite3.connect(str(DB_PATH))
+        conn.row_factory = sqlite3.Row
+
+        pf_products = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
+        pf_transactions = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
+        pf_audit = 0
+        if _table_exists(conn, "audit_logs"):
+            pf_audit = conn.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0]
+        pf_negative = conn.execute(
+            "SELECT COUNT(*) FROM products WHERE current_stock < 0"
+        ).fetchone()[0]
+        pf_dup_sku = len(conn.execute(
+            "SELECT sku, COUNT(*) as cnt FROM products GROUP BY sku HAVING cnt > 1"
+        ).fetchall())
+
+        pf_orphan = 0
+        pf_missing_pid = 0
+        if _column_exists(conn, "transactions", "product_id"):
+            pf_missing_pid = conn.execute(
+                "SELECT COUNT(*) FROM transactions WHERE product_id IS NULL OR product_id = 0"
+            ).fetchone()[0]
+            pf_orphan = conn.execute("""
+                SELECT COUNT(*) FROM transactions t
+                WHERE t.product_id IS NOT NULL AND t.product_id > 0
+                AND NOT EXISTS (SELECT 1 FROM products p WHERE p.id = t.product_id)
+            """).fetchone()[0]
+
+        conn.close()
+
+        if pf_products > 0:
+            preflight_warnings.append(f"清空后 products 表仍有 {pf_products} 条记录")
+            preflight_status = "warning"
+        if pf_transactions > 0:
+            preflight_warnings.append(f"清空后 transactions 表仍有 {pf_transactions} 条记录")
+            preflight_status = "warning"
+        if pf_audit > 0:
+            preflight_warnings.append(f"清空后 audit_logs 表仍有 {pf_audit} 条记录")
+            preflight_status = "warning"
+        if pf_negative > 0:
+            preflight_errors.append(f"清空后仍存在 {pf_negative} 个负库存产品")
+            preflight_status = "error"
+        if pf_orphan > 0:
+            preflight_errors.append(f"清空后仍存在 {pf_orphan} 条孤立 product_id 交易记录")
+            preflight_status = "error"
+
+        post_preflight = PreflightResponse(
+            database_exists=True,
+            database_readable=True,
+            backup_dir_exists=BACKUP_DIR.exists() and BACKUP_DIR.is_dir(),
+            backup_dir_writable=backup_size > 0,  # 刚成功写入备份，目录必定可写
+            products_count=pf_products,
+            transactions_count=pf_transactions,
+            audit_logs_count=pf_audit,
+            negative_stock_count=pf_negative,
+            transactions_missing_product_id_count=pf_missing_pid,
+            transactions_orphan_product_id_count=pf_orphan,
+            duplicate_sku_count=pf_dup_sku,
+            status=preflight_status,
+            warnings=preflight_warnings,
+            errors=preflight_errors,
+        )
+    except sqlite3.Error as e:
+        post_preflight = PreflightResponse(
+            database_exists=DB_PATH.exists(),
+            database_readable=False,
+            backup_dir_exists=BACKUP_DIR.exists() and BACKUP_DIR.is_dir(),
+            backup_dir_writable=False,
+            products_count=0,
+            transactions_count=0,
+            audit_logs_count=0,
+            negative_stock_count=0,
+            transactions_missing_product_id_count=0,
+            transactions_orphan_product_id_count=0,
+            duplicate_sku_count=0,
+            status="error",
+            warnings=[],
+            errors=[f"清空后 preflight 检查失败：{e}"],
+        )
+
+    # ── 9. 组装返回 ──
+    return ResetBusinessDataResponse(
+        success=True,
+        message="测试业务数据已清空",
+        backup=ResetBusinessDataBackup(
+            filename=backup_filename,
+            size_bytes=backup_size,
+            created_at=backup_created_at,
+        ),
+        before=ResetBusinessDataCounts(**before_counts),
+        after=ResetBusinessDataCounts(**after_counts),
+        preflight=post_preflight,
+        warnings=[
+            "用户账号、系统设置和备份文件已保留。",
+            "后续正式数据应以旧系统导出的真实产品库存 CSV 为准重新导入。",
+        ],
     )

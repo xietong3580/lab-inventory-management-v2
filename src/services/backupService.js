@@ -245,3 +245,50 @@ export async function getResetPreview() {
 
   return response.json();
 }
+
+/**
+ * 清空测试业务数据（仅管理员可用，需确认短语完全匹配）
+ * @param {string} confirmation - 确认短语，必须为「清空测试业务数据」
+ * @returns {Promise<{
+ *   success: boolean,
+ *   message: string,
+ *   backup: { filename: string, size_bytes: number, created_at: string },
+ *   before: { products: number, transactions: number, ledger_records: number, audit_logs: number, low_stock_products: number },
+ *   after: { products: number, transactions: number, ledger_records: number, audit_logs: number, low_stock_products: number },
+ *   preflight: {
+ *     database_exists: boolean, database_readable: boolean,
+ *     backup_dir_exists: boolean, backup_dir_writable: boolean,
+ *     products_count: number, transactions_count: number, audit_logs_count: number,
+ *     negative_stock_count: number, transactions_missing_product_id_count: number,
+ *     transactions_orphan_product_id_count: number, duplicate_sku_count: number,
+ *     status: 'ok' | 'warning' | 'error', warnings: string[], errors: string[]
+ *   },
+ *   warnings: string[]
+ * }>}
+ */
+export async function resetBusinessData(confirmation) {
+  const token = getToken();
+  if (!token) {
+    throw new Error('未登录');
+  }
+
+  const response = await fetch(`${API_BASE}/maintenance/reset-business-data`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ confirmation }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 403) {
+      throw new Error('需要管理员权限才能执行清空操作');
+    }
+    throw new Error(errorData.detail || `清空请求失败 (${response.status})`);
+  }
+
+  return response.json();
+}
