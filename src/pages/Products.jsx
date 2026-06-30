@@ -1100,8 +1100,8 @@ function Products() {
               >
                 取消
               </button>
-              {/* admin 可见：创建备份后再导出（仅当有警告或错误时显示） */}
-              {canWrite && preflightResult && preflightResult.status !== 'ok' && (
+              {/* admin 始终可见：创建备份后再导出 */}
+              {canWrite && !isPreflightChecking && (
                 <button
                   onClick={handleBackupThenExport}
                   disabled={isBackupBeforeExport}
