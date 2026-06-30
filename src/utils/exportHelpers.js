@@ -167,29 +167,39 @@ export const exportProductsToCSV = (products, fileName = 'products-export') => {
     return;
   }
 
-  // 构建 CSV 标题行
+  // 构建 CSV 标题行（字段顺序对齐数据库真实列，便于旧系统迁移与人工核对）
   const headers = [
-    '产品名称',
+    '产品ID',
     'SKU',
+    '产品名称',
     '分类',
+    '品牌',
+    '规格',
+    '存储位置',
+    '单位',
     '当前库存',
     '最低库存',
-    '状态',
-    '单位',
-    '存储位置',
-    '最后更新'
+    '库存状态',
+    '供应商',
+    '备注',
+    '更新日期'
   ];
 
   // 构建数据行
   const rows = products.map(product => [
-    escapeCSV(product.name || ''),
+    escapeCSV(product.id || ''),
     escapeCSV(product.sku || ''),
+    escapeCSV(product.name || ''),
     escapeCSV(product.category || ''),
-    escapeCSV(product.currentStock || 0),
-    escapeCSV(product.minStock || 0),
-    escapeCSV(product.status === '低库存' ? '低库存' : '正常'),
-    escapeCSV(product.unit || ''),
+    escapeCSV(product.brand || ''),
+    escapeCSV(product.specification || ''),
     escapeCSV(product.location || ''),
+    escapeCSV(product.unit || ''),
+    escapeCSV(product.currentStock != null ? product.currentStock : 0),
+    escapeCSV(product.minStock != null ? product.minStock : 0),
+    escapeCSV(product.status || '正常'),
+    escapeCSV(product.supplier || ''),
+    escapeCSV(product.notes || ''),
     escapeCSV(product.lastUpdated || '')
   ]);
 

@@ -4,6 +4,7 @@ import { getProductsWithCalculatedStatus, calculateProductStatus, updateProduct,
 import { getLedgerTypeConfig, formatLedgerTime } from '../utils/inventoryHistoryHelpers';
 import { filterProducts, hasActiveFilters } from '../utils/productFilterHelpers';
 import { exportProductsToCSV } from '../utils/exportHelpers';
+import { runPreflightCheck, createMaintenanceBackup } from '../services/backupService';
 import { usePermission } from '../hooks/usePermission';
 import {
   INVENTORY_CATEGORIES,
@@ -86,6 +87,13 @@ function Products() {
   const [saveError, setSaveError] = useState(null);
   const [deletingId, setDeletingId] = useState(null); // 正在删除的产品 ID
   const [actionMessage, setActionMessage] = useState(null); // { type: 'success'|'error', text: '...' }
+
+  // 导出前安全检查相关状态
+  const [isPreflightChecking, setIsPreflightChecking] = useState(false);
+  const [preflightResult, setPreflightResult] = useState(null);
+  const [preflightError, setPreflightError] = useState('');
+  const [showPreflightModal, setShowPreflightModal] = useState(false);
+  const [isBackupBeforeExport, setIsBackupBeforeExport] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -187,11 +195,43 @@ function Products() {
     }, 0);
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (filteredProducts.length === 0) {
       alert('没有可导出的数据，请先调整筛选条件或等待数据加载。');
       return;
     }
+    // 导出前先运行安全检查
+    setIsPreflightChecking(true);
+    setPreflightResult(null);
+    setPreflightError('');
+    try {
+      const result = await runPreflightCheck();
+      setPreflightResult(result);
+    } catch (err) {
+      setPreflightError(err.message || '安全检查请求失败');
+    } finally {
+      setIsPreflightChecking(false);
+      setShowPreflightModal(true);
+    }
+  };
+
+  // 确认导出（跳过安全检查或检查通过后）
+  const handleConfirmExport = () => {
+    setShowPreflightModal(false);
+    exportProductsToCSV(filteredProducts, 'products-export');
+  };
+
+  // 创建备份后再导出（仅 admin 可用）
+  const handleBackupThenExport = async () => {
+    setIsBackupBeforeExport(true);
+    try {
+      await createMaintenanceBackup();
+    } catch (err) {
+      console.error('创建备份失败:', err);
+    } finally {
+      setIsBackupBeforeExport(false);
+    }
+    setShowPreflightModal(false);
     exportProductsToCSV(filteredProducts, 'products-export');
   };
 
@@ -933,6 +973,165 @@ function Products() {
           提示：点击"编辑"可修改产品信息，点击"删除"将移除该产品记录。低库存状态的产品会以橙色标识。
         </div>
       </div>
+
+      {/* 导出前安全检查模态框 */}
+      {showPreflightModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-200">
+              <h2 className="text-lg font-semibold text-slate-800">导出前安全检查</h2>
+              <p className="text-sm text-slate-500 mt-1">在导出产品数据前检查数据库完整性</p>
+            </div>
+
+            <div className="p-4 md:p-6 space-y-4">
+              {/* 检查中 */}
+              {isPreflightChecking && (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-600 mr-3"></div>
+                  <span className="text-slate-600">正在检查数据库状态...</span>
+                </div>
+              )}
+
+              {/* 检查失败 */}
+              {preflightError && !isPreflightChecking && (
+                <div className="p-3 rounded-md border bg-rose-50 border-rose-200">
+                  <div className="text-rose-800 font-medium mb-1">检查请求失败</div>
+                  <div className="text-sm text-rose-700">{preflightError}</div>
+                </div>
+              )}
+
+              {/* 检查结果 */}
+              {preflightResult && !isPreflightChecking && (
+                <>
+                  {/* 状态横幅 */}
+                  <div className={`p-3 rounded-md border text-sm ${
+                    preflightResult.status === 'ok'
+                      ? 'bg-emerald-50 border-emerald-200'
+                      : preflightResult.status === 'warning'
+                      ? 'bg-amber-50 border-amber-200'
+                      : 'bg-rose-50 border-rose-200'
+                  }`}>
+                    <div className={`font-medium mb-2 ${
+                      preflightResult.status === 'ok'
+                        ? 'text-emerald-800'
+                        : preflightResult.status === 'warning'
+                        ? 'text-amber-800'
+                        : 'text-rose-800'
+                    }`}>
+                      {preflightResult.status === 'ok' && '✅ 检查通过 — 可以安全导出'}
+                      {preflightResult.status === 'warning' && '⚠️ 存在警告 — 仍可导出，但建议先处理'}
+                      {preflightResult.status === 'error' && '❌ 存在错误 — 导出有风险，请确认后再操作'}
+                    </div>
+                    <div className="space-y-1 text-slate-700">
+                      <div className="flex gap-2">
+                        <span className="text-slate-500 shrink-0">产品数：</span>
+                        <span>{preflightResult.products_count}</span>
+                        <span className="text-slate-400 mx-1">|</span>
+                        <span className="text-slate-500">交易数：</span>
+                        <span>{preflightResult.transactions_count}</span>
+                        <span className="text-slate-400 mx-1">|</span>
+                        <span className="text-slate-500">日志数：</span>
+                        <span>{preflightResult.audit_logs_count}</span>
+                      </div>
+                      {/* 异常项 */}
+                      {(preflightResult.negative_stock_count > 0 ||
+                        preflightResult.transactions_missing_product_id_count > 0 ||
+                        preflightResult.transactions_orphan_product_id_count > 0 ||
+                        preflightResult.duplicate_sku_count > 0) && (
+                        <div className="flex gap-2 mt-1">
+                          <span className="text-slate-500 shrink-0">异常：</span>
+                          <span className="text-rose-700">
+                            {[
+                              preflightResult.negative_stock_count > 0 && `负库存 ${preflightResult.negative_stock_count}`,
+                              preflightResult.transactions_missing_product_id_count > 0 && `缺productId ${preflightResult.transactions_missing_product_id_count}`,
+                              preflightResult.transactions_orphan_product_id_count > 0 && `孤立productId ${preflightResult.transactions_orphan_product_id_count}`,
+                              preflightResult.duplicate_sku_count > 0 && `重复SKU ${preflightResult.duplicate_sku_count}`,
+                            ].filter(Boolean).join(' · ')}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    {/* Warnings 明细 */}
+                    {preflightResult.warnings && preflightResult.warnings.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-amber-200">
+                        <div className="text-xs font-medium text-amber-700 mb-1">警告明细：</div>
+                        <ul className="text-xs text-amber-700 space-y-0.5 list-disc list-inside">
+                          {preflightResult.warnings.map((w, i) => (
+                            <li key={i}>{w}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {/* Errors 明细 */}
+                    {preflightResult.errors && preflightResult.errors.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-rose-200">
+                        <div className="text-xs font-medium text-rose-700 mb-1">错误明细：</div>
+                        <ul className="text-xs text-rose-700 space-y-0.5 list-disc list-inside">
+                          {preflightResult.errors.map((e, i) => (
+                            <li key={i}>{e}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 权限提示 */}
+                  {!canWrite && (
+                    <div className="p-3 rounded-md border bg-slate-50 border-slate-200 text-sm text-slate-600">
+                      ℹ️ 当前为只读权限，仅可查看检查结果。如需创建备份，请联系管理员。
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* 检查失败但可跳过 */}
+              {preflightError && !isPreflightChecking && (
+                <div className="p-3 rounded-md border bg-amber-50 border-amber-200 text-sm text-amber-700">
+                  安全检查未完成，仍可继续导出，但建议确认数据状态后再操作。
+                </div>
+              )}
+            </div>
+
+            {/* 底部操作按钮 */}
+            <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex flex-wrap justify-end gap-3">
+              <button
+                onClick={() => setShowPreflightModal(false)}
+                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium"
+              >
+                取消
+              </button>
+              {/* admin 可见：创建备份后再导出（仅当有警告或错误时显示） */}
+              {canWrite && preflightResult && preflightResult.status !== 'ok' && (
+                <button
+                  onClick={handleBackupThenExport}
+                  disabled={isBackupBeforeExport}
+                  className={`px-4 py-2 rounded-md transition-colors font-medium ${
+                    isBackupBeforeExport
+                      ? 'bg-slate-400 text-white cursor-not-allowed'
+                      : 'bg-slate-700 text-white hover:bg-slate-800'
+                  }`}
+                >
+                  {isBackupBeforeExport ? '备份中...' : '创建备份后导出'}
+                </button>
+              )}
+              <button
+                onClick={handleConfirmExport}
+                disabled={isPreflightChecking}
+                className={`px-4 py-2 rounded-md transition-colors font-medium ${
+                  isPreflightChecking
+                    ? 'bg-slate-400 text-white cursor-not-allowed'
+                    : preflightResult?.status === 'error'
+                    ? 'bg-rose-600 text-white hover:bg-rose-700'
+                    : 'bg-slate-700 text-white hover:bg-slate-800'
+                }`}
+                title={preflightResult?.status === 'error' ? '存在错误，导出有风险，请确认后继续' : ''}
+              >
+                {preflightResult?.status === 'error' ? '已知风险，继续导出' : '继续导出'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 产品表单模态框 */}
       {isModalOpen && (
