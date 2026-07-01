@@ -180,6 +180,8 @@ export const exportProductsToCSV = (products, fileName = 'products-export') => {
     '当前库存',
     '最低库存',
     '库存状态',
+    '采购价',
+    '售价',
     '供应商',
     '备注',
     '更新日期'
@@ -198,6 +200,8 @@ export const exportProductsToCSV = (products, fileName = 'products-export') => {
     escapeCSV(product.currentStock != null ? product.currentStock : 0),
     escapeCSV(product.minStock != null ? product.minStock : 0),
     escapeCSV(product.status || '正常'),
+    escapeCSV(product.purchasePrice != null ? product.purchasePrice : ''),
+    escapeCSV(product.salePrice != null ? product.salePrice : ''),
     escapeCSV(product.supplier || ''),
     escapeCSV(product.notes || ''),
     escapeCSV(product.lastUpdated || '')

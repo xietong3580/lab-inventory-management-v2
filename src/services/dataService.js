@@ -74,6 +74,9 @@ const FIELD_MAPPING = {
   brand: 'brand',
   specification: 'specification',
   supplier: 'supplier',
+  // P1 价格字段（Step 10-6C）
+  purchase_price: 'purchasePrice',
+  sale_price: 'salePrice',
   // notes 映射保持为 notes（与 Transaction notes 共享）
   // 交易记录字段映射
   transaction_id: 'id',

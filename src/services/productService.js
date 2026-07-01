@@ -136,7 +136,9 @@ export const addProduct = (productData) => {
         brand: newProduct.brand || '',
         specification: newProduct.specification || '',
         supplier: newProduct.supplier || '',
-        notes: newProduct.notes || ''
+        notes: newProduct.notes || '',
+        purchasePrice: newProduct.purchasePrice ?? null,
+        salePrice: newProduct.salePrice ?? null
       }
     }
   );
@@ -197,7 +199,9 @@ export const updateProduct = (id, updates) => {
         brand: oldProduct.brand || '',
         specification: oldProduct.specification || '',
         supplier: oldProduct.supplier || '',
-        notes: oldProduct.notes || ''
+        notes: oldProduct.notes || '',
+        purchasePrice: oldProduct.purchasePrice ?? null,
+        salePrice: oldProduct.salePrice ?? null
       },
       newProduct: {
         name: updatedProduct.name,
@@ -210,7 +214,9 @@ export const updateProduct = (id, updates) => {
         brand: updatedProduct.brand || '',
         specification: updatedProduct.specification || '',
         supplier: updatedProduct.supplier || '',
-        notes: updatedProduct.notes || ''
+        notes: updatedProduct.notes || '',
+        purchasePrice: updatedProduct.purchasePrice ?? null,
+        salePrice: updatedProduct.salePrice ?? null
       },
       changedFields,
       updateSummary: Object.keys(changedFields).length > 0
@@ -262,6 +268,8 @@ export const deleteProduct = (id) => {
             specification: productToDelete.specification || '',
             supplier: productToDelete.supplier || '',
             notes: productToDelete.notes || '',
+            purchasePrice: productToDelete.purchasePrice ?? null,
+            salePrice: productToDelete.salePrice ?? null,
             lastUpdated: productToDelete.lastUpdated || ''
           },
           deletionTime: getCurrentDateTimeWithSeconds()

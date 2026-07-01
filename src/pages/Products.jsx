@@ -107,7 +107,9 @@ function Products() {
     brand: '',
     specification: '',
     supplier: '',
-    notes: ''
+    notes: '',
+    purchasePrice: '',
+    salePrice: ''
   });
 
   // 辅助函数：获取当前日期字符串
@@ -265,7 +267,9 @@ function Products() {
         brand: product.brand || '',
         specification: product.specification || '',
         supplier: product.supplier || '',
-        notes: product.notes || ''
+        notes: product.notes || '',
+        purchasePrice: product.purchasePrice != null ? product.purchasePrice : '',
+        salePrice: product.salePrice != null ? product.salePrice : ''
       });
     } else {
       // 新增模式：重置表单
@@ -280,7 +284,9 @@ function Products() {
         brand: '',
         specification: '',
         supplier: '',
-        notes: ''
+        notes: '',
+        purchasePrice: '',
+        salePrice: ''
       });
     }
     setIsModalOpen(true);
@@ -307,6 +313,15 @@ function Products() {
       setSaveError('SKU 不能为空，请填写后保存');
       return;
     }
+    // Step 10-6C：价格字段非负数校验
+    if (formData.purchasePrice !== '' && Number(formData.purchasePrice) < 0) {
+      setSaveError('采购价不能为负数');
+      return;
+    }
+    if (formData.salePrice !== '' && Number(formData.salePrice) < 0) {
+      setSaveError('售价不能为负数');
+      return;
+    }
 
     setIsSaving(true);
     setSaveError(null);
@@ -323,6 +338,8 @@ function Products() {
           specification: formData.specification.trim(),
           supplier: formData.supplier.trim(),
           notes: formData.notes.trim(),
+          purchasePrice: formData.purchasePrice !== '' ? Number(formData.purchasePrice) : null,
+          salePrice: formData.salePrice !== '' ? Number(formData.salePrice) : null,
           lastUpdated: getToday()
         };
         const updatedProduct = await dataProductService.updateProduct(editingProduct.id, updates);
@@ -347,6 +364,8 @@ function Products() {
           specification: formData.specification.trim(),
           supplier: formData.supplier.trim(),
           notes: formData.notes.trim(),
+          purchasePrice: formData.purchasePrice !== '' ? Number(formData.purchasePrice) : null,
+          salePrice: formData.salePrice !== '' ? Number(formData.salePrice) : null,
           lastUpdated: getToday()
         };
         const newProduct = await dataProductService.addProduct(newProductData);
@@ -383,6 +402,8 @@ function Products() {
             specification: formData.specification.trim(),
             supplier: formData.supplier.trim(),
             notes: formData.notes.trim(),
+            purchasePrice: formData.purchasePrice !== '' ? Number(formData.purchasePrice) : null,
+            salePrice: formData.salePrice !== '' ? Number(formData.salePrice) : null,
             lastUpdated: getToday()
           };
           const updatedProduct = updateProduct(editingProduct.id, updates);
@@ -409,6 +430,8 @@ function Products() {
             specification: formData.specification.trim(),
             supplier: formData.supplier.trim(),
             notes: formData.notes.trim(),
+            purchasePrice: formData.purchasePrice !== '' ? Number(formData.purchasePrice) : null,
+            salePrice: formData.salePrice !== '' ? Number(formData.salePrice) : null,
             lastUpdated: getToday()
           };
           const newProduct = addProduct(newProductData);
@@ -1368,6 +1391,40 @@ function Products() {
                       onChange={handleFormChange}
                       className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
                       placeholder="产品备注说明"
+                    />
+                  </div>
+                </div>
+
+                {/* P1 价格字段（Step 10-6C） */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      采购价
+                    </label>
+                    <input
+                      type="number"
+                      name="purchasePrice"
+                      value={formData.purchasePrice}
+                      onChange={handleFormChange}
+                      step="0.01"
+                      min="0"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      placeholder="如：12.50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                      售价
+                    </label>
+                    <input
+                      type="number"
+                      name="salePrice"
+                      value={formData.salePrice}
+                      onChange={handleFormChange}
+                      step="0.01"
+                      min="0"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      placeholder="如：25.00"
                     />
                   </div>
                 </div>

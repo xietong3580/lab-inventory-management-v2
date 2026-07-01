@@ -20,6 +20,9 @@ class ProductBase(BaseModel):
     specification: Optional[str] = ""
     supplier: Optional[str] = ""
     notes: Optional[str] = ""
+    # P1 价格字段（Step 10-6C）
+    purchasePrice: Optional[float] = None
+    salePrice: Optional[float] = None
 
 class ProductCreate(ProductBase):
     """创建产品请求模型"""
@@ -39,6 +42,9 @@ class ProductUpdate(BaseModel):
     specification: Optional[str] = None
     supplier: Optional[str] = None
     notes: Optional[str] = None
+    # P1 价格字段（Step 10-6C）
+    purchasePrice: Optional[float] = None
+    salePrice: Optional[float] = None
 
 class ProductResponse(ProductBase):
     """产品响应模型"""

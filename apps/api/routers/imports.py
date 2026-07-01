@@ -100,6 +100,19 @@ P1_FIELD_ALIASES: Dict[str, List[str]] = {
         "供应商", "供货商", "供应单位",
         "厂商",
     ],
+    # P1 价格字段（Step 10-6C）
+    "purchase_price": [
+        "purchase_price", "purchasePrice",
+        "采购价", "成本价", "进价",
+        "采购单价", "成本单价",
+        "cost_price",
+    ],
+    "sale_price": [
+        "sale_price", "salePrice",
+        "售价", "销售价", "销售单价",
+        "报价", "参考售价",
+        "price", "selling_price",
+    ],
     "image_url": [
         "image", "image_url",
         "图片", "产品图片",
@@ -509,9 +522,28 @@ def _parse_and_validate_csv(
             elif prio == "P1":
                 v = raw_val.strip() if raw_val else None
                 p1_data[canonical] = v
-                if not v:
-                    display = _field_display(canonical)
-                    row_warnings.append(f"建议填写'{display}'字段")
+                # Step 10-6C：价格字段数值校验
+                if canonical in ("purchase_price", "sale_price"):
+                    if not v:
+                        display = _field_display(canonical)
+                        row_warnings.append(f"建议填写'{display}'字段")
+                    else:
+                        try:
+                            num = float(v)
+                            if num < 0:
+                                row_errors.append(
+                                    f"{_field_display(canonical)}不能为负数: {num}"
+                                )
+                            else:
+                                p1_data[canonical] = num
+                        except (ValueError, TypeError):
+                            row_errors.append(
+                                f"{_field_display(canonical)}不是有效数字: '{v}'"
+                            )
+                else:
+                    if not v:
+                        display = _field_display(canonical)
+                        row_warnings.append(f"建议填写'{display}'字段")
             elif prio == "P2":
                 v = raw_val.strip() if raw_val else None
                 p2_data[canonical] = v
@@ -1016,6 +1048,9 @@ async def execute_products_import(
                 specification=(p1.get("specification") or None),
                 supplier=(p1.get("supplier") or None),
                 notes=(p1.get("notes") or None),
+                # P1 价格字段（Step 10-6C）
+                purchase_price=p1.get("purchase_price"),
+                sale_price=p1.get("sale_price"),
             )
             db.add(product)
             db.flush()  # 获取自增 id

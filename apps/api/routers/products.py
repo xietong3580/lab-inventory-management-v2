@@ -82,6 +82,9 @@ def create_product(product_data: ProductCreate, db: Session = Depends(get_db), c
         specification=product_data.specification or None,
         supplier=product_data.supplier or None,
         notes=product_data.notes or None,
+        # P1 价格字段（Step 10-6C）
+        purchase_price=product_data.purchasePrice,
+        sale_price=product_data.salePrice,
     )
 
     db.add(db_product)
@@ -139,6 +142,9 @@ def update_product(
         "specification": "specification",
         "supplier": "supplier",
         "notes": "notes",
+        # P1 价格字段（Step 10-6C）
+        "purchasePrice": "purchase_price",
+        "salePrice": "sale_price",
     }
 
     for frontend_key, backend_key in field_mapping.items():

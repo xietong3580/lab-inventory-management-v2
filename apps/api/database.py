@@ -80,6 +80,9 @@ def migrate_products():
         ("specification", "VARCHAR(200)"),
         ("supplier", "VARCHAR(100)"),
         ("notes", "TEXT"),
+        # P1 价格字段（Step 10-6C）
+        ("purchase_price", "FLOAT"),
+        ("sale_price", "FLOAT"),
     ]
 
     for col_name, col_type in new_columns:
@@ -142,6 +145,10 @@ class Product(Base):
     supplier = Column(String(100), nullable=True)
     notes = Column(Text, nullable=True)
 
+    # P1 价格字段（Step 10-6C）
+    purchase_price = Column(Float, nullable=True)
+    sale_price = Column(Float, nullable=True)
+
     # 额外字段
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
@@ -166,6 +173,9 @@ class Product(Base):
             "specification": self.specification or "",
             "supplier": self.supplier or "",
             "notes": self.notes or "",
+            # P1 价格字段（Step 10-6C）
+            "purchasePrice": self.purchase_price,
+            "salePrice": self.sale_price,
         }
 
 class Transaction(Base):
