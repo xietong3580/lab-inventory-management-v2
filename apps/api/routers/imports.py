@@ -354,6 +354,9 @@ def _parse_and_validate_csv(
             else:
                 recognized_stock_context.append(canonical)
 
+    # 必填字段缺失检查（在所有返回路径中展示）
+    missing_required = [f for f in REQUIRED_FIELDS if f not in field_headers]
+
     # 重复映射 → 直接返回错误
     header_errors: List[str] = []
     for field, headers in dup_check.items():
@@ -375,6 +378,7 @@ def _parse_and_validate_csv(
                 "recognized_p2": recognized_p2,
                 "recognized_stock_context": recognized_stock_context,
                 "ignored": ignored_columns,
+                "missing_required": missing_required,
             },
             "rows": [],
             "errors": header_errors,
@@ -406,6 +410,7 @@ def _parse_and_validate_csv(
                 "recognized_p2": recognized_p2,
                 "recognized_stock_context": recognized_stock_context,
                 "ignored": ignored_columns,
+                "missing_required": missing_required,
             },
             "rows": [],
             "errors": [
@@ -420,8 +425,7 @@ def _parse_and_validate_csv(
             ],
         }
 
-    # ── 5. 必填字段检查 ──────────────────────────────────────
-    missing_required = [f for f in REQUIRED_FIELDS if f not in field_headers]
+    # ── 5. 必填字段检查（使用步骤 3 已计算的 missing_required）──
     if missing_required:
         aliases_all = {**P0_FIELD_ALIASES, **P1_FIELD_ALIASES,
                        **P2_FIELD_ALIASES, **STOCK_CONTEXT_ALIASES}
@@ -439,6 +443,7 @@ def _parse_and_validate_csv(
                 "recognized_p2": recognized_p2,
                 "recognized_stock_context": recognized_stock_context,
                 "ignored": ignored_columns,
+                "missing_required": missing_required,
             },
             "rows": [],
             "errors": [
@@ -471,6 +476,7 @@ def _parse_and_validate_csv(
                 "recognized_p2": recognized_p2,
                 "recognized_stock_context": recognized_stock_context,
                 "ignored": ignored_columns,
+                "missing_required": missing_required,
             },
             "rows": [],
             "errors": ["CSV 文件仅包含表头，没有数据行"],
@@ -503,11 +509,9 @@ def _parse_and_validate_csv(
             elif prio == "P1":
                 v = raw_val.strip() if raw_val else None
                 p1_data[canonical] = v
-                if v:
-                    row_warnings.append(
-                        f"P1 扩展字段 '{_field_display(canonical)}' "
-                        f"将写入数据库"
-                    )
+                if not v:
+                    display = _field_display(canonical)
+                    row_warnings.append(f"建议填写'{display}'字段")
             elif prio == "P2":
                 v = raw_val.strip() if raw_val else None
                 p2_data[canonical] = v
@@ -700,6 +704,7 @@ def _parse_and_validate_csv(
             "recognized_p2": recognized_p2,
             "recognized_stock_context": recognized_stock_context,
             "ignored": ignored_columns,
+            "missing_required": missing_required,
         },
         "rows": row_results,
         "errors": global_errors,

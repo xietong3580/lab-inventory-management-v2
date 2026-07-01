@@ -229,6 +229,7 @@ function ProductImportPreview() {
         p2: Array.isArray(columns.recognized_p2) ? columns.recognized_p2 : [],
         stockContext: Array.isArray(columns.recognized_stock_context) ? columns.recognized_stock_context : [],
         ignored: Array.isArray(columns.ignored) ? columns.ignored : [],
+        missingRequired: Array.isArray(columns.missing_required) ? columns.missing_required : [],
       }
     : null;
 
@@ -512,24 +513,45 @@ function ProductImportPreview() {
               {/* can_import 状态提示 */}
               {stats.canImport === false && (
                 <div className="mt-3 p-3 bg-rose-50 border border-rose-200 rounded-md">
-                  <span className="text-sm text-rose-700">
-                    当前 CSV 存在阻断错误，不能进入正式导入。
-                  </span>
-                  <span className="text-sm text-rose-600 ml-1">请修正错误后重新预览。</span>
+                  <div className="text-sm text-rose-700 flex items-start gap-2">
+                    <span className="text-rose-500 mt-0.5 shrink-0">✗</span>
+                    <span>
+                      <strong>存在错误，正式导入前需要修正。</strong>
+                      请修正上方红色错误后重新预览。
+                    </span>
+                  </div>
                 </div>
               )}
-              {stats.canImport === true && canWrite && (
+              {stats.canImport === true && canWrite && stats.warning === 0 && stats.error === 0 && (
                 <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-md">
-                  <span className="text-sm text-emerald-700">
-                    当前 CSV 通过预览校验，确认数据库备份后可执行正式导入。
-                  </span>
+                  <div className="text-sm text-emerald-700 flex items-start gap-2">
+                    <span className="text-emerald-500 mt-0.5 shrink-0">✓</span>
+                    <span>
+                      <strong>预览通过，可进入后续导入流程。</strong>
+                      确认数据库备份后可执行正式导入。
+                    </span>
+                  </div>
+                </div>
+              )}
+              {stats.canImport === true && canWrite && (stats.warning > 0 || stats.error > 0) && (
+                <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                  <div className="text-sm text-amber-700 flex items-start gap-2">
+                    <span className="text-amber-500 mt-0.5 shrink-0">⚠</span>
+                    <span>
+                      <strong>可继续人工确认，但建议补全字段。</strong>
+                      当前 {stats.warning} 行存在建议级警告，建议补全品牌、规格、供应商、备注等字段以获得更完整的库存数据。
+                    </span>
+                  </div>
                 </div>
               )}
               {stats.canImport === true && !canWrite && (
                 <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-md">
-                  <span className="text-sm text-slate-600">
-                    当前 CSV 通过预览校验，但仅管理员可执行正式导入。
-                  </span>
+                  <div className="text-sm text-slate-600 flex items-start gap-2">
+                    <span className="text-slate-400 mt-0.5 shrink-0">ℹ</span>
+                    <span>
+                      当前 CSV 通过预览校验，但<strong>仅管理员可执行正式导入</strong>。
+                    </span>
+                  </div>
                 </div>
               )}
             </div>
@@ -590,6 +612,31 @@ function ProductImportPreview() {
           {/* ── 字段识别 ── */}
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-slate-800 mb-3">字段识别结果</h2>
+
+            {/* 缺失必填字段警示 */}
+            {fields && fields.missingRequired.length > 0 && (
+              <div className="mb-4 p-4 bg-rose-50 border border-rose-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <span className="text-rose-500 mt-0.5 shrink-0 text-lg leading-none">✗</span>
+                  <div>
+                    <div className="text-sm font-semibold text-rose-800 mb-1">
+                      缺失必填字段 — 无法导入
+                    </div>
+                    <div className="text-sm text-rose-700">
+                      CSV 表头中缺少以下必填字段列，请补充后重新上传：
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {fields.missingRequired.map((f) => (
+                        <span key={f} className="px-2 py-1 bg-rose-100 text-rose-800 text-xs rounded border border-rose-300 font-medium">
+                          {f}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* P0: 当前可落库字段 */}
               <div className="bg-white border border-slate-200 rounded-lg">
@@ -931,13 +978,18 @@ function ProductImportPreview() {
                   </span>
                 )}
                 {canWrite && !stats?.canImport && stats && (
-                  <span className="text-xs text-slate-400">
-                    请修正 CSV 中的阻断错误后重新预览
+                  <span className="text-xs text-rose-500 font-medium">
+                    存在错误 · 请修正后重新预览
                   </span>
                 )}
-                {canWrite && stats?.canImport && (
-                  <span className="text-xs text-slate-500">
-                    预览校验通过，可执行正式导入
+                {canWrite && stats?.canImport && (stats.warning > 0 || stats.error > 0) && (
+                  <span className="text-xs text-amber-600 font-medium">
+                    预览通过 · 建议补全字段后可执行正式导入
+                  </span>
+                )}
+                {canWrite && stats?.canImport && stats.warning === 0 && stats.error === 0 && (
+                  <span className="text-xs text-emerald-600 font-medium">
+                    预览通过 · 可执行正式导入
                   </span>
                 )}
               </div>
