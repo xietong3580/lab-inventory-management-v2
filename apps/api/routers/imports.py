@@ -27,6 +27,7 @@ P0_FIELD_ALIASES: Dict[str, List[str]] = {
         "sku", "SKU",
         "产品货号", "货号", "产品编号", "商品编号", "物料编码",
         "产品代码",
+        "编码",  # 旧系统常见简写形式
     ],
     "name": [
         "name",
@@ -46,6 +47,7 @@ P0_FIELD_ALIASES: Dict[str, List[str]] = {
         "当前库存", "库存数量", "现有库存",
         "库存", "当前库存数量", "在库数量",
         "stock", "quantity", "qty",
+        "现存量",  # 旧系统常见库存列名
         # ── 明确本地真实库存（无需口径 warning） ──
         "本地库存", "本地真实库存", "实际库存", "实物库存", "本仓库存",
         "local_stock", "real_stock", "physical_stock",
