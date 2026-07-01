@@ -237,6 +237,12 @@ function ProductImportPreview() {
   const globalErrors = Array.isArray(previewResult?.errors) ? previewResult.errors : [];
   const globalWarnings = Array.isArray(previewResult?.warnings) ? previewResult.warnings : [];
 
+  // 旧系统无货号产品计数（Step 10-6C-fix）
+  const legacyNoCodeCount = useMemo(
+    () => rows.filter((r) => r.suggested_sku != null).length,
+    [rows],
+  );
+
   // 库存口径相关 warning 过滤
   const stockCaliberWarnings = useMemo(
     () => globalWarnings.filter(hasStockCaliberKeyword),
@@ -557,6 +563,20 @@ function ProductImportPreview() {
             </div>
           )}
 
+          {/* 旧系统无货号产品迁移提示（Step 10-6C-fix） */}
+          {legacyNoCodeCount > 0 && (
+            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="text-sm text-blue-700 flex items-start gap-2">
+                <span className="text-blue-500 mt-0.5 shrink-0">ℹ</span>
+                <span>
+                  <strong>发现 {legacyNoCodeCount} 行旧系统无产品货号。</strong>
+                  系统可在正式导入时生成迁移 SKU（LEGACY-NOCODE-0001 起），产品名称保持不变。
+                  建议后续在系统中为这些产品补充正式货号。
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* ── 全局错误 ── */}
           {globalErrors.length > 0 && (
             <div className="mb-6">
@@ -843,7 +863,16 @@ function ProductImportPreview() {
 
                             {/* SKU */}
                             <td className="px-3 py-3 whitespace-nowrap">
-                              <span className="text-sm font-medium text-slate-800">{n.sku ?? '-'}</span>
+                              {n.sku != null ? (
+                                <span className="text-sm font-medium text-slate-800">{n.sku}</span>
+                              ) : row.suggested_sku != null ? (
+                                <span className="text-sm text-blue-600 font-medium" title="正式导入时将生成此迁移 SKU">
+                                  {row.suggested_sku}
+                                  <span className="text-xs text-blue-400 ml-1">（将生成）</span>
+                                </span>
+                              ) : (
+                                <span className="text-sm text-slate-400">-</span>
+                              )}
                             </td>
 
                             {/* 产品名称 */}

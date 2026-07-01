@@ -265,7 +265,10 @@ def _validate_field(field: str, raw_value: str) -> Tuple[Optional[Any], List[str
 
     if field == "sku":
         if not trimmed:
-            return None, ["SKU 不能为空"]
+            return None, []
+        # Step 10-6C-fix：将常见空值占位符统一视为空 SKU
+        if trimmed.lower() in ("nan", "null", "none", "na", "n/a", "nil", "-", "--"):
+            return None, []
         return trimmed, []
 
     if field == "name":
@@ -522,12 +525,9 @@ def _parse_and_validate_csv(
             elif prio == "P1":
                 v = raw_val.strip() if raw_val else None
                 p1_data[canonical] = v
-                # Step 10-6C：价格字段数值校验
+                # Step 10-6C-fix：价格字段仅校验数值，为空不产生 warning
                 if canonical in ("purchase_price", "sale_price"):
-                    if not v:
-                        display = _field_display(canonical)
-                        row_warnings.append(f"建议填写'{display}'字段")
-                    else:
+                    if v:
                         try:
                             num = float(v)
                             if num < 0:
@@ -540,10 +540,7 @@ def _parse_and_validate_csv(
                             row_errors.append(
                                 f"{_field_display(canonical)}不是有效数字: '{v}'"
                             )
-                else:
-                    if not v:
-                        display = _field_display(canonical)
-                        row_warnings.append(f"建议填写'{display}'字段")
+                # 非价格 P1 字段为空不再产生行级 warning，降噪
             elif prio == "P2":
                 v = raw_val.strip() if raw_val else None
                 p2_data[canonical] = v
@@ -619,7 +616,49 @@ def _parse_and_validate_csv(
             "inventory_context": inventory_context,
             "errors": row_errors,
             "warnings": row_warnings,
+            "suggested_sku": None,
         })
+
+    # ── 7.5. 旧系统无货号产品迁移 SKU 生成 ────────────────────
+    # Step 10-6C-fix：旧系统中存在无产品货号但有产品名称的行。
+    # 这些行不应作为 error 阻断导入，系统将为它们生成迁移 SKU。
+    legacy_nocode_counter = 0
+    for row_result in row_results:
+        row_errs = row_result.get("errors", [])
+        norm = row_result.get("normalized", {})
+        row_name = norm.get("name")
+
+        # 检查：行中有 SKU 缺失错误，但产品名称存在
+        has_sku_missing = any(
+            e for e in row_errs
+            if "SKU" in e and ("不能为空" in e or "为空" in e or "缺失" in e)
+        )
+        # 也检查 normalized sku 是否为 None（row_errors 可能不在列表中）
+        sku_norm = norm.get("sku")
+        sku_is_empty = sku_norm is None
+
+        if (has_sku_missing or sku_is_empty) and row_name:
+            # 移除 SKU 相关的 error，转为 warning
+            new_errs = [
+                e for e in row_errs
+                if not ("SKU" in e and ("不能为空" in e or "为空" in e or "缺失" in e))
+            ]
+            row_result["errors"] = new_errs
+
+            legacy_nocode_counter += 1
+            suggested = f"LEGACY-NOCODE-{legacy_nocode_counter:04d}"
+            row_result["suggested_sku"] = suggested
+            row_result["warnings"].append(
+                f"旧系统产品货号为空，正式导入时将生成迁移 SKU {suggested}，"
+                f"产品名称「{row_name}」保持不变。"
+            )
+
+            # 重新判定行状态
+            if not new_errs:
+                if row_result["warnings"]:
+                    row_result["status"] = "warning"
+                else:
+                    row_result["status"] = "valid"
 
     # ── 8. CSV 内部 SKU 重复检查 ────────────────────────────
     global_errors: List[str] = []
@@ -670,6 +709,15 @@ def _parse_and_validate_csv(
 
     # ── 11. 全局提示 ────────────────────────────────────────
     global_warnings: List[str] = []
+
+    # 旧系统无货号产品迁移提示
+    if legacy_nocode_counter > 0:
+        global_warnings.append(
+            f"发现 {legacy_nocode_counter} 行旧系统产品货号为空。"
+            f"正式导入时系统将为这些产品生成迁移 SKU（LEGACY-NOCODE-0001 起），"
+            f"产品名称保持不变。建议后续在系统中补充正式产品货号。"
+            f"原始旧系统文件不会被修改。"
+        )
 
     # 将 DB 已有 SKU 提示追加到全局 warnings（不阻断导入）
     if db_existing_msgs:
