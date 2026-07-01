@@ -102,6 +102,88 @@ body {
   outline-offset: 2px;
 }
 
+/* ==========================================================================
+   交互光标统一
+   可点击元素 → cursor: pointer
+   禁用状态   → cursor: not-allowed
+   文本输入框保留默认 text 光标，不在此列表中
+   ========================================================================== */
+
+/* --- 可点击元素：手指指针 --- */
+
+/* 原生按钮（Tailwind preflight 可能重置为 default，显式覆盖） */
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+/* ARIA 按钮角色（div/span 模拟按钮） */
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+/* 链接 */
+a[href] {
+  cursor: pointer;
+}
+
+/* 下拉选择框 */
+select:not(:disabled) {
+  cursor: pointer;
+}
+
+/* 复选框 / 单选框 */
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled) {
+  cursor: pointer;
+}
+
+/* 文件上传 */
+input[type="file"]:not(:disabled) {
+  cursor: pointer;
+}
+
+/* 按钮类 input */
+input[type="submit"]:not(:disabled),
+input[type="reset"]:not(:disabled),
+input[type="button"]:not(:disabled) {
+  cursor: pointer;
+}
+
+/* 颜色选择器 / 范围滑块 */
+input[type="color"]:not(:disabled),
+input[type="range"]:not(:disabled) {
+  cursor: pointer;
+}
+
+/* <details> 展开/收起 */
+summary {
+  cursor: pointer;
+}
+
+/* 关联表单控件的 label */
+label[for] {
+  cursor: pointer;
+}
+
+/* 通用可点击工具类（页面中按需使用） */
+.cursor-clickable {
+  cursor: pointer;
+}
+
+/* --- 禁用状态：禁止图标 --- */
+
+button:disabled,
+[aria-disabled="true"],
+select:disabled,
+input:disabled {
+  cursor: not-allowed;
+}
+
+/* 通用禁用光标工具类 */
+.cursor-disabled {
+  cursor: not-allowed;
+}
+
 /* 实用类 - 可全局使用 */
 .text-body {
   font-size: 0.9375rem; /* 15px */
