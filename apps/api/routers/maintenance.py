@@ -173,7 +173,49 @@ class RestorePrepareResponse(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════
-# 辅助函数
+# 正式启用检查响应模型（Step 10-8A）
+# ═══════════════════════════════════════════════════════════
+
+class GoLiveDatabaseStatus(BaseModel):
+    products_count: int = 0
+    transactions_count: int = 0
+    audit_logs_count: int = 0
+    users_count: int = 0
+    low_stock_count: int = 0
+    negative_stock_count: int = 0
+    missing_sku_count: int = 0
+    duplicate_sku_count: int = 0
+
+
+class GoLiveBackupStatus(BaseModel):
+    backup_files_count: int = 0
+    latest_backup_filename: str = ""
+    latest_backup_time: str = ""
+    latest_backup_size_bytes: int = 0
+    has_available_backup: bool = False
+    has_pre_restore_backup: bool = False
+    candidate_extensions: list = []
+
+
+class GoLiveEntryReadiness(BaseModel):
+    current_products_count: int = 0
+    current_transactions_count: int = 0
+    data_may_be_test_data: bool = False
+    before_entry_reminder: str = ""
+    batch_entry_reminder: str = ""
+    final_backup_reminder: str = ""
+
+
+class GoLiveChecklistResponse(BaseModel):
+    success: bool
+    database_status: GoLiveDatabaseStatus
+    backup_status: GoLiveBackupStatus
+    entry_readiness: GoLiveEntryReadiness
+    recommended_steps: list
+    warnings: list
+    overall_level: str  # "ok" | "warning" | "error"
+    overall_message: str
+    message: str
 # ═══════════════════════════════════════════════════════════
 
 def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
@@ -1471,4 +1513,215 @@ def restore_prepare(
         ),
         operator=operator_name,
         timestamp=now_str,
+    )
+
+
+# ═══════════════════════════════════════════════════════════
+# 正式启用检查接口（Step 10-8A）
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/go-live-checklist", response_model=GoLiveChecklistResponse)
+def go_live_checklist():
+    """
+    正式启用前只读状态总览（所有登录用户可访问，只读）。
+
+    返回：
+    - 当前数据库状态（产品数、出入库记录数、审计日志数、用户数、低库存、负库存、缺失/重复 SKU）
+    - 备份状态（数量、最新备份、是否有可用备份、是否有恢复前备份）
+    - 正式录入准备状态
+    - 推荐流程步骤
+    - 风险提示
+    - 整体评估
+
+    本接口只读，不执行任何写操作。
+    """
+    warnings: List[str] = []
+    db_status = {}
+    backup_status = {}
+    entry_readiness = {}
+
+    # ── 1. 当前数据库状态 ──
+    products_count = 0
+    transactions_count = 0
+    audit_logs_count = 0
+    users_count = 0
+    low_stock_count = 0
+    negative_stock_count = 0
+    missing_sku_count = 0
+    duplicate_sku_count = 0
+
+    if DB_PATH.exists():
+        try:
+            conn = sqlite3.connect(str(DB_PATH))
+            conn.row_factory = sqlite3.Row
+
+            products_count = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
+            transactions_count = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
+
+            if _table_exists(conn, "audit_logs"):
+                audit_logs_count = conn.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0]
+            if _table_exists(conn, "users"):
+                users_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+
+            # 低库存
+            low_stock_count = conn.execute(
+                "SELECT COUNT(*) FROM products WHERE current_stock <= min_stock AND current_stock >= 0"
+            ).fetchone()[0]
+
+            # 负库存
+            negative_stock_count = conn.execute(
+                "SELECT COUNT(*) FROM products WHERE current_stock < 0"
+            ).fetchone()[0]
+            if negative_stock_count > 0:
+                warnings.append(f"存在 {negative_stock_count} 个负库存产品，请及时修正")
+
+            # 缺失 SKU
+            missing_sku_count = conn.execute(
+                "SELECT COUNT(*) FROM products WHERE sku IS NULL OR TRIM(sku) = ''"
+            ).fetchone()[0]
+            if missing_sku_count > 0:
+                warnings.append(f"存在 {missing_sku_count} 个产品缺少 SKU 编码")
+
+            # 重复 SKU
+            dupes = conn.execute(
+                "SELECT sku, COUNT(*) as cnt FROM products WHERE sku IS NOT NULL AND TRIM(sku) != '' GROUP BY sku HAVING cnt > 1"
+            ).fetchall()
+            duplicate_sku_count = len(dupes)
+            if duplicate_sku_count > 0:
+                warnings.append(f"存在 {duplicate_sku_count} 个重复的 SKU 编码")
+
+            conn.close()
+        except sqlite3.Error as e:
+            warnings.append(f"数据库状态统计异常：{e}")
+
+    db_status = GoLiveDatabaseStatus(
+        products_count=products_count,
+        transactions_count=transactions_count,
+        audit_logs_count=audit_logs_count,
+        users_count=users_count,
+        low_stock_count=low_stock_count,
+        negative_stock_count=negative_stock_count,
+        missing_sku_count=missing_sku_count,
+        duplicate_sku_count=duplicate_sku_count,
+    )
+
+    # ── 2. 备份状态 ──
+    backup_files_count = 0
+    latest_backup_filename = ""
+    latest_backup_time = ""
+    latest_backup_size_bytes = 0
+    has_available_backup = False
+    has_pre_restore_backup = False
+    candidate_extensions = []
+
+    if BACKUP_DIR.exists() and BACKUP_DIR.is_dir():
+        try:
+            backup_files = []
+            for ext in _ALLOWED_EXTENSIONS:
+                backup_files.extend(BACKUP_DIR.glob(f"*{ext}"))
+            backup_files = sorted(set(backup_files), key=lambda f: f.stat().st_mtime, reverse=True)
+
+            backup_files_count = len(backup_files)
+            extensions_seen = set()
+            for bf in backup_files:
+                ext = bf.suffix.lower()
+                if ext not in extensions_seen:
+                    extensions_seen.add(ext)
+                    candidate_extensions.append(ext)
+                if bf.name.startswith("pre_restore_backup_"):
+                    has_pre_restore_backup = True
+
+            if backup_files_count > 0:
+                latest = backup_files[0]
+                try:
+                    stat = latest.stat()
+                    latest_backup_filename = latest.name
+                    latest_backup_time = datetime.fromtimestamp(stat.st_mtime).isoformat()
+                    latest_backup_size_bytes = stat.st_size
+                    if stat.st_size > 0:
+                        has_available_backup = True
+                except OSError:
+                    pass
+        except OSError as e:
+            warnings.append(f"备份目录扫描异常：{e}")
+
+    if not has_available_backup:
+        warnings.append("尚未检测到可用备份，正式操作前请先创建数据库备份")
+
+    backup_status = GoLiveBackupStatus(
+        backup_files_count=backup_files_count,
+        latest_backup_filename=latest_backup_filename,
+        latest_backup_time=latest_backup_time,
+        latest_backup_size_bytes=latest_backup_size_bytes,
+        has_available_backup=has_available_backup,
+        has_pre_restore_backup=has_pre_restore_backup,
+        candidate_extensions=candidate_extensions,
+    )
+
+    # ── 3. 正式录入准备状态 ──
+    data_may_be_test_data = products_count > 0 or transactions_count > 0
+    before_entry_reminder = "正式录入前建议先创建数据库备份，确保可以回滚"
+    batch_entry_reminder = "每批手动录入后建议导出 CSV 文件，与旧系统或腾讯文档反向核对"
+    final_backup_reminder = "全部录入完成后建议创建正式启用前数据库备份"
+
+    if data_may_be_test_data:
+        warnings.append("当前系统存在业务数据，正式录入前请确认数据是否为有效的正式产品数据")
+
+    entry_readiness = GoLiveEntryReadiness(
+        current_products_count=products_count,
+        current_transactions_count=transactions_count,
+        data_may_be_test_data=data_may_be_test_data,
+        before_entry_reminder=before_entry_reminder,
+        batch_entry_reminder=batch_entry_reminder,
+        final_backup_reminder=final_backup_reminder,
+    )
+
+    # ── 4. 推荐流程 ──
+    recommended_steps = [
+        "第一步：创建当前数据库备份，确保操作安全",
+        "第二步：确认当前系统中产品与出入库记录是否需要保留",
+        "第三步：如需清空测试业务数据，先在设置页完成备份，再按受控清空流程处理",
+        "第四步：按库存分类或库位分批手动录入正式产品信息",
+        "第五步：每批录入完成后导出 CSV 文件，与旧系统或腾讯文档反向核对",
+        "第六步：全部产品录入完成后，创建正式启用前数据库备份",
+        "第七步：确认用户权限、审计日志和备份预检均正常工作",
+        "第八步：正式开始使用新系统进行出入库操作",
+    ]
+
+    # ── 5. 风险提示 ──
+    risk_warnings = [
+        "不要在未创建备份时清空数据，操作不可逆",
+        "不要把未知采购价、售价填为 0，未知时应留空",
+        "不要把旧系统历史出入库记录直接混入新系统正式出入库",
+        "不要在未核对库存数量前直接正式启用系统",
+        "不要直接手工修改数据库文件，应通过系统功能操作",
+        "不要提交数据库文件或备份文件到代码仓库",
+        "出问题时先查看备份预检、恢复准备和审计日志，不要盲目修改数据",
+    ]
+
+    # ── 6. 整体评估 ──
+    all_warnings = warnings + risk_warnings
+    if negative_stock_count > 0 or duplicate_sku_count > 0:
+        overall_level = "error"
+        overall_message = "存在需要立即处理的数据异常（负库存或重复 SKU），请在正式启用前修正"
+    elif not has_available_backup:
+        overall_level = "warning"
+        overall_message = "尚未检测到可用备份，正式操作前请先创建数据库备份"
+    elif missing_sku_count > 0 or data_may_be_test_data:
+        overall_level = "warning"
+        overall_message = "系统数据尚有需要关注的事项，请在正式启用前检查"
+    else:
+        overall_level = "ok"
+        overall_message = "系统状态正常，可以开始正式录入产品"
+
+    return GoLiveChecklistResponse(
+        success=True,
+        database_status=db_status,
+        backup_status=backup_status,
+        entry_readiness=entry_readiness,
+        recommended_steps=recommended_steps,
+        warnings=all_warnings,
+        overall_level=overall_level,
+        overall_message=overall_message,
+        message="正式启用检查完成，请逐项查看状态和提醒",
     )

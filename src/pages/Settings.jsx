@@ -3,6 +3,8 @@ import { systemService } from '../services/dataService';
 import { usePermission } from '../hooks/usePermission';
 import { changePassword } from '../services/authService';
 import { createManualBackup, getBackups, downloadBackup, formatBytes, runPreflightCheck, createMaintenanceBackup, getResetPreview, resetBusinessData, getRestoreCandidates, getRestorePreflight, prepareRestore } from '../services/backupService';
+import GoLiveChecklistPanel from '../components/GoLiveChecklistPanel';
+import SystemOperationGuide from '../components/SystemOperationGuide';
 
 function Settings() {
   const { canWrite, adminOnlyTitle } = usePermission();
@@ -1452,6 +1454,12 @@ function Settings() {
             </div>
           </div>
         </div>
+
+        {/* Step 10-8A：正式启用前检查 */}
+        <GoLiveChecklistPanel canWrite={canWrite} />
+
+        {/* Step 10-8A：库存系统功能介绍与使用说明 */}
+        <SystemOperationGuide />
 
         {/* 账号安全 / 修改密码 */}
         <div className="bg-white border border-slate-200 rounded-lg lg:col-span-2">

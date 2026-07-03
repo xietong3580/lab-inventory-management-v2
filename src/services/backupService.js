@@ -428,3 +428,43 @@ export async function prepareRestore(filename) {
 
   return response.json();
 }
+
+// ═══════════════════════════════════════════════════════════
+// 正式启用检查（Step 10-8A）
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * 获取正式启用前只读状态总览（所有登录用户可访问，只读）
+ * @returns {Promise<{
+ *   success: boolean,
+ *   database_status: {},
+ *   backup_status: {},
+ *   entry_readiness: {},
+ *   recommended_steps: string[],
+ *   warnings: string[],
+ *   overall_level: 'ok' | 'warning' | 'error',
+ *   overall_message: string,
+ *   message: string
+ * }>}
+ */
+export async function getGoLiveChecklist() {
+  const token = getToken();
+  if (!token) {
+    throw new Error('未登录');
+  }
+
+  const response = await fetch(`${API_BASE}/maintenance/go-live-checklist`, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `正式启用检查请求失败 (${response.status})`);
+  }
+
+  return response.json();
+}
