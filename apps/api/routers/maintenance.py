@@ -9,6 +9,7 @@
 - GET  /api/maintenance/restore-preflight  备份恢复预检（仅管理员，只读）
 """
 
+import json
 import re
 import sqlite3
 from datetime import datetime
@@ -145,6 +146,30 @@ class RestorePreflightResponse(BaseModel):
     warnings: List[str]
     errors: List[str]
     message: str
+
+
+# ═══════════════════════════════════════════════════════════
+# 恢复准备响应模型（Step 10-7B）
+# ═══════════════════════════════════════════════════════════
+
+class RestorePrepareRequest(BaseModel):
+    filename: str
+
+
+class RestorePrepareResponse(BaseModel):
+    success: bool
+    target_backup_filename: str
+    target_size_bytes: int
+    pre_restore_backup_filename: str
+    pre_restore_backup_size_bytes: int
+    target_counts: dict  # backup file data counts
+    current_counts: dict  # live DB data counts
+    confirmation_phrase: str
+    warnings: List[str]
+    risks: List[str]
+    message: str
+    operator: str
+    timestamp: str
 
 
 # ═══════════════════════════════════════════════════════════
@@ -787,13 +812,165 @@ def reset_business_data(req: ResetBusinessDataRequest, admin=Depends(require_adm
 
 
 # ═══════════════════════════════════════════════════════════
-# 恢复预检接口（Step 10-7A）
+# 恢复预检 + 恢复准备接口（Step 10-7A / 10-7B）
 # ═══════════════════════════════════════════════════════════
 
 # 合法的备份文件扩展名
 _ALLOWED_EXTENSIONS = {".db", ".sqlite"}
 # 文件名安全模式：仅允许字母、数字、下划线、连字符、点号
 _FILENAME_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.\-]*$")
+# 恢复准备确认短语
+_RESTORE_PREPARE_CONFIRMATION = "确认我已了解恢复风险"
+
+
+def _count_live_data(conn: sqlite3.Connection) -> dict:
+    """
+    统计当前正式数据库核心数据量（只读）。
+
+    返回 dict: products_count, transactions_count, audit_logs_count, users_count
+    """
+    counts = {
+        "products_count": 0,
+        "transactions_count": 0,
+        "audit_logs_count": 0,
+        "users_count": 0,
+    }
+    for table in ["products", "transactions", "audit_logs", "users"]:
+        try:
+            if _table_exists(conn, table):
+                counts[f"{table}_count"] = conn.execute(
+                    f"SELECT COUNT(*) FROM {table}"
+                ).fetchone()[0]
+        except sqlite3.Error:
+            pass
+    return counts
+
+
+def _run_backup_preflight(backup_path: Path, safe_name: str) -> dict:
+    """
+    对目标备份执行完整预检，返回结构化结果 dict。
+
+    这是 restore-preflight 的内部复用版本，返回 dict 而非 Response。
+    """
+    checks: List[dict] = []
+    error_msgs: List[str] = []
+    warning_msgs: List[str] = []
+    counts = {
+        "products_count": 0,
+        "transactions_count": 0,
+        "audit_logs_count": 0,
+        "users_count": 0,
+    }
+
+    # 1. 文件存在性
+    if not backup_path.exists():
+        return {
+            "success": False, "level": "error", "filename": safe_name,
+            "size_bytes": 0, "checks": [
+                {"name": "文件存在性", "passed": False, "detail": "备份文件不存在"}
+            ], "counts": counts, "warnings": [],
+            "errors": ["备份文件不存在"],
+            "message": "预检失败：备份文件不存在",
+        }
+    checks.append({"name": "文件存在性", "passed": True, "detail": "备份文件存在"})
+
+    # 2. 文件大小
+    file_size = 0
+    try:
+        file_size = backup_path.stat().st_size
+    except OSError as e:
+        error_msgs.append(f"无法读取文件大小：{e}")
+        checks.append({"name": "文件大小", "passed": False, "detail": f"无法读取：{e}"})
+    else:
+        if file_size == 0:
+            error_msgs.append("备份文件大小为 0，不可用于恢复")
+            checks.append({"name": "文件大小", "passed": False, "detail": "文件大小为 0"})
+        else:
+            checks.append({"name": "文件大小", "passed": True, "detail": f"{file_size:,} 字节"})
+
+    if file_size == 0:
+        return {
+            "success": False, "level": "error", "filename": safe_name,
+            "size_bytes": 0, "checks": checks, "counts": counts,
+            "warnings": warning_msgs, "errors": error_msgs,
+            "message": "预检失败：备份文件大小为 0，不可用于恢复",
+        }
+
+    # 3. SQLite 可打开
+    can_open, open_detail = _is_sqlite_valid(backup_path)
+    checks.append({"name": "SQLite 可打开", "passed": can_open, "detail": open_detail})
+    if not can_open:
+        error_msgs.append(open_detail)
+        return {
+            "success": False, "level": "error", "filename": safe_name,
+            "size_bytes": file_size, "checks": checks, "counts": counts,
+            "warnings": warning_msgs, "errors": error_msgs,
+            "message": f"预检失败：备份文件无法作为有效 SQLite 数据库打开 — {open_detail}",
+        }
+
+    # 4. PRAGMA integrity_check
+    int_ok, int_detail = _validate_integrity(backup_path)
+    checks.append({"name": "完整性检查", "passed": int_ok, "detail": int_detail})
+    if not int_ok:
+        error_msgs.append(int_detail)
+
+    # 5. 关键表检查 + 数据量统计
+    expected_tables = {
+        "products": "产品表",
+        "transactions": "出入库记录表",
+        "audit_logs": "审计日志表",
+        "users": "用户表",
+    }
+    try:
+        uri = backup_path.resolve().as_uri()
+        conn = sqlite3.connect(f"{uri}?mode=ro", uri=True)
+        conn.row_factory = sqlite3.Row
+        for table_name, table_label in expected_tables.items():
+            exists = _table_exists(conn, table_name)
+            checks.append({
+                "name": f"{table_label} ({table_name})",
+                "passed": exists,
+                "detail": "表存在" if exists else f"缺少 {table_name} 表",
+            })
+            if not exists:
+                warning_msgs.append(f"备份中缺少 {table_name} 表（{table_label}）")
+            if exists:
+                try:
+                    row_count = conn.execute(
+                        f"SELECT COUNT(*) FROM {table_name}"
+                    ).fetchone()[0]
+                    count_key = f"{table_name}_count"
+                    if count_key in counts:
+                        counts[count_key] = row_count
+                except sqlite3.Error:
+                    pass
+        conn.close()
+    except sqlite3.Error as e:
+        error_msgs.append(f"关键表检查失败：{e}")
+        checks.append({"name": "关键表检查", "passed": False, "detail": f"SQLite 查询异常：{e}"})
+
+    # 6. 判定整体结果
+    if error_msgs:
+        level = "error"
+        overall_ok = False
+    elif warning_msgs:
+        level = "warning"
+        overall_ok = True
+    else:
+        level = "ok"
+        overall_ok = True
+
+    msg = (
+        "预检通过，备份文件可用于恢复" if level == "ok"
+        else "预检通过但有警告" if level == "warning"
+        else "预检失败，该备份文件不可用于恢复"
+    )
+
+    return {
+        "success": overall_ok, "level": level, "filename": safe_name,
+        "size_bytes": file_size, "checks": checks, "counts": counts,
+        "warnings": warning_msgs, "errors": error_msgs, "message": msg,
+    }
 
 
 def _validate_backup_filename(filename: str) -> str:
@@ -1120,4 +1297,178 @@ def restore_preflight(
             else "预检通过但有警告，请检查警告项" if level == "warning"
             else "预检失败，该备份文件不可用于恢复"
         ),
+    )
+
+
+# ═══════════════════════════════════════════════════════════
+# 恢复准备接口（Step 10-7B）
+# ═══════════════════════════════════════════════════════════
+
+@router.post("/restore-prepare", response_model=RestorePrepareResponse)
+def restore_prepare(
+    req: RestorePrepareRequest,
+    admin=Depends(require_admin),
+):
+    """
+    恢复前准备（仅管理员，不执行真实恢复）。
+
+    安全流程：
+    1. 校验 filename 安全性
+    2. 对目标备份执行预检（复用 _run_backup_preflight）
+    3. 预检失败则拒绝准备
+    4. 预检通过 → 创建"恢复前当前数据库备份"（安全网）
+    5. 统计当前正式数据库核心数据量
+    6. 记录审计日志
+    7. 返回恢复计划（含确认短语和风险提示）
+
+    本接口：
+    - ✅ 创建恢复前备份
+    - ✅ 记录审计日志
+    - ❌ 不覆盖当前数据库
+    - ❌ 不执行真实恢复
+    - ❌ 不删除任何备份
+    """
+    # ── 1. 安全校验文件名 ──
+    safe_name = _validate_backup_filename(req.filename)
+
+    # ── 2. 确认文件在备份目录下 ──
+    backup_path = (BACKUP_DIR / safe_name).resolve()
+    allowed_prefix = BACKUP_DIR.resolve()
+    if not str(backup_path).startswith(str(allowed_prefix)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="不允许访问备份目录之外的文件",
+        )
+
+    # ── 3. 对目标备份执行预检 ──
+    preflight = _run_backup_preflight(backup_path, safe_name)
+    if not preflight["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"目标备份预检未通过，无法准备恢复：{preflight['message']}",
+        )
+    if preflight["level"] == "error":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"目标备份存在严重错误：{'; '.join(preflight['errors'][:3])}",
+        )
+
+    # ── 4. 检查当前数据库是否存在 ──
+    if not DB_PATH.exists():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="当前数据库文件不存在，无法创建恢复前备份",
+        )
+
+    # ── 5. 统计当前正式数据库核心数据量 ──
+    current_counts = {}
+    try:
+        conn = sqlite3.connect(str(DB_PATH))
+        current_counts = _count_live_data(conn)
+        conn.close()
+    except sqlite3.Error as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"当前数据库统计失败：{e}",
+        )
+
+    # ── 6. 创建恢复前当前数据库备份（安全网） ──
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    pre_restore_filename = f"pre_restore_backup_{timestamp}.sqlite"
+    pre_restore_path = BACKUP_DIR / pre_restore_filename
+
+    try:
+        src = sqlite3.connect(str(DB_PATH))
+        dst = sqlite3.connect(str(pre_restore_path))
+        src.backup(dst)
+        src.close()
+        dst.close()
+    except sqlite3.Error as e:
+        if pre_restore_path.exists():
+            pre_restore_path.unlink()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"恢复前备份创建失败：{e}",
+        )
+
+    # 确认备份大小
+    if not pre_restore_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="恢复前备份创建后未找到文件",
+        )
+    pre_restore_size = pre_restore_path.stat().st_size
+    if pre_restore_size == 0:
+        pre_restore_path.unlink()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="恢复前备份大小为 0",
+        )
+
+    # ── 7. 记录审计日志 ──
+    operator_name = admin.username if hasattr(admin, "username") else "admin"
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    audit_details = json.dumps({
+        "action": "restore_prepare",
+        "target_backup": safe_name,
+        "target_size_bytes": preflight["size_bytes"],
+        "pre_restore_backup": pre_restore_filename,
+        "current_counts": current_counts,
+        "target_counts": preflight["counts"],
+        "confirmation_phrase": _RESTORE_PREPARE_CONFIRMATION,
+        "note": "仅完成恢复前准备，未执行真实恢复",
+    }, ensure_ascii=False)
+
+    try:
+        audit_conn = sqlite3.connect(str(DB_PATH))
+        if _table_exists(audit_conn, "audit_logs"):
+            audit_conn.execute(
+                "INSERT INTO audit_logs (action_type, product_name, operator, timestamp, details, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    "RESTORE_PREPARE",
+                    f"恢复准备 — 目标备份: {safe_name}",
+                    operator_name,
+                    now_str,
+                    audit_details,
+                    now_str,
+                ),
+            )
+            audit_conn.commit()
+        audit_conn.close()
+    except sqlite3.Error as e:
+        # 审计记录失败不影响主流程返回，但加入 warnings
+        pass
+
+    # ── 8. 组装风险提示 ──
+    risks = [
+        "恢复操作将用备份文件完全替换当前数据库，恢复后当前数据库中的数据将被覆盖。",
+        "恢复前已自动创建当前数据库备份作为安全网，恢复后如需撤销请使用该备份。",
+        "恢复将影响所有用户的数据，请在确认无人操作时执行。",
+        "恢复后需要重启后端服务，SQLite 文件级替换才能生效。",
+        "请先导出当前数据为 CSV 进行二次核对，确认无误后再执行恢复。",
+    ]
+
+    warnings = list(preflight.get("warnings", []))
+    if preflight["level"] == "warning":
+        warnings.append("目标备份预检存在警告，请仔细审查警告项后再决定是否恢复。")
+
+    return RestorePrepareResponse(
+        success=True,
+        target_backup_filename=safe_name,
+        target_size_bytes=preflight["size_bytes"],
+        pre_restore_backup_filename=pre_restore_filename,
+        pre_restore_backup_size_bytes=pre_restore_size,
+        target_counts=preflight["counts"],
+        current_counts=current_counts,
+        confirmation_phrase=_RESTORE_PREPARE_CONFIRMATION,
+        warnings=warnings,
+        risks=risks,
+        message=(
+            f"恢复准备完成。已创建当前数据库备份 {pre_restore_filename}，"
+            f"目标备份 {safe_name} 预检通过。当前版本仅完成准备，不执行真实恢复。"
+        ),
+        operator=operator_name,
+        timestamp=now_str,
     )

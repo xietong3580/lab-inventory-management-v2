@@ -378,3 +378,53 @@ export async function getRestorePreflight(filename) {
 
   return response.json();
 }
+
+// ═══════════════════════════════════════════════════════════
+// 恢复准备（Step 10-7B）
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * 执行恢复前准备（仅管理员可用，创建恢复前备份，不执行真实恢复）
+ * @param {string} filename - 目标备份文件名
+ * @returns {Promise<{
+ *   success: boolean,
+ *   target_backup_filename: string,
+ *   target_size_bytes: number,
+ *   pre_restore_backup_filename: string,
+ *   pre_restore_backup_size_bytes: number,
+ *   target_counts: { products_count: number, transactions_count: number, audit_logs_count: number, users_count: number },
+ *   current_counts: { products_count: number, transactions_count: number, audit_logs_count: number, users_count: number },
+ *   confirmation_phrase: string,
+ *   warnings: string[],
+ *   risks: string[],
+ *   message: string,
+ *   operator: string,
+ *   timestamp: string
+ * }>}
+ */
+export async function prepareRestore(filename) {
+  const token = getToken();
+  if (!token) {
+    throw new Error('未登录');
+  }
+
+  const response = await fetch(`${API_BASE}/maintenance/restore-prepare`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ filename }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 403) {
+      throw new Error('需要管理员权限才能执行恢复准备');
+    }
+    throw new Error(errorData.detail || `恢复准备请求失败 (${response.status})`);
+  }
+
+  return response.json();
+}

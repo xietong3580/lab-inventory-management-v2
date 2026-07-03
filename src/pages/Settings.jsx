@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { systemService } from '../services/dataService';
 import { usePermission } from '../hooks/usePermission';
 import { changePassword } from '../services/authService';
-import { createManualBackup, getBackups, downloadBackup, formatBytes, runPreflightCheck, createMaintenanceBackup, getResetPreview, resetBusinessData, getRestoreCandidates, getRestorePreflight } from '../services/backupService';
+import { createManualBackup, getBackups, downloadBackup, formatBytes, runPreflightCheck, createMaintenanceBackup, getResetPreview, resetBusinessData, getRestoreCandidates, getRestorePreflight, prepareRestore } from '../services/backupService';
 
 function Settings() {
   const { canWrite, adminOnlyTitle } = usePermission();
@@ -52,6 +52,11 @@ function Settings() {
   const [isRunningPreflight, setIsRunningPreflight] = useState(false);
   const [preflightingFile, setPreflightingFile] = useState(null);
   const [restorePreflightError, setRestorePreflightError] = useState('');
+  // Step 10-7B：恢复准备相关状态
+  const [isPreparingRestore, setIsPreparingRestore] = useState(false);
+  const [preparingFile, setPreparingFile] = useState(null);
+  const [restorePlan, setRestorePlan] = useState(null);
+  const [restorePlanError, setRestorePlanError] = useState('');
 
   // 获取数据源模式
   useEffect(() => {
@@ -113,6 +118,8 @@ function Settings() {
     setIsRunningPreflight(true);
     setRestorePreflightResult(null);
     setRestorePreflightError('');
+    setRestorePlan(null);  // 清除上次的恢复计划
+    setRestorePlanError('');
     try {
       const result = await getRestorePreflight(filename);
       setRestorePreflightResult(result);
@@ -121,6 +128,23 @@ function Settings() {
     } finally {
       setIsRunningPreflight(false);
       setPreflightingFile(null);
+    }
+  };
+
+  // Step 10-7B：执行恢复前准备（创建恢复前备份，不执行真实恢复）
+  const handlePrepareRestore = async (filename) => {
+    setPreparingFile(filename);
+    setIsPreparingRestore(true);
+    setRestorePlan(null);
+    setRestorePlanError('');
+    try {
+      const result = await prepareRestore(filename);
+      setRestorePlan(result);
+    } catch (err) {
+      setRestorePlanError(err.message || '恢复准备失败');
+    } finally {
+      setIsPreparingRestore(false);
+      setPreparingFile(null);
     }
   };
 
@@ -1234,9 +1258,117 @@ function Settings() {
                       </div>
                     )}
 
+                    {/* Step 10-7B：准备恢复按钮（仅预检通过 ok/warning 时显示） */}
+                    {restorePreflightResult && (restorePreflightResult.level === 'ok' || restorePreflightResult.level === 'warning') && (
+                      <div className="mt-3 pt-3 border-t border-slate-200">
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs text-slate-600">
+                            预检{restorePreflightResult.level === 'ok' ? '通过' : '通过（有警告）'}，可准备恢复
+                          </div>
+                          <button
+                            onClick={() => handlePrepareRestore(restorePreflightResult.filename)}
+                            disabled={isPreparingRestore}
+                            title={isPreparingRestore ? '准备中...' : '创建恢复前备份并生成恢复计划'}
+                            className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                              isPreparingRestore
+                                ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                                : 'bg-slate-600 text-white hover:bg-slate-700'
+                            }`}
+                          >
+                            {preparingFile === restorePreflightResult.filename && isPreparingRestore ? (
+                              <span className="flex items-center gap-1">
+                                <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                准备中...
+                              </span>
+                            ) : '准备恢复'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Step 10-7B：恢复准备错误 */}
+                    {restorePlanError && (
+                      <div className="mt-3 p-3 rounded-md border bg-rose-50 border-rose-200">
+                        <div className="text-rose-800 font-medium mb-1">恢复准备失败</div>
+                        <div className="text-sm text-rose-700">{restorePlanError}</div>
+                      </div>
+                    )}
+
+                    {/* Step 10-7B：恢复计划卡片 */}
+                    {restorePlan && (
+                      <div className="mt-3 p-4 rounded-md border bg-blue-50 border-blue-200 text-sm">
+                        <div className="text-blue-800 font-medium mb-3">📋 恢复计划</div>
+
+                        {/* 目标备份 */}
+                        <div className="mb-3">
+                          <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">目标备份文件</div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-700">
+                            <span className="font-mono">{restorePlan.target_backup_filename}</span>
+                            <span>{formatBytes(restorePlan.target_size_bytes)}</span>
+                          </div>
+                        </div>
+
+                        {/* 恢复前备份 */}
+                        <div className="mb-3 pt-3 border-t border-blue-200">
+                          <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">恢复前自动备份（安全网）</div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-700">
+                            <span className="font-mono text-emerald-700">{restorePlan.pre_restore_backup_filename}</span>
+                            <span className="text-emerald-700">{formatBytes(restorePlan.pre_restore_backup_size_bytes)}</span>
+                          </div>
+                        </div>
+
+                        {/* 数据对比 */}
+                        <div className="mb-3 pt-3 border-t border-blue-200">
+                          <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">数据对比</div>
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            <div className="text-slate-500">指标</div>
+                            <div className="text-slate-500 text-center">当前数据库</div>
+                            <div className="text-slate-500 text-center">目标备份</div>
+                            {['products_count', 'transactions_count', 'audit_logs_count', 'users_count'].map(key => {
+                              const labels = { products_count: '产品', transactions_count: '出入库记录', audit_logs_count: '审计日志', users_count: '用户' };
+                              return [
+                                <div key={`${key}-label`} className="text-slate-600">{labels[key]}</div>,
+                                <div key={`${key}-curr`} className="text-slate-800 text-center font-medium">{(restorePlan.current_counts && restorePlan.current_counts[key]) ?? '—'}</div>,
+                                <div key={`${key}-tgt`} className="text-blue-800 text-center font-medium">{(restorePlan.target_counts && restorePlan.target_counts[key]) ?? '—'}</div>
+                              ];
+                            })}
+                          </div>
+                        </div>
+
+                        {/* 风险提示 */}
+                        <div className="mb-3 pt-3 border-t border-amber-200">
+                          <div className="text-xs font-medium text-amber-700 mb-1">⚠️ 风险提示</div>
+                          <ul className="text-xs text-amber-700 space-y-1 list-disc list-inside">
+                            {restorePlan.risks && restorePlan.risks.map((risk, i) => (
+                              <li key={i}>{risk}</li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        {/* 确认短语 */}
+                        <div className="mb-3 pt-3 border-t border-blue-200">
+                          <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">恢复执行确认短语</div>
+                          <div className="p-2 bg-white border border-blue-300 rounded text-xs font-mono text-slate-700">
+                            {restorePlan.confirmation_phrase}
+                          </div>
+                        </div>
+
+                        {/* 操作信息 */}
+                        <div className="pt-3 border-t border-blue-200 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                          <span>操作人：{restorePlan.operator}</span>
+                          <span>时间：{new Date(restorePlan.timestamp).toLocaleString('zh-CN')}</span>
+                        </div>
+
+                        {/* 提示 */}
+                        <div className="mt-3 p-2.5 bg-white border border-blue-200 rounded-md text-xs text-slate-600">
+                          当前版本只完成恢复前准备（创建安全备份 + 生成恢复计划），不执行真实恢复。恢复计划已记录审计日志。
+                        </div>
+                      </div>
+                    )}
+
                     {/* 提示 */}
                     <div className="mt-3 p-2.5 bg-slate-50 border border-slate-200 rounded-md text-xs text-slate-500">
-                      当前版本仅支持恢复前预检，不执行真实恢复。如需从备份恢复数据库，请联系管理员按恢复流程操作。
+                      当前版本仅支持恢复前预检和恢复准备，不执行真实恢复。如需从备份恢复数据库，请联系管理员按恢复流程操作。
                     </div>
                   </>
                 ) : (
