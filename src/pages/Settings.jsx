@@ -378,8 +378,8 @@ function Settings() {
         </p>
       </div>
 
-      {/* 设置卡片网格 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* 设置卡片区 */}
+      <div className="space-y-6">
         {/* 库存预警设置 */}
         <div className="bg-white border border-slate-200 rounded-lg">
           <div className="px-6 py-4 border-b border-slate-100">
@@ -467,7 +467,7 @@ function Settings() {
         </div>
 
         {/* 品牌信息设置 */}
-        <div className="bg-white border border-slate-200 rounded-lg lg:col-span-2">
+        <div className="bg-white border border-slate-200 rounded-lg">
           <div className="px-6 py-4 border-b border-slate-100">
             <h2 className="text-lg font-semibold text-slate-800">品牌信息</h2>
             <p className="text-sm text-slate-500 mt-1">配置系统显示的品牌标识和信息</p>
@@ -1456,17 +1456,13 @@ function Settings() {
         </div>
 
         {/* Step 10-8A：管理员维护检查 */}
-        <div className="lg:col-span-2">
-          <GoLiveChecklistPanel canWrite={canWrite} />
-        </div>
+        <GoLiveChecklistPanel canWrite={canWrite} />
 
         {/* Step 10-8A：库存系统功能介绍与使用说明 */}
-        <div className="lg:col-span-2">
-          <SystemOperationGuide />
-        </div>
+        <SystemOperationGuide />
 
         {/* 账号安全 / 修改密码 */}
-        <div className="bg-white border border-slate-200 rounded-lg lg:col-span-2">
+        <div className="bg-white border border-slate-200 rounded-lg">
           <div className="px-6 py-4 border-b border-slate-100">
             <h2 className="text-lg font-semibold text-slate-800">账号安全</h2>
             <p className="text-sm text-slate-500 mt-1">修改当前登录账号的密码</p>
