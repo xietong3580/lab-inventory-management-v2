@@ -96,6 +96,11 @@ function Products() {
   const [isBackupBeforeExport, setIsBackupBeforeExport] = useState(false);
   const [backupExportError, setBackupExportError] = useState('');
 
+  // Step 10-6D：SKU 重复前端预检查 & 产品名称重复轻提示
+  const [skuError, setSkuError] = useState(null);
+  const [nameWarning, setNameWarning] = useState(null);
+  const [nameSpecWarning, setNameSpecWarning] = useState(null);
+
   const [formData, setFormData] = useState({
     name: '',
     sku: '',
@@ -290,6 +295,11 @@ function Products() {
       });
     }
     setIsModalOpen(true);
+    // Step 10-6D：清空验证状态
+    setSkuError(null);
+    setNameWarning(null);
+    setNameSpecWarning(null);
+    setSaveError(null);
   };
 
   // 关闭模态框
@@ -298,9 +308,9 @@ function Products() {
     setEditingProduct(null);
   };
 
-  // 表单提交
-  const handleFormSubmit = async (e) => {
-    e.preventDefault();
+  // 表单提交（keepModalOpen 用于"保存并继续新增"）
+  const handleFormSubmit = async (e, keepModalOpen = false) => {
+    if (e && e.preventDefault) e.preventDefault();
 
     if (!canWrite || isSaving) return; // viewer 不可提交，防重复提交
 
@@ -313,6 +323,13 @@ function Products() {
       setSaveError('SKU 不能为空，请填写后保存');
       return;
     }
+
+    // Step 10-6D：SKU 重复前端预检查（提交前再次确认）
+    if (skuError) {
+      setSaveError('SKU 已存在，请确认是否重复产品。');
+      return;
+    }
+
     // Step 10-6C：价格字段非负数校验
     if (formData.purchasePrice !== '' && Number(formData.purchasePrice) < 0) {
       setSaveError('采购价不能为负数');
@@ -376,10 +393,36 @@ function Products() {
 
       // 保存成功
       setIsSaving(false);
-      handleCloseModal();
-      setActionMessage({ type: 'success', text: editingProduct ? '产品已更新' : '产品已添加' });
-      // 3 秒后自动清除成功提示
-      setTimeout(() => setActionMessage(null), 3000);
+
+      if (keepModalOpen && !editingProduct) {
+        // Step 10-6D：保存并继续新增 — 保留分类/单位/库位/最低库存，重置其余字段
+        setFormData(prev => ({
+          name: '',
+          sku: '',
+          category: prev.category,
+          currentStock: 0,
+          minStock: prev.minStock,
+          unit: prev.unit,
+          location: prev.location,
+          brand: '',
+          specification: '',
+          supplier: '',
+          notes: '',
+          purchasePrice: '',
+          salePrice: ''
+        }));
+        setSkuError(null);
+        setNameWarning(null);
+        setNameSpecWarning(null);
+        setSaveError(null);
+        setActionMessage({ type: 'success', text: '产品已添加，可继续录入下一产品' });
+        setTimeout(() => setActionMessage(null), 3000);
+      } else {
+        handleCloseModal();
+        setActionMessage({ type: 'success', text: editingProduct ? '产品已更新' : '产品已添加' });
+        // 3 秒后自动清除成功提示
+        setTimeout(() => setActionMessage(null), 3000);
+      }
     } catch (error) {
       console.error('保存产品失败:', error);
       setIsSaving(false);
@@ -437,10 +480,36 @@ function Products() {
           const newProduct = addProduct(newProductData);
           newProduct.status = calculateProductStatus(newProduct);
           setAllProducts([...allProducts, newProduct]);
-          setSaveError(null);
-          handleCloseModal();
-          setActionMessage({ type: 'success', text: '产品已添加' });
-          setTimeout(() => setActionMessage(null), 3000);
+
+          if (keepModalOpen) {
+            // 降级模式下的"保存并继续"
+            setFormData(prev => ({
+              name: '',
+              sku: '',
+              category: prev.category,
+              currentStock: 0,
+              minStock: prev.minStock,
+              unit: prev.unit,
+              location: prev.location,
+              brand: '',
+              specification: '',
+              supplier: '',
+              notes: '',
+              purchasePrice: '',
+              salePrice: ''
+            }));
+            setSkuError(null);
+            setNameWarning(null);
+            setNameSpecWarning(null);
+            setSaveError(null);
+            setActionMessage({ type: 'success', text: '产品已添加，可继续录入下一产品' });
+            setTimeout(() => setActionMessage(null), 3000);
+          } else {
+            setSaveError(null);
+            handleCloseModal();
+            setActionMessage({ type: 'success', text: '产品已添加' });
+            setTimeout(() => setActionMessage(null), 3000);
+          }
         }
       } catch (fallbackError) {
         console.error('降级保存也失败:', fallbackError);
@@ -449,7 +518,53 @@ function Products() {
     }
   };
 
-  // 表单字段变化处理（含库存分类→库位联动）
+  // Step 10-6D：SKU 重复前端预检查
+  const checkSkuDuplicate = (skuValue, currentProductId = null) => {
+    if (!skuValue || !skuValue.trim()) {
+      setSkuError(null);
+      return;
+    }
+    const trimmedSku = skuValue.trim().toLowerCase();
+    const duplicate = allProducts.find(
+      p => p.sku.trim().toLowerCase() === trimmedSku && p.id !== currentProductId
+    );
+    if (duplicate) {
+      setSkuError('SKU 已存在，请确认是否重复产品。');
+    } else {
+      setSkuError(null);
+    }
+  };
+
+  // Step 10-6D：产品名称重复轻提示
+  const checkNameDuplicate = (nameValue, specValue, currentProductId = null) => {
+    if (!nameValue || !nameValue.trim()) {
+      setNameWarning(null);
+      setNameSpecWarning(null);
+      return;
+    }
+    const trimmedName = nameValue.trim();
+    const trimmedSpec = specValue ? specValue.trim() : '';
+    const sameName = allProducts.find(
+      p => p.name.trim() === trimmedName && p.id !== currentProductId
+    );
+    if (!sameName) {
+      setNameWarning(null);
+      setNameSpecWarning(null);
+      return;
+    }
+    // 名称相同
+    const specMatch = sameName.specification && trimmedSpec &&
+      sameName.specification.trim() === trimmedSpec;
+    if (specMatch) {
+      setNameWarning(null);
+      setNameSpecWarning('已存在相同产品名称和规格的产品，请确认是否为重复录入。');
+    } else {
+      setNameSpecWarning(null);
+      setNameWarning('已存在相同产品名称，请确认是否为不同规格或重复录入。');
+    }
+  };
+
+  // 表单字段变化处理（含库存分类→库位联动、SKU/名称重复检查）
   const handleFormChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => {
@@ -461,6 +576,16 @@ function Products() {
       }
       return updates;
     });
+
+    // Step 10-6D：实时重复检查
+    if (name === 'sku') {
+      checkSkuDuplicate(value, editingProduct ? editingProduct.id : null);
+    }
+    if (name === 'name' || name === 'specification') {
+      const newName = name === 'name' ? value : formData.name;
+      const newSpec = name === 'specification' ? value : formData.specification;
+      checkNameDuplicate(newName, newSpec, editingProduct ? editingProduct.id : null);
+    }
   };
 
   // 操作按钮事件处理
@@ -570,18 +695,22 @@ function Products() {
           </button>
 
           {/* 右侧：导出按钮 */}
-          <button
-            onClick={handleExport}
-            disabled={!canWrite || filteredProducts.length === 0}
-            title={!canWrite ? adminOnlyTitle : ''}
-            className={`px-4 py-2 border rounded-md transition-colors font-medium ${
-              !canWrite || filteredProducts.length === 0
-                ? 'border-slate-200 text-slate-400 cursor-not-allowed'
-                : 'border-slate-300 text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            导出 CSV
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={handleExport}
+              disabled={!canWrite || filteredProducts.length === 0}
+              title={!canWrite ? adminOnlyTitle : ''}
+              className={`px-4 py-2 border rounded-md transition-colors font-medium ${
+                !canWrite || filteredProducts.length === 0
+                  ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              导出 CSV
+            </button>
+            {/* Step 10-6D：导出核对轻提示 */}
+            <p className="text-xs text-slate-400">录入完成后建议导出 CSV，与旧系统/腾讯文档反向核对。</p>
+          </div>
         </div>
 
         {/* 第二行：搜索与主筛选 */}
@@ -1203,9 +1332,17 @@ function Products() {
                     name="name"
                     value={formData.name}
                     onChange={handleFormChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    className={`w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent ${
+                      nameSpecWarning ? 'border-amber-400 bg-amber-50' : nameWarning ? 'border-amber-300 bg-amber-50' : 'border-slate-300'
+                    }`}
                     placeholder="请输入产品名称"
                   />
+                  {nameWarning && !nameSpecWarning && (
+                    <p className="mt-1 text-sm text-amber-600 font-medium">{nameWarning}</p>
+                  )}
+                  {nameSpecWarning && (
+                    <p className="mt-1 text-sm text-amber-700 font-medium">{nameSpecWarning}</p>
+                  )}
                 </div>
 
                 {/* SKU */}
@@ -1218,9 +1355,14 @@ function Products() {
                     name="sku"
                     value={formData.sku}
                     onChange={handleFormChange}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    className={`w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent ${
+                      skuError ? 'border-rose-400 bg-rose-50' : 'border-slate-300'
+                    }`}
                     placeholder="如：PRD-2026001"
                   />
+                  {skuError && (
+                    <p className="mt-1 text-sm text-rose-600 font-medium">{skuError}</p>
+                  )}
                 </div>
 
                 {/* 库存分类和单位 */}
@@ -1431,6 +1573,13 @@ function Products() {
 
               </div>
 
+              {/* Step 10-6D：手动录入提示文案 */}
+              <div className="mx-6 mt-3 p-3 bg-slate-50 border border-slate-200 rounded-md">
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  正式录入建议：SKU / 产品名称 / 当前库存 / 库位优先核对；采购价、售价未知可留空，不要填 0 代替未知。
+                </p>
+              </div>
+
               {/* 保存错误提示 */}
               {saveError && (
                 <div className="mx-6 mt-3 p-3 bg-rose-50 border border-rose-200 rounded-md">
@@ -1457,11 +1606,28 @@ function Products() {
                 >
                   取消
                 </button>
+                {/* Step 10-6D：保存并继续新增（仅新增模式可用，编辑模式不显示） */}
+                {!editingProduct && (
+                  <button
+                    type="button"
+                    onClick={(e) => handleFormSubmit(e, true)}
+                    disabled={isSaving || !!skuError}
+                    title={skuError ? '请先解决 SKU 重复问题' : ''}
+                    className={`px-4 py-2 border rounded-md transition-colors font-medium ${
+                      isSaving || skuError
+                        ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                        : 'border-slate-400 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    {isSaving ? '保存中...' : '保存并继续新增'}
+                  </button>
+                )}
                 <button
                   type="submit"
-                  disabled={isSaving}
+                  disabled={isSaving || !!skuError}
+                  title={skuError ? '请先解决 SKU 重复问题' : ''}
                   className={`px-4 py-2 rounded-md transition-colors font-medium ${
-                    isSaving
+                    isSaving || skuError
                       ? 'bg-slate-400 text-white cursor-not-allowed'
                       : 'bg-slate-700 text-white hover:bg-slate-800'
                   }`}
