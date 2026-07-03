@@ -1456,10 +1456,14 @@ function Settings() {
         </div>
 
         {/* Step 10-8A：正式启用前检查 */}
-        <GoLiveChecklistPanel canWrite={canWrite} />
+        <div className="lg:col-span-2">
+          <GoLiveChecklistPanel canWrite={canWrite} />
+        </div>
 
         {/* Step 10-8A：库存系统功能介绍与使用说明 */}
-        <SystemOperationGuide />
+        <div className="lg:col-span-2">
+          <SystemOperationGuide />
+        </div>
 
         {/* 账号安全 / 修改密码 */}
         <div className="bg-white border border-slate-200 rounded-lg lg:col-span-2">
