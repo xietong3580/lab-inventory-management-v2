@@ -73,10 +73,29 @@ export const generateAuditSummary = (log, compact = false) => {
       return compact
         ? `通过 CSV ${log.productName || '批量导入产品'}`
         : `通过 CSV ${log.productName || '批量导入产品'}`;
-    case 'RESTORE_PREPARE':
-      return compact
-        ? `恢复准备 — ${log.productName || '目标备份'}`
-        : `恢复准备操作，${log.productName || '已生成恢复计划'}`;
+    case 'RESTORE_PREPARE': {
+      // 从 productName 中提取目标备份文件名（去掉重复的"恢复准备 — "前缀）
+      const targetInfo = (log.productName || '').replace(/^恢复准备\s*[—–-]\s*/, '');
+      // 尝试从 details JSON 中获取更多信息
+      let preRestoreBackup = '';
+      try {
+        if (log.details) {
+          const det = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+          if (det.pre_restore_backup) preRestoreBackup = det.pre_restore_backup;
+        }
+      } catch { /* details 不可解析时忽略 */ }
+      if (compact) {
+        const parts = [targetInfo || '目标备份'];
+        if (preRestoreBackup) parts.push(`恢复前备份：${preRestoreBackup}`);
+        parts.push('未执行真实恢复');
+        return parts.join('；');
+      }
+      const parts = [];
+      if (targetInfo) parts.push(targetInfo);
+      if (preRestoreBackup) parts.push(`已创建恢复前备份：${preRestoreBackup}`);
+      parts.push('未执行真实恢复');
+      return parts.join('，');
+    }
     default:
       return `${actionLabel}操作`;
   }

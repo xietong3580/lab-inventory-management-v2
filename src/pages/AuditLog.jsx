@@ -384,7 +384,7 @@ function AuditLog() {
                       <div className="col-span-3">
                         <div className="text-sm text-slate-800 truncate"
                           title={log.productName || undefined}>
-                          {log.productName || '-'}
+                          {['RESTORE_PREPARE', 'SYSTEM_RESET'].includes(log.actionType) ? '-' : (log.productName || '-')}
                         </div>
                       </div>
 
