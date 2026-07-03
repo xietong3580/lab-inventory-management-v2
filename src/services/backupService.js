@@ -292,3 +292,89 @@ export async function resetBusinessData(confirmation) {
 
   return response.json();
 }
+
+// ═══════════════════════════════════════════════════════════
+// 恢复预检（Step 10-7A）
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * 获取备份恢复候选列表（仅管理员可用，只读）
+ * @returns {Promise<{
+ *   success: boolean,
+ *   candidates: Array<{
+ *     filename: string,
+ *     size_bytes: number,
+ *     created_at: string,
+ *     extension: string,
+ *     is_candidate: boolean,
+ *     warnings: string[]
+ *   }>,
+ *   count: number,
+ *   message: string
+ * }>}
+ */
+export async function getRestoreCandidates() {
+  const token = getToken();
+  if (!token) {
+    throw new Error('未登录');
+  }
+
+  const response = await fetch(`${API_BASE}/maintenance/restore-candidates`, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 403) {
+      throw new Error('需要管理员权限才能查看恢复候选列表');
+    }
+    throw new Error(errorData.detail || `获取恢复候选列表失败 (${response.status})`);
+  }
+
+  return response.json();
+}
+
+/**
+ * 对指定备份文件执行恢复预检（仅管理员可用，只读，不执行真实恢复）
+ * @param {string} filename - 备份文件名（纯文件名，不含路径）
+ * @returns {Promise<{
+ *   success: boolean,
+ *   filename: string,
+ *   size_bytes: number,
+ *   level: 'ok' | 'warning' | 'error',
+ *   checks: Array<{ name: string, passed: boolean, detail: string }>,
+ *   counts: { products_count: number, transactions_count: number, audit_logs_count: number, users_count: number },
+ *   warnings: string[],
+ *   errors: string[],
+ *   message: string
+ * }>}
+ */
+export async function getRestorePreflight(filename) {
+  const token = getToken();
+  if (!token) {
+    throw new Error('未登录');
+  }
+
+  const encodedFilename = encodeURIComponent(filename);
+  const response = await fetch(`${API_BASE}/maintenance/restore-preflight?filename=${encodedFilename}`, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    if (response.status === 403) {
+      throw new Error('需要管理员权限才能执行恢复预检');
+    }
+    throw new Error(errorData.detail || `恢复预检请求失败 (${response.status})`);
+  }
+
+  return response.json();
+}

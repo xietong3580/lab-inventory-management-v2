@@ -1,18 +1,21 @@
 """
-维护 API 路由：备份前安全检查 + 数据库物理备份 + 测试业务数据清空
+维护 API 路由：备份前安全检查 + 数据库物理备份 + 测试业务数据清空 + 恢复预检
 
 - GET  /api/maintenance/preflight           备份前安全检查（所有登录用户可访问，只读）
 - POST /api/maintenance/backups            创建 SQLite 数据库物理副本（仅管理员）
 - GET  /api/maintenance/reset-preview      测试业务数据清空预览（所有登录用户可访问，只读）
 - POST /api/maintenance/reset-business-data 清空测试业务数据（仅管理员，需确认短语）
+- GET  /api/maintenance/restore-candidates 备份恢复候选列表（仅管理员，只读）
+- GET  /api/maintenance/restore-preflight  备份恢复预检（仅管理员，只读）
 """
 
+import re
 import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from database import BASE_DIR
@@ -104,6 +107,44 @@ class ResetBusinessDataResponse(BaseModel):
     after: ResetBusinessDataCounts
     preflight: PreflightResponse
     warnings: List[str]
+
+
+# ═══════════════════════════════════════════════════════════
+# 恢复预检响应模型（Step 10-7A）
+# ═══════════════════════════════════════════════════════════
+
+class RestoreCandidate(BaseModel):
+    filename: str
+    size_bytes: int
+    created_at: str
+    extension: str
+    is_candidate: bool
+    warnings: List[str]
+
+
+class RestoreCandidatesResponse(BaseModel):
+    success: bool
+    candidates: List[RestoreCandidate]
+    count: int
+    message: str
+
+
+class RestorePreflightCheck(BaseModel):
+    name: str
+    passed: bool
+    detail: str
+
+
+class RestorePreflightResponse(BaseModel):
+    success: bool  # 整体预检是否成功
+    filename: str
+    size_bytes: int
+    level: str  # "ok" | "warning" | "error"
+    checks: List[RestorePreflightCheck]
+    counts: dict  # { products_count, transactions_count, audit_logs_count, users_count }
+    warnings: List[str]
+    errors: List[str]
+    message: str
 
 
 # ═══════════════════════════════════════════════════════════
@@ -742,4 +783,341 @@ def reset_business_data(req: ResetBusinessDataRequest, admin=Depends(require_adm
             "用户账号、系统设置和备份文件已保留。",
             "后续正式数据应以旧系统导出的真实产品库存 CSV 为准重新导入。",
         ],
+    )
+
+
+# ═══════════════════════════════════════════════════════════
+# 恢复预检接口（Step 10-7A）
+# ═══════════════════════════════════════════════════════════
+
+# 合法的备份文件扩展名
+_ALLOWED_EXTENSIONS = {".db", ".sqlite"}
+# 文件名安全模式：仅允许字母、数字、下划线、连字符、点号
+_FILENAME_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.\-]*$")
+
+
+def _validate_backup_filename(filename: str) -> str:
+    """
+    安全校验备份文件名，拒绝路径穿越和非法扩展名。
+
+    Raises HTTPException on failure, returns sanitized filename on success.
+    """
+    if not filename or not filename.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="文件名不能为空",
+        )
+
+    # 禁止路径分隔符、反斜杠、点dot路径穿越
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="文件名包含非法字符，已拒绝",
+        )
+
+    # 仅允许纯文件名（不含路径）
+    name = Path(filename).name
+    if name != filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="文件名包含路径信息，已拒绝",
+        )
+
+    # 安全模式校验
+    if not _FILENAME_PATTERN.match(name):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="文件名包含不允许的字符",
+        )
+
+    # 扩展名校验
+    suffix = Path(name).suffix.lower()
+    if suffix not in _ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"不支持的文件类型：{suffix}，仅允许 .db 和 .sqlite",
+        )
+
+    return name
+
+
+def _is_sqlite_valid(filepath: Path) -> tuple[bool, str]:
+    """
+    使用 SQLite 只读模式打开并检查文件是否为有效数据库。
+
+    Returns (is_valid, detail_message).
+    """
+    try:
+        uri = filepath.resolve().as_uri()
+        conn = sqlite3.connect(f"{uri}?mode=ro", uri=True)
+        conn.execute("SELECT 1")
+        conn.close()
+        return True, "文件为有效 SQLite 数据库"
+    except sqlite3.Error as e:
+        return False, f"SQLite 打开失败：{e}"
+
+
+def _validate_integrity(filepath: Path) -> tuple[bool, str]:
+    """对备份文件执行 PRAGMA integrity_check（只读模式）。"""
+    try:
+        uri = filepath.resolve().as_uri()
+        conn = sqlite3.connect(f"{uri}?mode=ro", uri=True)
+        result = conn.execute("PRAGMA integrity_check").fetchone()
+        conn.close()
+        if result and result[0] == "ok":
+            return True, "完整性检查通过"
+        return False, f"完整性检查失败：{result[0] if result else '未知错误'}"
+    except sqlite3.Error as e:
+        return False, f"完整性检查异常：{e}"
+
+
+@router.get("/restore-candidates", response_model=RestoreCandidatesResponse)
+def restore_candidates(admin=Depends(require_admin)):
+    """
+    列出可用的备份恢复候选文件（仅管理员，只读）。
+
+    - 扫描 backups 目录下的 .db 和 .sqlite 文件
+    - 返回文件大小、时间、类型、是否可用为候选
+    - 不打开文件，不做恢复操作
+    - 不返回绝对路径给前端
+    """
+    warnings: List[str] = []
+    candidates: List[RestoreCandidate] = []
+
+    # 确保备份目录存在
+    if not BACKUP_DIR.exists() or not BACKUP_DIR.is_dir():
+        return RestoreCandidatesResponse(
+            success=True,
+            candidates=[],
+            count=0,
+            message="备份目录不存在，暂无恢复候选",
+        )
+
+    # 扫描备份文件
+    try:
+        backup_files = []
+        for ext in _ALLOWED_EXTENSIONS:
+            backup_files.extend(BACKUP_DIR.glob(f"*{ext}"))
+
+        # 去重并按修改时间倒序
+        backup_files = sorted(set(backup_files), key=lambda f: f.stat().st_mtime, reverse=True)
+    except OSError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"扫描备份目录失败：{e}",
+        )
+
+    for bf in backup_files:
+        try:
+            stat = bf.stat()
+            file_warnings: List[str] = []
+            is_candidate = True
+
+            if stat.st_size == 0:
+                file_warnings.append("文件大小为 0，不可用于恢复")
+                is_candidate = False
+
+            candidates.append(RestoreCandidate(
+                filename=bf.name,
+                size_bytes=stat.st_size,
+                created_at=datetime.fromtimestamp(stat.st_ctime).isoformat(),
+                extension=bf.suffix.lower(),
+                is_candidate=is_candidate,
+                warnings=file_warnings,
+            ))
+        except OSError:
+            # 跳过无法读取状态的文件
+            continue
+
+    return RestoreCandidatesResponse(
+        success=True,
+        candidates=candidates,
+        count=len(candidates),
+        message=f"共发现 {len(candidates)} 个备份候选文件",
+    )
+
+
+@router.get("/restore-preflight", response_model=RestorePreflightResponse)
+def restore_preflight(
+    filename: str = Query(..., description="备份文件名（纯文件名，不含路径）"),
+    admin=Depends(require_admin),
+):
+    """
+    对指定备份文件做只读恢复预检（仅管理员，只读）。
+
+    安全要求：
+    - filename 必须是纯文件名，不允许路径穿越
+    - 文件必须位于 BACKUP_DIR 下
+    - 扩展名必须是 .db 或 .sqlite
+    - 使用 SQLite 只读模式打开
+    - 禁止对当前正式数据库做任何写操作
+    - 禁止覆盖数据库
+
+    预检内容：
+    1. 文件存在性检查
+    2. 文件大小检查
+    3. SQLite 可打开检查（只读）
+    4. PRAGMA integrity_check
+    5. 关键表存在检查（products / transactions / audit_logs / users）
+    6. 核心数据量统计
+    """
+    # ── 安全校验文件名 ──
+    safe_name = _validate_backup_filename(filename)
+
+    # ── 确认文件在备份目录下 ──
+    backup_path = (BACKUP_DIR / safe_name).resolve()
+    allowed_prefix = BACKUP_DIR.resolve()
+
+    if not str(backup_path).startswith(str(allowed_prefix)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="不允许访问备份目录之外的文件",
+        )
+
+    checks: List[RestorePreflightCheck] = []
+    error_messages: List[str] = []
+    warning_messages: List[str] = []
+    counts = {
+        "products_count": 0,
+        "transactions_count": 0,
+        "audit_logs_count": 0,
+        "users_count": 0,
+    }
+
+    # ── 1. 文件存在性检查 ──
+    if not backup_path.exists():
+        checks.append(RestorePreflightCheck(name="文件存在性", passed=False, detail="备份文件不存在"))
+        return RestorePreflightResponse(
+            success=False,
+            filename=safe_name,
+            size_bytes=0,
+            level="error",
+            checks=checks,
+            counts=counts,
+            warnings=warning_messages,
+            errors=["备份文件不存在"] + error_messages,
+            message="预检失败：备份文件不存在",
+        )
+    checks.append(RestorePreflightCheck(name="文件存在性", passed=True, detail="备份文件存在"))
+
+    # ── 2. 文件大小检查 ──
+    file_size = 0
+    try:
+        file_size = backup_path.stat().st_size
+    except OSError as e:
+        error_messages.append(f"无法读取文件大小：{e}")
+        checks.append(RestorePreflightCheck(name="文件大小", passed=False, detail=f"无法读取：{e}"))
+    else:
+        if file_size == 0:
+            error_messages.append("备份文件大小为 0，不可用于恢复")
+            checks.append(RestorePreflightCheck(name="文件大小", passed=False, detail="文件大小为 0"))
+        else:
+            checks.append(RestorePreflightCheck(
+                name="文件大小", passed=True,
+                detail=f"{file_size:,} 字节",
+            ))
+
+    if file_size == 0:
+        return RestorePreflightResponse(
+            success=False,
+            filename=safe_name,
+            size_bytes=0,
+            level="error",
+            checks=checks,
+            counts=counts,
+            warnings=warning_messages,
+            errors=error_messages,
+            message="预检失败：备份文件大小为 0，不可用于恢复",
+        )
+
+    # ── 3. SQLite 可打开检查（只读模式） ──
+    can_open, open_detail = _is_sqlite_valid(backup_path)
+    checks.append(RestorePreflightCheck(name="SQLite 可打开", passed=can_open, detail=open_detail))
+    if not can_open:
+        error_messages.append(open_detail)
+        return RestorePreflightResponse(
+            success=False,
+            filename=safe_name,
+            size_bytes=file_size,
+            level="error",
+            checks=checks,
+            counts=counts,
+            warnings=warning_messages,
+            errors=error_messages,
+            message=f"预检失败：备份文件无法作为有效 SQLite 数据库打开 — {open_detail}",
+        )
+
+    # ── 4. PRAGMA integrity_check ──
+    int_ok, int_detail = _validate_integrity(backup_path)
+    checks.append(RestorePreflightCheck(name="完整性检查", passed=int_ok, detail=int_detail))
+    if not int_ok:
+        error_messages.append(int_detail)
+
+    # ── 5. 关键表检查 + 数据量统计 ──
+    expected_tables = {
+        "products": "产品表",
+        "transactions": "出入库记录表",
+        "audit_logs": "审计日志表",
+        "users": "用户表",
+    }
+
+    try:
+        uri = backup_path.resolve().as_uri()
+        conn = sqlite3.connect(f"{uri}?mode=ro", uri=True)
+        conn.row_factory = sqlite3.Row
+
+        for table_name, table_label in expected_tables.items():
+            exists = _table_exists(conn, table_name)
+            checks.append(RestorePreflightCheck(
+                name=f"{table_label} ({table_name})",
+                passed=exists,
+                detail="表存在" if exists else f"缺少 {table_name} 表",
+            ))
+            if not exists:
+                warning_messages.append(f"备份中缺少 {table_name} 表（{table_label}）")
+
+            # 统计行数
+            if exists:
+                try:
+                    row_count = conn.execute(
+                        f"SELECT COUNT(*) FROM {table_name}"
+                    ).fetchone()[0]
+                    count_key = f"{table_name}_count"
+                    if count_key in counts:
+                        counts[count_key] = row_count
+                except sqlite3.Error:
+                    pass
+
+        conn.close()
+    except sqlite3.Error as e:
+        error_messages.append(f"关键表检查失败：{e}")
+        checks.append(RestorePreflightCheck(
+            name="关键表检查", passed=False, detail=f"SQLite 查询异常：{e}",
+        ))
+
+    # ── 6. 判定整体结果 ──
+    if error_messages:
+        level = "error"
+        overall_success = False
+    elif warning_messages:
+        level = "warning"
+        overall_success = True
+    else:
+        level = "ok"
+        overall_success = True
+
+    return RestorePreflightResponse(
+        success=overall_success,
+        filename=safe_name,
+        size_bytes=file_size,
+        level=level,
+        checks=checks,
+        counts=counts,
+        warnings=warning_messages,
+        errors=error_messages,
+        message=(
+            "预检通过，备份文件可用于恢复" if level == "ok"
+            else "预检通过但有警告，请检查警告项" if level == "warning"
+            else "预检失败，该备份文件不可用于恢复"
+        ),
     )

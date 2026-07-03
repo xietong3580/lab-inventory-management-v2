@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { systemService } from '../services/dataService';
 import { usePermission } from '../hooks/usePermission';
 import { changePassword } from '../services/authService';
-import { createManualBackup, getBackups, downloadBackup, formatBytes, runPreflightCheck, createMaintenanceBackup, getResetPreview, resetBusinessData } from '../services/backupService';
+import { createManualBackup, getBackups, downloadBackup, formatBytes, runPreflightCheck, createMaintenanceBackup, getResetPreview, resetBusinessData, getRestoreCandidates, getRestorePreflight } from '../services/backupService';
 
 function Settings() {
   const { canWrite, adminOnlyTitle } = usePermission();
@@ -44,6 +44,14 @@ function Settings() {
   const [isResettingBusiness, setIsResettingBusiness] = useState(false);
   const [resetBusinessResult, setResetBusinessResult] = useState(null);
   const [resetBusinessError, setResetBusinessError] = useState('');
+  // Step 10-7A：恢复预检相关状态
+  const [restoreCandidates, setRestoreCandidates] = useState([]);
+  const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
+  const [candidatesError, setCandidatesError] = useState('');
+  const [restorePreflightResult, setRestorePreflightResult] = useState(null);
+  const [isRunningPreflight, setIsRunningPreflight] = useState(false);
+  const [preflightingFile, setPreflightingFile] = useState(null);
+  const [restorePreflightError, setRestorePreflightError] = useState('');
 
   // 获取数据源模式
   useEffect(() => {
@@ -74,6 +82,47 @@ function Settings() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canWrite]);
+
+  // Step 10-7A：加载恢复候选列表（仅管理员）
+  const loadRestoreCandidates = async () => {
+    if (!canWrite) return;
+    setIsLoadingCandidates(true);
+    setCandidatesError('');
+    try {
+      const data = await getRestoreCandidates();
+      setRestoreCandidates(data.candidates || []);
+    } catch (err) {
+      setCandidatesError(err.message || '加载恢复候选列表失败');
+      setRestoreCandidates([]);
+    } finally {
+      setIsLoadingCandidates(false);
+    }
+  };
+
+  // admin 进入页面时自动加载恢复候选列表
+  useEffect(() => {
+    if (canWrite) {
+      loadRestoreCandidates();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canWrite]);
+
+  // Step 10-7A：对指定备份文件执行恢复预检
+  const handleRestorePreflight = async (filename) => {
+    setPreflightingFile(filename);
+    setIsRunningPreflight(true);
+    setRestorePreflightResult(null);
+    setRestorePreflightError('');
+    try {
+      const result = await getRestorePreflight(filename);
+      setRestorePreflightResult(result);
+    } catch (err) {
+      setRestorePreflightError(err.message || '恢复预检失败');
+    } finally {
+      setIsRunningPreflight(false);
+      setPreflightingFile(null);
+    }
+  };
 
   // 打开重置确认对话框
   const handleOpenResetConfirm = () => {
@@ -1037,6 +1086,161 @@ function Settings() {
                   <div className="pt-3 border-t border-slate-100">
                     <div className="text-sm text-slate-400 py-2">仅管理员可查看备份记录</div>
                   </div>
+                )}
+              </div>
+              {/* Step 10-7A：数据库备份恢复预检（只读） */}
+              <div className="pt-4 border-t border-slate-100">
+                <div className="font-medium text-slate-800 mb-2">数据库备份恢复预检</div>
+                <p className="text-sm text-slate-600 mb-3">
+                  此功能仅检查备份文件是否可用于未来恢复，不会覆盖当前数据库。
+                </p>
+                {canWrite ? (
+                  <>
+                    {/* 恢复候选列表 */}
+                    {isLoadingCandidates ? (
+                      <div className="text-sm text-slate-500 py-2">正在加载恢复候选列表...</div>
+                    ) : candidatesError && !isLoadingCandidates ? (
+                      <div className="text-sm text-rose-600 py-2">{candidatesError}</div>
+                    ) : restoreCandidates.length === 0 ? (
+                      <div className="text-sm text-slate-400 py-2">暂无备份恢复候选文件</div>
+                    ) : (
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {restoreCandidates.map((candidate) => (
+                          <div key={candidate.filename} className="py-2 px-3 bg-slate-50 border border-slate-100 rounded text-xs">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-mono text-slate-700 truncate flex-1 mr-2">{candidate.filename}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-xs font-medium shrink-0 ${
+                                candidate.is_candidate
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : 'bg-rose-100 text-rose-700'
+                              }`}>
+                                {candidate.is_candidate ? '可用' : '不可用'}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div className="text-slate-500">
+                                {formatBytes(candidate.size_bytes)} · {candidate.extension} · {new Date(candidate.created_at).toLocaleString('zh-CN')}
+                              </div>
+                              <button
+                                onClick={() => handleRestorePreflight(candidate.filename)}
+                                disabled={isRunningPreflight || !candidate.is_candidate}
+                                title={!candidate.is_candidate ? '该备份不可用于恢复' : (isRunningPreflight ? '预检进行中...' : '运行恢复预检')}
+                                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                                  isRunningPreflight || !candidate.is_candidate
+                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                    : 'bg-slate-600 text-white hover:bg-slate-700'
+                                }`}
+                              >
+                                {preflightingFile === candidate.filename ? (
+                                  <span className="flex items-center gap-1">
+                                    <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                    预检中...
+                                  </span>
+                                ) : '预检'}
+                              </button>
+                            </div>
+                            {candidate.warnings && candidate.warnings.length > 0 && (
+                              <div className="mt-1 text-amber-600">
+                                {candidate.warnings.map((w, i) => (
+                                  <div key={i}>{w}</div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 恢复预检结果 */}
+                    {restorePreflightError && (
+                      <div className="mt-3 p-3 rounded-md border bg-rose-50 border-rose-200">
+                        <div className="text-rose-800 font-medium mb-1">预检失败</div>
+                        <div className="text-sm text-rose-700">{restorePreflightError}</div>
+                      </div>
+                    )}
+                    {restorePreflightResult && (
+                      <div className={`mt-3 p-3 rounded-md border text-sm ${
+                        restorePreflightResult.level === 'ok'
+                          ? 'bg-emerald-50 border-emerald-200'
+                          : restorePreflightResult.level === 'warning'
+                          ? 'bg-amber-50 border-amber-200'
+                          : 'bg-rose-50 border-rose-200'
+                      }`}>
+                        <div className={`font-medium mb-2 ${
+                          restorePreflightResult.level === 'ok'
+                            ? 'text-emerald-800'
+                            : restorePreflightResult.level === 'warning'
+                            ? 'text-amber-800'
+                            : 'text-rose-800'
+                        }`}>
+                          {restorePreflightResult.level === 'ok' && '✅ 预检通过'}
+                          {restorePreflightResult.level === 'warning' && '⚠️ 预检通过（有警告）'}
+                          {restorePreflightResult.level === 'error' && '❌ 预检失败'}
+                          <span className="font-normal text-slate-600 ml-2">
+                            — {restorePreflightResult.filename} ({formatBytes(restorePreflightResult.size_bytes)})
+                          </span>
+                        </div>
+
+                        {/* 检查项 */}
+                        <div className="space-y-1 mb-3">
+                          <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">检查项</div>
+                          {restorePreflightResult.checks.map((check, i) => (
+                            <div key={i} className="flex items-start gap-2">
+                              <span className={`mt-0.5 ${check.passed ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                {check.passed ? '✓' : '✗'}
+                              </span>
+                              <div>
+                                <span className="text-slate-700">{check.name}</span>
+                                <span className="text-slate-500 ml-2">{check.detail}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* 数据统计 */}
+                        {restorePreflightResult.counts && (
+                          <div className="mb-3 pt-2 border-t border-slate-200">
+                            <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">备份数据概览</div>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-700">
+                              <span>产品：{restorePreflightResult.counts.products_count ?? '—'}</span>
+                              <span>出入库记录：{restorePreflightResult.counts.transactions_count ?? '—'}</span>
+                              <span>审计日志：{restorePreflightResult.counts.audit_logs_count ?? '—'}</span>
+                              <span>用户：{restorePreflightResult.counts.users_count ?? '—'}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Warnings / Errors */}
+                        {restorePreflightResult.warnings && restorePreflightResult.warnings.length > 0 && (
+                          <div className="mb-2 pt-2 border-t border-amber-200">
+                            <div className="text-xs font-medium text-amber-700 mb-1">警告</div>
+                            <ul className="text-xs text-amber-700 space-y-0.5 list-disc list-inside">
+                              {restorePreflightResult.warnings.map((w, i) => (
+                                <li key={i}>{w}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {restorePreflightResult.errors && restorePreflightResult.errors.length > 0 && (
+                          <div className="pt-2 border-t border-rose-200">
+                            <div className="text-xs font-medium text-rose-700 mb-1">错误</div>
+                            <ul className="text-xs text-rose-700 space-y-0.5 list-disc list-inside">
+                              {restorePreflightResult.errors.map((e, i) => (
+                                <li key={i}>{e}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 提示 */}
+                    <div className="mt-3 p-2.5 bg-slate-50 border border-slate-200 rounded-md text-xs text-slate-500">
+                      当前版本仅支持恢复前预检，不执行真实恢复。如需从备份恢复数据库，请联系管理员按恢复流程操作。
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-sm text-slate-400 py-2">仅管理员可执行恢复预检</div>
                 )}
               </div>
               <div className="pt-4 border-t border-slate-100">
