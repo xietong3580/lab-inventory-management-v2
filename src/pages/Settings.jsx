@@ -1455,7 +1455,7 @@ function Settings() {
           </div>
         </div>
 
-        {/* Step 10-8A：正式启用前检查 */}
+        {/* Step 10-8A：管理员维护检查 */}
         <div className="lg:col-span-2">
           <GoLiveChecklistPanel canWrite={canWrite} />
         </div>

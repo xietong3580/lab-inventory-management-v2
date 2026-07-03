@@ -28,7 +28,7 @@ export default function GoLiveChecklistPanel({ canWrite }) {
       <div className="bg-white border border-slate-200 rounded-lg p-6">
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-slate-600 mr-3"></div>
-          <span className="text-slate-500">正在加载正式启用前检查...</span>
+          <span className="text-slate-500">正在加载管理员维护检查...</span>
         </div>
       </div>
     );
@@ -52,7 +52,7 @@ export default function GoLiveChecklistPanel({ canWrite }) {
     '不要在未创建备份时清空数据，操作不可逆',
     '不要把未知采购价、售价填为 0，未知时应留空',
     '不要把旧系统历史出入库记录直接混入新系统正式出入库',
-    '不要在未核对库存数量前直接正式启用系统',
+    '不要在未核对库存数量前开始正式出入库操作',
     '不要直接手工修改数据库文件，应通过系统功能操作',
     '不要提交数据库文件或备份文件到代码仓库',
     '出问题时先查看备份预检、恢复准备和审计日志，不要盲目修改数据',
@@ -61,9 +61,9 @@ export default function GoLiveChecklistPanel({ canWrite }) {
   return (
     <div className="bg-white border border-slate-200 rounded-lg">
       <div className="px-6 py-4 border-b border-slate-100">
-        <h2 className="text-lg font-semibold text-slate-800">正式启用前检查</h2>
+        <h2 className="text-lg font-semibold text-slate-800">管理员维护检查</h2>
         <p className="text-sm text-slate-500 mt-1">
-          此模块用于正式录入产品和替换旧系统前的只读检查，不会修改任何数据。
+          用于管理员在正式启用、清空数据、批量录入、备份恢复等重要操作前，检查当前数据和备份状态。本模块只做检查和提醒，不会修改任何数据。
         </p>
       </div>
 
@@ -159,7 +159,7 @@ export default function GoLiveChecklistPanel({ canWrite }) {
 
         {/* 推荐流程步骤 */}
         <div>
-          <div className="text-sm font-medium text-slate-700 mb-2">正式启用推荐流程</div>
+          <div className="text-sm font-medium text-slate-700 mb-2">维护操作推荐流程</div>
           <div className="space-y-2">
             {steps.map((step, i) => (
               <div key={i} className="flex items-start gap-3 p-2.5 bg-slate-50 border border-slate-200 rounded">
@@ -187,7 +187,7 @@ export default function GoLiveChecklistPanel({ canWrite }) {
         {/* 当前存在业务数据的提醒 */}
         {entry.data_may_be_test_data && (
           <div className="p-3 rounded-md border bg-blue-50 border-blue-200 text-sm text-blue-700">
-            当前系统存在 {entry.current_products_count} 个产品和 {entry.current_transactions_count} 条出入库记录。若这些是测试数据，正式录入前请先完成备份，并按受控清空流程处理。
+            当前系统存在 {entry.current_products_count} 个产品和 {entry.current_transactions_count} 条出入库记录。如当前数据并非正式数据，请先完成备份，再按受控清空流程处理。
           </div>
         )}
 

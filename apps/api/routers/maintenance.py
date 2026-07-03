@@ -1523,7 +1523,7 @@ def restore_prepare(
 @router.get("/go-live-checklist", response_model=GoLiveChecklistResponse)
 def go_live_checklist():
     """
-    正式启用前只读状态总览（所有登录用户可访问，只读）。
+    管理员维护检查：只读状态总览（所有登录用户可访问，只读）。
 
     返回：
     - 当前数据库状态（产品数、出入库记录数、审计日志数、用户数、低库存、负库存、缺失/重复 SKU）
@@ -1662,7 +1662,7 @@ def go_live_checklist():
     data_may_be_test_data = products_count > 0 or transactions_count > 0
     before_entry_reminder = "正式录入前建议先创建数据库备份，确保可以回滚"
     batch_entry_reminder = "每批手动录入后建议导出 CSV 文件，与旧系统或腾讯文档反向核对"
-    final_backup_reminder = "全部录入完成后建议创建正式启用前数据库备份"
+    final_backup_reminder = "全部录入完成后建议创建数据库备份"
 
     if data_may_be_test_data:
         warnings.append("当前系统存在业务数据，正式录入前请确认数据是否为有效的正式产品数据")
@@ -1683,7 +1683,7 @@ def go_live_checklist():
         "第三步：如需清空测试业务数据，先在设置页完成备份，再按受控清空流程处理",
         "第四步：按库存分类或库位分批手动录入正式产品信息",
         "第五步：每批录入完成后导出 CSV 文件，与旧系统或腾讯文档反向核对",
-        "第六步：全部产品录入完成后，创建正式启用前数据库备份",
+        "第六步：全部产品录入完成后，创建数据库备份",
         "第七步：确认用户权限、审计日志和备份预检均正常工作",
         "第八步：正式开始使用新系统进行出入库操作",
     ]
@@ -1693,7 +1693,7 @@ def go_live_checklist():
         "不要在未创建备份时清空数据，操作不可逆",
         "不要把未知采购价、售价填为 0，未知时应留空",
         "不要把旧系统历史出入库记录直接混入新系统正式出入库",
-        "不要在未核对库存数量前直接正式启用系统",
+        "不要在未核对库存数量前开始正式出入库操作",
         "不要直接手工修改数据库文件，应通过系统功能操作",
         "不要提交数据库文件或备份文件到代码仓库",
         "出问题时先查看备份预检、恢复准备和审计日志，不要盲目修改数据",
@@ -1703,13 +1703,13 @@ def go_live_checklist():
     all_warnings = warnings + risk_warnings
     if negative_stock_count > 0 or duplicate_sku_count > 0:
         overall_level = "error"
-        overall_message = "存在需要立即处理的数据异常（负库存或重复 SKU），请在正式启用前修正"
+        overall_message = "存在需要立即处理的数据异常（负库存或重复 SKU），请在重要操作前修正"
     elif not has_available_backup:
         overall_level = "warning"
         overall_message = "尚未检测到可用备份，正式操作前请先创建数据库备份"
     elif missing_sku_count > 0 or data_may_be_test_data:
         overall_level = "warning"
-        overall_message = "系统数据尚有需要关注的事项，请在正式启用前检查"
+        overall_message = "系统数据尚有需要关注的事项，请在重要操作前检查确认"
     else:
         overall_level = "ok"
         overall_message = "系统状态正常，可以开始正式录入产品"
@@ -1723,5 +1723,5 @@ def go_live_checklist():
         warnings=all_warnings,
         overall_level=overall_level,
         overall_message=overall_message,
-        message="正式启用检查完成，请逐项查看状态和提醒",
+        message="管理员维护检查完成，请逐项查看状态和提醒",
     )
