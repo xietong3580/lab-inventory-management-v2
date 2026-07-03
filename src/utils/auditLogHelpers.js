@@ -8,7 +8,8 @@ export const actionTypeMap = {
   TRANSACTION_ADD: { label: '出入库', color: 'bg-slate-50 text-slate-700' },
   TRANSACTION_REVERSE: { label: '撤销交易', color: 'bg-amber-50 text-amber-700' },
   SYSTEM_RESET: { label: '系统重置', color: 'bg-violet-50 text-violet-700' },
-  PRODUCTS_CSV_IMPORT: { label: '批量导入', color: 'bg-slate-100 text-slate-700 border border-slate-300' }
+  PRODUCTS_CSV_IMPORT: { label: '批量导入', color: 'bg-slate-100 text-slate-700 border border-slate-300' },
+  RESTORE_PREPARE: { label: '恢复准备', color: 'bg-sky-50 text-sky-700' },
 };
 
 /**
@@ -72,6 +73,10 @@ export const generateAuditSummary = (log, compact = false) => {
       return compact
         ? `通过 CSV ${log.productName || '批量导入产品'}`
         : `通过 CSV ${log.productName || '批量导入产品'}`;
+    case 'RESTORE_PREPARE':
+      return compact
+        ? `恢复准备 — ${log.productName || '目标备份'}`
+        : `恢复准备操作，${log.productName || '已生成恢复计划'}`;
     default:
       return `${actionLabel}操作`;
   }

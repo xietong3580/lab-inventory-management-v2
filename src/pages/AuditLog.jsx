@@ -346,10 +346,10 @@ function AuditLog() {
               {/* 表头行 */}
               <div className="grid grid-cols-12 gap-4 mb-4 pb-3 border-b border-slate-200">
                 <div className="col-span-1 text-sm font-medium text-slate-700">时间</div>
-                <div className="col-span-1 text-sm font-medium text-slate-700">操作类型</div>
+                <div className="col-span-2 text-sm font-medium text-slate-700">操作类型</div>
                 <div className="col-span-3 text-sm font-medium text-slate-700">产品</div>
                 <div className="col-span-1 text-sm font-medium text-slate-700">操作人</div>
-                <div className="col-span-6 text-sm font-medium text-slate-700">摘要</div>
+                <div className="col-span-5 text-sm font-medium text-slate-700">摘要</div>
               </div>
 
               {/* 日志行列表 */}
@@ -367,35 +367,37 @@ function AuditLog() {
                     >
                       {/* 时间列 */}
                       <div className="col-span-1">
-                        <div className="text-sm font-medium text-slate-800">
+                        <div className="text-sm font-medium text-slate-800 whitespace-nowrap">
                           {displayTime}
                         </div>
                       </div>
 
                       {/* 操作类型列 */}
-                      <div className="col-span-1">
-                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${actionConfig.color}`}>
+                      <div className="col-span-2">
+                        <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap ${actionConfig.color}`}
+                          title={log.actionType}>
                           {actionConfig.label}
                         </span>
                       </div>
 
                       {/* 产品列 */}
                       <div className="col-span-3">
-                        <div className="text-sm text-slate-800 truncate">
+                        <div className="text-sm text-slate-800 truncate"
+                          title={log.productName || undefined}>
                           {log.productName || '-'}
                         </div>
                       </div>
 
                       {/* 操作人列 */}
                       <div className="col-span-1">
-                        <div className="text-sm text-slate-800">
+                        <div className="text-sm text-slate-800 whitespace-nowrap">
                           {displayOperator}
                         </div>
                       </div>
 
                       {/* 摘要列 */}
-                      <div className="col-span-6">
-                        <div className="text-sm text-slate-600">
+                      <div className="col-span-5">
+                        <div className="text-sm text-slate-600 break-words">
                           {summaryText}
                         </div>
                       </div>
