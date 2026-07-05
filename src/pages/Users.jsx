@@ -410,6 +410,15 @@ function Users() {
           <>
             <div className="overflow-x-auto">
               <table className="w-full divide-y divide-slate-200 table-fixed">
+                <colgroup>
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '21%' }} />
+                  <col style={{ width: '9%' }} />
+                  <col style={{ width: '8%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '22%' }} />
+                </colgroup>
                 <thead className="bg-slate-50">
                   <tr>
                     <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">用户名</th>
@@ -418,7 +427,7 @@ function Users() {
                     <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">角色</th>
                     <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">状态</th>
                     <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">最后登录</th>
-                    <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap w-[185px]">操作</th>
+                    <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
