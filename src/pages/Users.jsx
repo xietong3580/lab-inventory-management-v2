@@ -416,7 +416,16 @@ function Users() {
                         <StatusBadge status={user.status} />
                       </td>
                       <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                        <div className="text-sm text-slate-700">{user.lastLogin || '-'}</div>
+                        <div className="text-sm text-slate-700">{(() => {
+                          const raw = user.lastLogin;
+                          if (!raw || raw === '-' || raw === 'null' || raw === 'undefined') return '从未登录';
+                          try {
+                            const t = new Date(raw);
+                            if (isNaN(t.getTime())) return '从未登录';
+                            const pad = (n) => String(n).padStart(2, '0');
+                            return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())} ${pad(t.getHours())}:${pad(t.getMinutes())}`;
+                          } catch { return '从未登录'; }
+                        })()}</div>
                       </td>
                       <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -443,7 +452,7 @@ function Users() {
                             onClick={canWrite ? () => openPwdModal(user) : undefined}
                             disabled={!canWrite}
                             title={!canWrite ? adminOnlyTitle : ''}
-                            className={`px-3 py-1.5 text-sm bg-slate-50 text-amber-600 border border-amber-200 rounded hover:bg-amber-50 transition-colors ${disabledBtnClass}`}
+                            className={`px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors ${disabledBtnClass}`}
                           >
                             重置密码
                           </button>
