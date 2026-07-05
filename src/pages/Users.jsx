@@ -287,7 +287,7 @@ function Users() {
   // 状态标签组件
   function StatusBadge({ status }) {
     const config = {
-      活跃: { text: '活跃', bg: 'bg-emerald-50', textColor: 'text-emerald-700' },
+      活跃: { text: '活跃', bg: 'bg-slate-50', textColor: 'text-slate-600' },
       停用: { text: '停用', bg: 'bg-slate-100', textColor: 'text-slate-600' },
     };
     const { text, bg, textColor } = config[status] || config.停用;
@@ -313,7 +313,7 @@ function Users() {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-800">用户管理</h1>
         <p className="text-slate-600 mt-1">
-          管理系统用户账户、角色和权限。
+          管理系统用户账户及角色权限，管理员可新增、编辑用户并重置密码。
         </p>
       </div>
 
@@ -434,7 +434,7 @@ function Users() {
                             onClick={canWrite ? () => handleToggleStatus(user) : undefined}
                             disabled={!canWrite}
                             title={!canWrite ? adminOnlyTitle : ''}
-                            className={`px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors ${disabledBtnClass}`}
+                            className={`px-3 py-1.5 text-sm bg-slate-50 text-rose-600 border border-rose-200 rounded hover:bg-rose-50 transition-colors ${disabledBtnClass}`}
                           >
                             {user.status === '停用' || user.is_active === false ? '启用' : '停用'}
                           </button>
@@ -443,7 +443,7 @@ function Users() {
                             onClick={canWrite ? () => openPwdModal(user) : undefined}
                             disabled={!canWrite}
                             title={!canWrite ? adminOnlyTitle : ''}
-                            className={`px-3 py-1.5 text-sm bg-amber-50 text-amber-700 rounded hover:bg-amber-100 transition-colors ${disabledBtnClass}`}
+                            className={`px-3 py-1.5 text-sm bg-slate-50 text-amber-600 border border-amber-200 rounded hover:bg-amber-50 transition-colors ${disabledBtnClass}`}
                           >
                             重置密码
                           </button>

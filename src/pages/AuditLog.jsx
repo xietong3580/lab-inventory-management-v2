@@ -117,7 +117,7 @@ function AuditLog() {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-800">操作日志</h1>
         <p className="text-slate-600 mt-1">
-          系统所有操作记录的完整列表
+          系统操作记录列表，按时间倒序排列。用于操作追溯与日常核对。
         </p>
       </div>
 
@@ -296,7 +296,7 @@ function AuditLog() {
           ) : error ? (
             // 错误状态
             <div className="py-12 text-center">
-              <div className="text-rose-600 mb-2">⚠️ 数据加载异常</div>
+              <div className="text-slate-600 mb-2">数据加载异常</div>
               <div className="text-sm text-slate-600 max-w-md mx-auto mb-4">{error}</div>
               <div className="text-sm text-slate-500 max-w-md mx-auto">
                 系统已自动降级使用空数据，页面功能可能受限。
@@ -528,7 +528,7 @@ function AuditLog() {
       {/* 底部提示 */}
       <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
         <div className="text-sm text-slate-600">
-          提示：此页面展示系统所有操作记录，按时间倒序排列。
+          提示：操作日志用于记录和追溯系统中的关键操作。出问题时优先查看操作日志，确认最近有哪些人做了什么操作。
         </div>
       </div>
     </div>

@@ -46,7 +46,7 @@ function Header({ toggleSidebar }) {
               {roleLabel && (
                 <span className={`text-xs px-1.5 py-0.5 rounded ${
                   currentUser?.role === 'admin'
-                    ? 'bg-amber-100 text-amber-700'
+                    ? 'bg-amber-100 text-amber-600'
                     : 'bg-slate-100 text-slate-600'
                 }`}>
                   {roleLabel}

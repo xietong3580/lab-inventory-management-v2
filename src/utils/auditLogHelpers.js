@@ -2,14 +2,14 @@
 
 // 操作类型中文映射
 export const actionTypeMap = {
-  PRODUCT_ADD: { label: '新增产品', color: 'bg-emerald-50 text-emerald-700' },
-  PRODUCT_UPDATE: { label: '编辑产品', color: 'bg-blue-50 text-blue-700' },
-  PRODUCT_DELETE: { label: '删除产品', color: 'bg-rose-50 text-rose-700' },
-  TRANSACTION_ADD: { label: '出入库', color: 'bg-slate-50 text-slate-700' },
-  TRANSACTION_REVERSE: { label: '撤销交易', color: 'bg-amber-50 text-amber-700' },
-  SYSTEM_RESET: { label: '系统重置', color: 'bg-violet-50 text-violet-700' },
-  PRODUCTS_CSV_IMPORT: { label: '批量导入', color: 'bg-slate-100 text-slate-700 border border-slate-300' },
-  RESTORE_PREPARE: { label: '恢复准备', color: 'bg-sky-50 text-sky-700' },
+  PRODUCT_ADD: { label: '新增产品', color: 'bg-slate-50 text-slate-600' },
+  PRODUCT_UPDATE: { label: '编辑产品', color: 'bg-slate-100 text-slate-600' },
+  PRODUCT_DELETE: { label: '删除产品', color: 'bg-rose-50 text-rose-600' },
+  TRANSACTION_ADD: { label: '出入库', color: 'bg-slate-50 text-slate-600' },
+  TRANSACTION_REVERSE: { label: '撤销交易', color: 'bg-amber-50 text-amber-600' },
+  SYSTEM_RESET: { label: '系统重置', color: 'bg-slate-100 text-slate-500' },
+  PRODUCTS_CSV_IMPORT: { label: '批量导入', color: 'bg-slate-100 text-slate-600 border border-slate-200' },
+  RESTORE_PREPARE: { label: '恢复准备', color: 'bg-slate-50 text-slate-600' },
 };
 
 /**
