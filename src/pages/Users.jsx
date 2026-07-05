@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { userService } from '../services/dataService';
 import { usePermission } from '../hooks/usePermission';
 
@@ -19,6 +19,9 @@ function Users() {
   // ==== 全局消息 ====
   const [successMsg, setSuccessMsg] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
+
+  // ==== 搜索 ====
+  const [searchTerm, setSearchTerm] = useState('');
 
   // ==== 分页 ====
   const [currentPage, setCurrentPage] = useState(1);
@@ -60,11 +63,22 @@ function Users() {
     setErrorMsg(null);
   };
 
+  // ==== 搜索过滤 ====
+  const filteredUsers = useMemo(() => {
+    if (!searchTerm.trim()) return users;
+    const kw = searchTerm.trim().toLowerCase();
+    return users.filter(u =>
+      (u.username || '').toLowerCase().includes(kw) ||
+      (u.displayName || u.display_name || '').toLowerCase().includes(kw) ||
+      (u.email || '').toLowerCase().includes(kw)
+    );
+  }, [users, searchTerm]);
+
   // ==== 分页计算 ====
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const displayedUsers = users.slice(startIndex, endIndex);
-  const totalPages = Math.max(1, Math.ceil(users.length / itemsPerPage));
+  const displayedUsers = filteredUsers.slice(startIndex, endIndex);
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
 
   // ============================================================================
   // 新增用户弹窗
@@ -344,9 +358,15 @@ function Users() {
             <input
               type="text"
               placeholder="搜索用户名或邮箱..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') setCurrentPage(1); }}
               className="px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent w-full sm:w-64"
             />
-            <button className="px-4 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors font-medium w-full sm:w-auto">
+            <button
+              onClick={() => setCurrentPage(1)}
+              className="px-4 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors font-medium w-full sm:w-auto"
+            >
               搜索
             </button>
           </div>
@@ -374,7 +394,7 @@ function Users() {
               重试
             </button>
           </div>
-        ) : users.length === 0 ? (
+        ) : filteredUsers.length === 0 ? (
           <div className="p-8 text-center">
             <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-slate-50 flex items-center justify-center">
               <span className="text-2xl text-slate-500">👤</span>
@@ -467,7 +487,7 @@ function Users() {
             {/* 分页控制 */}
             <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex flex-col md:flex-row items-center md:items-center justify-center md:justify-between gap-4 md:gap-0">
               <div className="w-full md:w-auto text-sm text-slate-600 text-center md:text-left">
-                显示第 {startIndex + 1} - {Math.min(endIndex, users.length)} 条，共 {users.length} 条记录
+                显示第 {startIndex + 1} - {Math.min(endIndex, filteredUsers.length)} 条，共 {filteredUsers.length} 条记录
               </div>
               <div className="w-full md:w-auto flex justify-center flex-wrap items-center gap-2 whitespace-nowrap">
                 <button

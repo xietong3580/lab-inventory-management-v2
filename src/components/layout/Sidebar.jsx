@@ -66,15 +66,6 @@ function Sidebar({ closeSidebar }) {
           );
         })}
       </nav>
-
-      {/* 底部功能区占位 */}
-      <div className="mt-8 pt-6 border-t border-slate-100">
-        <div className="text-xs text-slate-500 mb-2">系统</div>
-        <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-800">
-          <div className="w-5 h-5 bg-slate-400 rounded"></div>
-          <span>系统信息</span>
-        </button>
-      </div>
     </aside>
   );
 }

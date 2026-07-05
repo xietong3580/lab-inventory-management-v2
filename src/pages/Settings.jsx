@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { systemService } from '../services/dataService';
 import { usePermission } from '../hooks/usePermission';
 import { changePassword } from '../services/authService';
@@ -8,6 +9,7 @@ import SystemOperationGuide from '../components/SystemOperationGuide';
 
 function Settings() {
   const { canWrite, adminOnlyTitle } = usePermission();
+  const navigate = useNavigate();
   // 重置相关状态
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetResult, setResetResult] = useState(null);
@@ -1429,7 +1431,10 @@ function Settings() {
               <div className="pt-4 border-t border-slate-100">
                 <div className="font-medium text-slate-800 mb-2">系统日志</div>
                 <p className="text-sm text-slate-600 mb-3">查看系统操作日志</p>
-                <button className="px-4 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors font-medium">
+                <button
+                  onClick={() => navigate('/audit-log')}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors font-medium"
+                >
                   查看日志
                 </button>
               </div>
@@ -1810,30 +1815,6 @@ function Settings() {
           </div>
         </div>
       )}
-
-      {/* 操作按钮 */}
-      <div className="mt-8 p-4 md:p-6 bg-white border border-slate-200 rounded-lg">
-        <div className="flex justify-end gap-4">
-          <button
-            disabled={!canWrite}
-            title={!canWrite ? adminOnlyTitle : ''}
-            className={`px-6 py-2.5 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium ${
-              !canWrite ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-          >
-            恢复默认
-          </button>
-          <button
-            disabled={!canWrite}
-            title={!canWrite ? adminOnlyTitle : ''}
-            className={`px-6 py-2.5 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium ${
-              !canWrite ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-          >
-            保存设置
-          </button>
-        </div>
-      </div>
 
       {/* 底部提示 */}
       <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
