@@ -59,6 +59,9 @@ function Settings() {
   const [preparingFile, setPreparingFile] = useState(null);
   const [restorePlan, setRestorePlan] = useState(null);
   const [restorePlanError, setRestorePlanError] = useState('');
+  // Step 10-8B：折叠面板状态
+  const [showDangerZone, setShowDangerZone] = useState(false);
+  const [showDebugOptions, setShowDebugOptions] = useState(false);
 
   // 获取数据源模式
   useEffect(() => {
@@ -380,6 +383,12 @@ function Settings() {
 
       {/* 设置卡片区 */}
       <div className="space-y-6">
+        {/* Step 10-8A：管理员维护检查 */}
+        <GoLiveChecklistPanel canWrite={canWrite} />
+
+        {/* Step 10-8A：库存系统功能介绍与使用说明 */}
+        <SystemOperationGuide />
+
         {/* 库存预警设置 */}
         <div className="bg-white border border-slate-200 rounded-lg">
           <div className="px-6 py-4 border-b border-slate-100">
@@ -812,194 +821,211 @@ function Settings() {
                   </div>
                 )}
               </div>
-              {/* ── 清空测试业务数据（admin 危险操作区）── */}
+              {/* ── 危险维护操作（折叠面板）── */}
               <div className="pt-4 border-t border-slate-100">
-                <div className="font-medium text-slate-800 mb-2">清空测试业务数据</div>
-                <p className="text-sm text-slate-600 mb-3">
-                  该操作会清空当前系统中的产品、库存、出入库记录、台账和测试审计日志。系统会先创建数据库备份，成功后才执行清空。用户账号、系统设置和备份文件不会被清空。
-                </p>
-                {canWrite ? (
-                  <>
-                    {/* 危险提示卡片 */}
-                    <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-md mb-4">
-                      <div className="flex items-start">
-                        <div className="shrink-0 mr-3 mt-0.5">
-                          <div className="w-5 h-5 rounded-full bg-rose-100 flex items-center justify-center">
-                            <span className="text-xs font-bold text-rose-600">!</span>
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium text-rose-800 mb-1">危险操作</div>
-                          <div className="text-sm text-rose-700">
-                            此操作会清空测试业务数据，不可撤销。请确认已准备好旧系统真实数据用于后续导入。
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    {/* 确认短语输入 */}
-                    <div className="mb-3">
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                        请输入确认短语
-                      </label>
-                      <input
-                        type="text"
-                        value={resetBusinessConfirmText}
-                        onChange={(e) => {
-                          setResetBusinessConfirmText(e.target.value);
-                          setResetBusinessError('');
-                        }}
-                        placeholder="清空测试业务数据"
-                        disabled={isResettingBusiness}
-                        className={`w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent font-medium ${
-                          isResettingBusiness ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : ''
-                        }`}
-                      />
-                      <p className="text-xs text-slate-500 mt-1">
-                        请输入：清空测试业务数据
-                      </p>
-                    </div>
-                    {/* 执行按钮 */}
-                    <button
-                      onClick={handleResetBusinessData}
-                      disabled={resetBusinessConfirmText !== '清空测试业务数据' || isResettingBusiness}
-                      title={
-                        resetBusinessConfirmText !== '清空测试业务数据'
-                          ? '请先输入正确的确认短语'
-                          : isResettingBusiness
-                          ? '清空操作进行中...'
-                          : '备份并清空测试业务数据'
-                      }
-                      className={`px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-700 transition-colors font-medium ${
-                        resetBusinessConfirmText !== '清空测试业务数据' || isResettingBusiness
-                          ? 'opacity-50 cursor-not-allowed'
-                          : ''
-                      }`}
-                    >
-                      {isResettingBusiness ? (
-                        <span className="flex items-center gap-2">
-                          <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                          清空中...
-                        </span>
-                      ) : (
-                        '备份并清空测试业务数据'
-                      )}
-                    </button>
-                    {/* 错误提示 */}
-                    {resetBusinessError && (
-                      <div className="mt-3 p-3 rounded-md border text-sm bg-rose-50 border-rose-200">
-                        <span className="text-rose-700">{resetBusinessError}</span>
-                      </div>
-                    )}
-                    {/* 执行结果 */}
-                    {resetBusinessResult && resetBusinessResult.success && (
-                      <div className="mt-3 space-y-3">
-                        {/* 备份信息 */}
-                        <div className="p-3 rounded-md border border-emerald-200 bg-emerald-50">
-                          <div className="text-sm font-medium text-emerald-800 mb-1">✅ 测试业务数据已清空</div>
-                          <div className="space-y-1 text-sm text-slate-700">
-                            <div className="flex gap-2">
-                              <span className="text-slate-500 shrink-0">备份文件：</span>
-                              <span className="font-mono text-xs break-all">{resetBusinessResult.backup.filename}</span>
+                <button
+                  type="button"
+                  onClick={() => setShowDangerZone(!showDangerZone)}
+                  className="w-full flex items-center justify-between text-left hover:bg-slate-50 -mx-2 px-2 py-1 rounded transition-colors"
+                >
+                  <div>
+                    <div className="font-medium text-slate-800">危险维护操作</div>
+                    <p className="text-sm text-slate-500 mt-0.5">仅管理员在确认备份和数据来源后使用。</p>
+                  </div>
+                  <svg className={`w-5 h-5 text-slate-400 transition-transform shrink-0 ${showDangerZone ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {showDangerZone && (
+                  <div className="mt-4">
+                    <div className="font-medium text-slate-800 mb-2">清空业务数据</div>
+                    <p className="text-sm text-slate-600 mb-3">
+                      该操作会清空当前系统中的产品、库存、出入库记录、台账和审计日志。系统会先创建数据库备份，成功后才执行清空。用户账号、系统设置和备份文件不会被清空。
+                    </p>
+                    {canWrite ? (
+                      <>
+                        {/* 危险提示卡片 */}
+                        <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-md mb-4">
+                          <div className="flex items-start">
+                            <div className="shrink-0 mr-3 mt-0.5">
+                              <div className="w-5 h-5 rounded-full bg-rose-100 flex items-center justify-center">
+                                <span className="text-xs font-bold text-rose-600">!</span>
+                              </div>
                             </div>
-                            <div className="flex gap-2">
-                              <span className="text-slate-500 shrink-0">备份大小：</span>
-                              <span>{formatBytes(resetBusinessResult.backup.size_bytes)}</span>
-                            </div>
-                            <div className="flex gap-2">
-                              <span className="text-slate-500 shrink-0">备份时间：</span>
-                              <span>{new Date(resetBusinessResult.backup.created_at).toLocaleString('zh-CN')}</span>
+                            <div>
+                              <div className="text-sm font-medium text-rose-800 mb-1">高风险操作</div>
+                              <div className="text-sm text-rose-700">
+                                此操作会清空当前业务数据且不可撤销。请确认已准备好数据来源并已完成备份。
+                              </div>
                             </div>
                           </div>
                         </div>
-                        {/* 清空前/后对比 */}
-                        <div className="p-3 rounded-md border border-slate-200 bg-slate-50">
-                          <div className="text-xs text-slate-500 mb-2">数据变化</div>
-                          <div className="grid grid-cols-3 gap-2 text-sm">
-                            <div className="text-slate-500">类别</div>
-                            <div className="text-slate-500 text-right">清空前</div>
-                            <div className="text-slate-500 text-right">清空后</div>
-                            {['products', 'transactions', 'ledger_records', 'audit_logs', 'low_stock_products'].map((key) => (
-                              <>
-                                <div className="text-slate-700">{{
-                                  products: '产品', transactions: '出入库', ledger_records: '台账',
-                                  audit_logs: '审计日志', low_stock_products: '低库存',
-                                }[key]}</div>
-                                <div className="text-rose-700 text-right font-medium">{resetBusinessResult.before[key]}</div>
-                                <div className="text-emerald-700 text-right font-medium">{resetBusinessResult.after[key]}</div>
-                              </>
-                            ))}
-                          </div>
+                        {/* 确认短语输入 */}
+                        <div className="mb-3">
+                          <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                            请输入确认短语
+                          </label>
+                          <input
+                            type="text"
+                            value={resetBusinessConfirmText}
+                            onChange={(e) => {
+                              setResetBusinessConfirmText(e.target.value);
+                              setResetBusinessError('');
+                            }}
+                            placeholder="清空测试业务数据"
+                            disabled={isResettingBusiness}
+                            className={`w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent font-medium ${
+                              isResettingBusiness ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : ''
+                            }`}
+                          />
+                          <p className="text-xs text-slate-500 mt-1">
+                            请输入：清空测试业务数据
+                          </p>
                         </div>
-                        {/* Preflight 状态 */}
-                        {resetBusinessResult.preflight && (
-                          <div className={`p-3 rounded-md border text-sm ${
-                            resetBusinessResult.preflight.status === 'ok'
-                              ? 'bg-emerald-50 border-emerald-200'
-                              : resetBusinessResult.preflight.status === 'warning'
-                              ? 'bg-amber-50 border-amber-200'
-                              : 'bg-rose-50 border-rose-200'
-                          }`}>
-                            <div className={`font-medium mb-1 ${
-                              resetBusinessResult.preflight.status === 'ok'
-                                ? 'text-emerald-800'
-                                : resetBusinessResult.preflight.status === 'warning'
-                                ? 'text-amber-800'
-                                : 'text-rose-800'
-                            }`}>
-                              {resetBusinessResult.preflight.status === 'ok' && '✅ 清空后检查通过'}
-                              {resetBusinessResult.preflight.status === 'warning' && '⚠️ 清空后存在警告'}
-                              {resetBusinessResult.preflight.status === 'error' && '❌ 清空后存在错误'}
-                            </div>
-                            <div className="text-xs text-slate-600 space-y-0.5">
-                              <div>产品 {resetBusinessResult.preflight.products_count} · 交易 {resetBusinessResult.preflight.transactions_count} · 审计日志 {resetBusinessResult.preflight.audit_logs_count}</div>
-                              {resetBusinessResult.preflight.warnings.length > 0 && (
-                                <div className="text-amber-700">
-                                  {resetBusinessResult.preflight.warnings.join('；')}
-                                </div>
-                              )}
-                              {resetBusinessResult.preflight.errors.length > 0 && (
-                                <div className="text-rose-700">
-                                  {resetBusinessResult.preflight.errors.join('；')}
-                                </div>
-                              )}
-                            </div>
+                        {/* 执行按钮 */}
+                        <button
+                          onClick={handleResetBusinessData}
+                          disabled={resetBusinessConfirmText !== '清空测试业务数据' || isResettingBusiness}
+                          title={
+                            resetBusinessConfirmText !== '清空测试业务数据'
+                              ? '请先输入正确的确认短语'
+                              : isResettingBusiness
+                              ? '清空操作进行中...'
+                              : '备份并清空测试业务数据'
+                          }
+                          className={`px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-700 transition-colors font-medium ${
+                            resetBusinessConfirmText !== '清空测试业务数据' || isResettingBusiness
+                              ? 'opacity-50 cursor-not-allowed'
+                              : ''
+                          }`}
+                        >
+                          {isResettingBusiness ? (
+                            <span className="flex items-center gap-2">
+                              <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                              清空中...
+                            </span>
+                          ) : (
+                            '备份并清空测试业务数据'
+                          )}
+                        </button>
+                        {/* 错误提示 */}
+                        {resetBusinessError && (
+                          <div className="mt-3 p-3 rounded-md border text-sm bg-rose-50 border-rose-200">
+                            <span className="text-rose-700">{resetBusinessError}</span>
                           </div>
                         )}
-                        {/* 系统提示 */}
-                        {resetBusinessResult.warnings && resetBusinessResult.warnings.length > 0 && (
-                          <div className="p-3 rounded-md border bg-amber-50 border-amber-200">
-                            <div className="text-xs font-medium text-amber-700 mb-1">提示</div>
-                            <ul className="text-xs text-amber-700 space-y-0.5 list-disc list-inside">
-                              {resetBusinessResult.warnings.map((w, i) => (
-                                <li key={i}>{w}</li>
-                              ))}
-                            </ul>
+                        {/* 执行结果 */}
+                        {resetBusinessResult && resetBusinessResult.success && (
+                          <div className="mt-3 space-y-3">
+                            {/* 备份信息 */}
+                            <div className="p-3 rounded-md border border-emerald-200 bg-emerald-50">
+                              <div className="text-sm font-medium text-emerald-800 mb-1">✅ 业务数据已清空</div>
+                              <div className="space-y-1 text-sm text-slate-700">
+                                <div className="flex gap-2">
+                                  <span className="text-slate-500 shrink-0">备份文件：</span>
+                                  <span className="font-mono text-xs break-all">{resetBusinessResult.backup.filename}</span>
+                                </div>
+                                <div className="flex gap-2">
+                                  <span className="text-slate-500 shrink-0">备份大小：</span>
+                                  <span>{formatBytes(resetBusinessResult.backup.size_bytes)}</span>
+                                </div>
+                                <div className="flex gap-2">
+                                  <span className="text-slate-500 shrink-0">备份时间：</span>
+                                  <span>{new Date(resetBusinessResult.backup.created_at).toLocaleString('zh-CN')}</span>
+                                </div>
+                              </div>
+                            </div>
+                            {/* 清空前/后对比 */}
+                            <div className="p-3 rounded-md border border-slate-200 bg-slate-50">
+                              <div className="text-xs text-slate-500 mb-2">数据变化</div>
+                              <div className="grid grid-cols-3 gap-2 text-sm">
+                                <div className="text-slate-500">类别</div>
+                                <div className="text-slate-500 text-right">清空前</div>
+                                <div className="text-slate-500 text-right">清空后</div>
+                                {['products', 'transactions', 'ledger_records', 'audit_logs', 'low_stock_products'].map((key) => (
+                                  <>
+                                    <div className="text-slate-700">{{
+                                      products: '产品', transactions: '出入库', ledger_records: '台账',
+                                      audit_logs: '审计日志', low_stock_products: '低库存',
+                                    }[key]}</div>
+                                    <div className="text-rose-700 text-right font-medium">{resetBusinessResult.before[key]}</div>
+                                    <div className="text-emerald-700 text-right font-medium">{resetBusinessResult.after[key]}</div>
+                                  </>
+                                ))}
+                              </div>
+                            </div>
+                            {/* Preflight 状态 */}
+                            {resetBusinessResult.preflight && (
+                              <div className={`p-3 rounded-md border text-sm ${
+                                resetBusinessResult.preflight.status === 'ok'
+                                  ? 'bg-emerald-50 border-emerald-200'
+                                  : resetBusinessResult.preflight.status === 'warning'
+                                  ? 'bg-amber-50 border-amber-200'
+                                  : 'bg-rose-50 border-rose-200'
+                              }`}>
+                                <div className={`font-medium mb-1 ${
+                                  resetBusinessResult.preflight.status === 'ok'
+                                    ? 'text-emerald-800'
+                                    : resetBusinessResult.preflight.status === 'warning'
+                                    ? 'text-amber-800'
+                                    : 'text-rose-800'
+                                }`}>
+                                  {resetBusinessResult.preflight.status === 'ok' && '✅ 清空后检查通过'}
+                                  {resetBusinessResult.preflight.status === 'warning' && '⚠️ 清空后存在警告'}
+                                  {resetBusinessResult.preflight.status === 'error' && '❌ 清空后存在错误'}
+                                </div>
+                                <div className="text-xs text-slate-600 space-y-0.5">
+                                  <div>产品 {resetBusinessResult.preflight.products_count} · 交易 {resetBusinessResult.preflight.transactions_count} · 审计日志 {resetBusinessResult.preflight.audit_logs_count}</div>
+                                  {resetBusinessResult.preflight.warnings.length > 0 && (
+                                    <div className="text-amber-700">
+                                      {resetBusinessResult.preflight.warnings.join('；')}
+                                    </div>
+                                  )}
+                                  {resetBusinessResult.preflight.errors.length > 0 && (
+                                    <div className="text-rose-700">
+                                      {resetBusinessResult.preflight.errors.join('；')}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            {/* 系统提示 */}
+                            {resetBusinessResult.warnings && resetBusinessResult.warnings.length > 0 && (
+                              <div className="p-3 rounded-md border bg-amber-50 border-amber-200">
+                                <div className="text-xs font-medium text-amber-700 mb-1">提示</div>
+                                <ul className="text-xs text-amber-700 space-y-0.5 list-disc list-inside">
+                                  {resetBusinessResult.warnings.map((w, i) => (
+                                    <li key={i}>{w}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {/* 刷新提示 */}
+                            <p className="text-xs text-slate-500">
+                              提示：清空完成后可刷新页面查看最新的产品列表和仪表盘状态。
+                            </p>
                           </div>
                         )}
-                        {/* 刷新提示 */}
-                        <p className="text-xs text-slate-500">
-                          提示：清空完成后可刷新页面查看最新的产品列表和仪表盘状态。
-                        </p>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  /* viewer 只读提示 */
-                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-md">
-                    <div className="flex items-start">
-                      <div className="shrink-0 mr-3 mt-0.5">
-                        <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-slate-700 mb-1">只读权限</div>
-                        <div className="text-sm text-slate-600">
-                          当前账号仅可查看清空范围，不能执行清空操作。
+                      </>
+                    ) : (
+                      /* viewer 只读提示 */
+                      <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-md">
+                        <div className="flex items-start">
+                          <div className="shrink-0 mr-3 mt-0.5">
+                            <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-slate-700 mb-1">只读权限</div>
+                            <div className="text-sm text-slate-600">
+                              当前账号仅可查看清空范围，不能执行清空操作。
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1402,21 +1428,38 @@ function Settings() {
                   </div>
                 </div>
               </div>
+              {/* ── 高级调试选项（折叠面板）── */}
               <div className="pt-4 border-t border-slate-100">
-                <div className="font-medium text-slate-800 mb-2">开发调试</div>
-                <p className="text-sm text-slate-600 mb-3">
-                  重置本地测试数据。此操作将清空当前浏览器中的本地演示数据，恢复为初始测试状态。
-                </p>
                 <button
-                  onClick={handleOpenResetConfirm}
-                  disabled={!canWrite}
-                  title={!canWrite ? adminOnlyTitle : ''}
-                  className={`px-4 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded-md hover:bg-rose-100 transition-colors font-medium ${
-                    !canWrite ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
+                  type="button"
+                  onClick={() => setShowDebugOptions(!showDebugOptions)}
+                  className="w-full flex items-center justify-between text-left hover:bg-slate-50 -mx-2 px-2 py-1 rounded transition-colors"
                 >
-                  重置本地测试数据
+                  <div>
+                    <div className="font-medium text-slate-800">高级调试选项</div>
+                    <p className="text-sm text-slate-500 mt-0.5">仅用于本地演示环境排查问题，正式使用时一般不需要操作。</p>
+                  </div>
+                  <svg className={`w-5 h-5 text-slate-400 transition-transform shrink-0 ${showDebugOptions ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </button>
+                {showDebugOptions && (
+                  <div className="mt-4">
+                    <p className="text-sm text-slate-600 mb-3">
+                      重置本地演示数据。此操作将清空当前浏览器中的本地演示数据，恢复为初始状态。仅用于本地演示环境排查问题，正式使用时一般不需要操作。
+                    </p>
+                    <button
+                      onClick={handleOpenResetConfirm}
+                      disabled={!canWrite}
+                      title={!canWrite ? adminOnlyTitle : ''}
+                      className={`px-3 py-1.5 bg-slate-100 text-slate-600 border border-slate-200 rounded-md hover:bg-slate-200 transition-colors font-medium text-sm ${
+                        !canWrite ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      重置本地演示数据
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1440,26 +1483,20 @@ function Settings() {
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-slate-600">最后更新</span>
-                <span className="text-sm font-medium text-slate-800">2026-03-29</span>
+                <span className="text-sm font-medium text-slate-800">持续维护中</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-slate-600">技术支持</span>
-                <span className="text-sm font-medium text-slate-800">tech@example.com</span>
+                <span className="text-sm font-medium text-slate-800">请联系系统管理员</span>
               </div>
             </div>
             <div className="mt-6 pt-6 border-t border-slate-100">
               <div className="text-sm text-slate-600">
-                本系统为独立新版库存管理系统，不影响现有旧版系统运行。
+                库存自动化管理系统，提供实验耗材、试剂和设备的库存监控、预警与报表功能。
               </div>
             </div>
           </div>
         </div>
-
-        {/* Step 10-8A：管理员维护检查 */}
-        <GoLiveChecklistPanel canWrite={canWrite} />
-
-        {/* Step 10-8A：库存系统功能介绍与使用说明 */}
-        <SystemOperationGuide />
 
         {/* 账号安全 / 修改密码 */}
         <div className="bg-white border border-slate-200 rounded-lg">
