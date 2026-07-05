@@ -1163,7 +1163,7 @@ function Dashboard() {
                 .map((item) => (
                   <div key={item.type} className="flex items-center justify-between p-2 md:p-2.5 bg-slate-50 border border-slate-200 rounded">
                     <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${item.color.split(' ')[0].replace('bg-', 'bg-')}`}></div>
+                      <div className={`w-2 h-2 rounded-full ${item.color.split(' ')[0]}`}></div>
                       <div className="text-xs md:text-sm font-medium text-slate-700 truncate">{item.label}</div>
                     </div>
                     <div className="text-xs md:text-sm font-semibold text-slate-800">{item.count}</div>
