@@ -1022,7 +1022,7 @@ function Products() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <div className="text-sm font-medium text-slate-800">产品核对概览</div>
-                <div className="text-xs text-slate-500 mt-0.5">用于辅助正式录入前核对产品资料完整性，不影响库存计算。</div>
+                <div className="text-xs text-slate-500 mt-0.5">用于快速了解产品资料完整性，便于日常维护和后续核对，不影响库存计算。</div>
               </div>
               <div className="flex items-center gap-4 md:gap-6">
                 {(() => {
