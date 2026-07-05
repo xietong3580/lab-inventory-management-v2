@@ -5,9 +5,9 @@ import { usePermission } from '../hooks/usePermission';
 // 紧急程度标签组件
 function UrgencyBadge({ urgency }) {
   const config = {
-    high: { text: '紧急', bg: 'bg-rose-50', textColor: 'text-rose-700' },
-    medium: { text: '中等', bg: 'bg-amber-50', textColor: 'text-amber-700' },
-    low: { text: '较低', bg: 'bg-slate-100', textColor: 'text-slate-700' },
+    high: { text: '紧急', bg: 'bg-rose-50', textColor: 'text-rose-600' },
+    medium: { text: '中等', bg: 'bg-amber-50', textColor: 'text-amber-600' },
+    low: { text: '较低', bg: 'bg-slate-100', textColor: 'text-slate-600' },
   };
   const { text, bg, textColor } = config[urgency] || config.low;
 
@@ -24,9 +24,9 @@ function StockRatioBar({ current, min }) {
   const minNum = Number(min) || 1; // 避免除以0
   const ratio = Math.min(100, Math.round((currentNum / minNum) * 100));
   const getColor = () => {
-    if (ratio <= 30) return 'bg-rose-500';
-    if (ratio <= 60) return 'bg-amber-500';
-    return 'bg-emerald-500';
+    if (ratio <= 30) return 'bg-rose-400';
+    if (ratio <= 60) return 'bg-amber-400';
+    return 'bg-emerald-400';
   };
 
   return (
@@ -163,7 +163,7 @@ function Alerts() {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-800">低库存预警</h1>
         <p className="text-slate-600 mt-1">
-          监控库存水平，及时发现并处理低库存风险，确保业务连续性。
+          以下产品当前库存低于或接近最低库存标准，建议管理员根据实际情况安排补货或核对库存。
         </p>
       </div>
 
@@ -172,21 +172,21 @@ function Alerts() {
         <div className="bg-white border border-slate-200 rounded-lg p-5">
           <div className="text-sm text-slate-500 mb-2">总预警数</div>
           <div className="text-2xl font-semibold text-slate-800">{totalAlerts}</div>
-          <div className="text-sm text-slate-500 mt-2">当前活跃预警</div>
+          <div className="text-sm text-slate-500 mt-2">当前预警产品</div>
         </div>
         <div className="bg-white border border-slate-200 rounded-lg p-5">
-          <div className="text-sm text-slate-500 mb-2">紧急预警</div>
-          <div className="text-2xl font-semibold text-rose-600">{highUrgencyCount}</div>
-          <div className="text-sm text-slate-500 mt-2">需立即处理</div>
+          <div className="text-sm text-slate-500 mb-2">紧急</div>
+          <div className="text-2xl font-semibold text-slate-800">{highUrgencyCount}</div>
+          <div className="text-sm text-slate-500 mt-2">需优先关注</div>
         </div>
         <div className="bg-white border border-slate-200 rounded-lg p-5">
-          <div className="text-sm text-slate-500 mb-2">中等预警</div>
-          <div className="text-2xl font-semibold text-amber-600">{mediumUrgencyCount}</div>
-          <div className="text-sm text-slate-500 mt-2">需关注</div>
+          <div className="text-sm text-slate-500 mb-2">中等</div>
+          <div className="text-2xl font-semibold text-slate-800">{mediumUrgencyCount}</div>
+          <div className="text-sm text-slate-500 mt-2">需安排处理</div>
         </div>
         <div className="bg-white border border-slate-200 rounded-lg p-5">
-          <div className="text-sm text-slate-500 mb-2">较低预警</div>
-          <div className="text-2xl font-semibold text-slate-600">{lowUrgencyCount}</div>
+          <div className="text-sm text-slate-500 mb-2">较低</div>
+          <div className="text-2xl font-semibold text-slate-800">{lowUrgencyCount}</div>
           <div className="text-sm text-slate-500 mt-2">可稍后处理</div>
         </div>
       </div>
@@ -275,8 +275,8 @@ function Alerts() {
               ) : productsData.error ? (
                 <tr>
                   <td colSpan="7" className="px-6 py-12 text-center">
-                    <div className="text-rose-600 mb-2">⚠️ {productsData.error}</div>
-                    <p className="text-slate-600">将显示降级数据或空列表</p>
+                    <div className="text-slate-600 mb-2">{productsData.error}</div>
+                    <p className="text-slate-500 text-sm">将显示降级数据或空列表</p>
                   </td>
                 </tr>
               ) : (
@@ -289,7 +289,7 @@ function Alerts() {
                       <div className="text-sm text-slate-700">{alert.category}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-lg font-semibold text-rose-600">{alert.currentStock}</div>
+                      <div className="text-sm font-medium text-slate-700">{alert.currentStock}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-slate-700">{alert.minStock}</div>
@@ -305,11 +305,11 @@ function Alerts() {
                         <button
                           disabled={!canWrite}
                           title={!canWrite ? adminOnlyTitle : ''}
-                          className={`px-3 py-1.5 text-sm bg-rose-50 text-rose-700 rounded hover:bg-rose-100 transition-colors font-medium ${
+                          className={`px-3 py-1.5 text-sm bg-slate-50 text-rose-600 border border-rose-200 rounded hover:bg-rose-50 transition-colors font-medium ${
                             !canWrite ? 'opacity-50 cursor-not-allowed' : ''
                           }`}
                         >
-                          立即补货
+                          安排补货
                         </button>
                         <button className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors">
                           查看详情
@@ -400,26 +400,26 @@ function Alerts() {
 
       {/* 预警处理建议 */}
       <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-rose-50 border border-rose-100 rounded-lg p-4">
-          <h3 className="font-semibold text-rose-800 mb-2">紧急预警处理建议</h3>
-          <ul className="text-sm text-rose-700 space-y-1">
-            <li>• 立即联系采购部门安排紧急补货</li>
-            <li>• 考虑临时调拨其他库存</li>
-            <li>• 通知相关使用部门调整计划</li>
+        <div className="bg-white border border-slate-200 rounded-lg p-4">
+          <h3 className="font-semibold text-slate-800 mb-2">紧急预警处理建议</h3>
+          <ul className="text-sm text-slate-600 space-y-1.5">
+            <li>• 联系采购部门安排补货</li>
+            <li>• 评估是否需临时调拨</li>
+            <li>• 通知相关使用部门</li>
           </ul>
         </div>
-        <div className="bg-amber-50 border border-amber-100 rounded-lg p-4">
-          <h3 className="font-semibold text-amber-800 mb-2">中等预警处理建议</h3>
-          <ul className="text-sm text-amber-700 space-y-1">
+        <div className="bg-white border border-slate-200 rounded-lg p-4">
+          <h3 className="font-semibold text-slate-800 mb-2">中等预警处理建议</h3>
+          <ul className="text-sm text-slate-600 space-y-1.5">
             <li>• 本周内安排补货计划</li>
-            <li>• 监控库存消耗速度</li>
-            <li>• 评估是否需调整最低库存标准</li>
+            <li>• 关注库存消耗速度</li>
+            <li>• 评估最低库存标准是否合理</li>
           </ul>
         </div>
-        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+        <div className="bg-white border border-slate-200 rounded-lg p-4">
           <h3 className="font-semibold text-slate-800 mb-2">预警管理说明</h3>
-          <p className="text-sm text-slate-600">
-            预警系统根据当前库存与最低库存的比例自动生成。建议定期检查并处理预警，确保库存健康。
+          <p className="text-sm text-slate-600 leading-relaxed">
+            低库存预警用于辅助日常库存维护，不会自动修改库存数量。预警根据当前库存与最低库存的比例自动生成，建议定期检查并处理。如库存数量与实际不符，请先核对出入库记录和产品台账。
           </p>
         </div>
       </div>
@@ -427,7 +427,7 @@ function Alerts() {
       {/* 底部提示 */}
       <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
         <div className="text-sm text-slate-600">
-          提示：低库存预警旨在提前发现库存不足风险。点击“立即补货”可快速发起采购流程，“查看详情”可了解更多产品信息。
+          低库存预警用于辅助日常库存维护。点击"安排补货"可发起采购流程，"查看详情"可了解产品信息及历史台账。预警不会自动修改库存数量。
         </div>
       </div>
     </div>
