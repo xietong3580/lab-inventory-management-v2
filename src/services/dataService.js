@@ -865,7 +865,7 @@ export const dashboardService = {
             change: '+0',
             changeType: 'neutral',
             description: '库存正常产品数',
-            iconColor: 'bg-emerald-500',
+            iconColor: 'bg-slate-400',
           },
           {
             id: 'low-stock-alerts',
@@ -874,7 +874,7 @@ export const dashboardService = {
             change: '+0',
             changeType: 'neutral',
             description: '需及时补货',
-            iconColor: 'bg-amber-500',
+            iconColor: 'bg-amber-400',
           },
           {
             id: 'recent-transactions',
@@ -883,7 +883,7 @@ export const dashboardService = {
             change: '+0',
             changeType: 'neutral',
             description: '交易活动',
-            iconColor: 'bg-blue-500',
+            iconColor: 'bg-slate-400',
           },
           {
             id: 'recent-audit-logs',
@@ -892,7 +892,7 @@ export const dashboardService = {
             change: '+0',
             changeType: 'neutral',
             description: '系统活动',
-            iconColor: 'bg-violet-500',
+            iconColor: 'bg-slate-400',
           },
         ];
       } catch (error) {

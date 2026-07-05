@@ -16,7 +16,7 @@ export const dashboardStats = [
     change: '+7',
     changeType: 'increase',
     description: '库存正常产品数',
-    iconColor: 'bg-emerald-500',
+    iconColor: 'bg-slate-400',
   },
   {
     id: 'low-stock-alerts',
@@ -25,7 +25,7 @@ export const dashboardStats = [
     change: '+5',
     changeType: 'increase',
     description: '需及时补货',
-    iconColor: 'bg-amber-500',
+    iconColor: 'bg-amber-400',
   },
   {
     id: 'recent-transactions',
@@ -34,7 +34,7 @@ export const dashboardStats = [
     change: '+8',
     changeType: 'increase',
     description: '较上周同期',
-    iconColor: 'bg-blue-500',
+    iconColor: 'bg-slate-400',
   },
   {
     id: 'recent-audit-logs',
@@ -43,7 +43,7 @@ export const dashboardStats = [
     change: '+23',
     changeType: 'increase',
     description: '较上周增长',
-    iconColor: 'bg-violet-500',
+    iconColor: 'bg-slate-400',
   },
 ];
 
