@@ -414,7 +414,7 @@ function Users() {
                     <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">角色</th>
                     <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">状态</th>
                     <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">最后登录</th>
-                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">操作</th>
+                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap min-w-[220px]">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -448,13 +448,13 @@ function Users() {
                         })()}</div>
                       </td>
                       <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 flex-nowrap">
                           {/* 编辑 */}
                           <button
                             onClick={canWrite ? () => openEditModal(user) : undefined}
                             disabled={!canWrite}
                             title={!canWrite ? adminOnlyTitle : ''}
-                            className={`px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors ${disabledBtnClass}`}
+                            className={`px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors whitespace-nowrap shrink-0 ${disabledBtnClass}`}
                           >
                             编辑
                           </button>
@@ -463,7 +463,7 @@ function Users() {
                             onClick={canWrite ? () => handleToggleStatus(user) : undefined}
                             disabled={!canWrite}
                             title={!canWrite ? adminOnlyTitle : ''}
-                            className={`px-3 py-1.5 text-sm bg-slate-50 text-rose-600 border border-rose-200 rounded hover:bg-rose-50 transition-colors ${disabledBtnClass}`}
+                            className={`px-3 py-1.5 text-sm bg-slate-50 text-rose-600 border border-rose-200 rounded hover:bg-rose-50 transition-colors whitespace-nowrap shrink-0 ${disabledBtnClass}`}
                           >
                             {user.status === '停用' || user.is_active === false ? '启用' : '停用'}
                           </button>
