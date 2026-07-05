@@ -343,7 +343,7 @@ function Settings() {
     // 浏览器二次确认
     const confirmed = window.confirm(
       '⚠️ 危险操作确认\n\n' +
-      '即将清空当前系统中的所有测试业务数据，包括：\n' +
+      '即将清空当前系统中的所有业务数据，包括：\n' +
       '• 产品与库存数据\n' +
       '• 出入库记录\n' +
       '• 库存台账\n' +
@@ -762,7 +762,7 @@ function Settings() {
               <div className="pt-4 border-t border-slate-100">
                 <div className="font-medium text-slate-800 mb-2">正式导入前清空预览</div>
                 <p className="text-sm text-slate-600 mb-3">
-                  当前系统内产品、库存、出入库和日志均视为测试业务数据。正式导入旧系统真实数据前，应先备份并按流程清空测试业务数据。本功能仅预览数量，不会删除或修改任何数据。
+                  该操作会清空产品、库存、出入库和日志等业务数据，建议正式启用前或管理员确认后，先备份再按流程操作。本功能仅预览数量，不会删除或修改任何数据。
                 </p>
                 <button
                   onClick={handleResetPreview}
@@ -895,29 +895,29 @@ function Settings() {
                               setResetBusinessConfirmText(e.target.value);
                               setResetBusinessError('');
                             }}
-                            placeholder="清空测试业务数据"
+                            placeholder="清空当前业务数据"
                             disabled={isResettingBusiness}
                             className={`w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent font-medium ${
                               isResettingBusiness ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : ''
                             }`}
                           />
                           <p className="text-xs text-slate-500 mt-1">
-                            请输入：清空测试业务数据
+                            请输入：清空当前业务数据
                           </p>
                         </div>
                         {/* 执行按钮 */}
                         <button
                           onClick={handleResetBusinessData}
-                          disabled={resetBusinessConfirmText !== '清空测试业务数据' || isResettingBusiness}
+                          disabled={resetBusinessConfirmText !== '清空当前业务数据' || isResettingBusiness}
                           title={
-                            resetBusinessConfirmText !== '清空测试业务数据'
+                            resetBusinessConfirmText !== '清空当前业务数据'
                               ? '请先输入正确的确认短语'
                               : isResettingBusiness
                               ? '清空操作进行中...'
-                              : '备份并清空测试业务数据'
+                              : '备份并清空当前业务数据'
                           }
                           className={`px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-700 transition-colors font-medium ${
-                            resetBusinessConfirmText !== '清空测试业务数据' || isResettingBusiness
+                            resetBusinessConfirmText !== '清空当前业务数据' || isResettingBusiness
                               ? 'opacity-50 cursor-not-allowed'
                               : ''
                           }`}
@@ -928,7 +928,7 @@ function Settings() {
                               清空中...
                             </span>
                           ) : (
-                            '备份并清空测试业务数据'
+                            '备份并清空当前业务数据'
                           )}
                         </button>
                         {/* 错误提示 */}
@@ -1439,19 +1439,19 @@ function Settings() {
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-slate-700">当前数据源模式:</span>
                     <span className={`text-sm font-medium px-2 py-1 rounded ${dataSourceMode === 'api' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                      {dataSourceMode === 'api' ? 'API 模式 (真实数据)' : dataSourceMode === 'mock' ? 'MOCK 模式 (演示数据)' : '未知'}
+                      {dataSourceMode === 'api' ? 'API 模式 (真实数据)' : dataSourceMode === 'mock' ? '本地模式（缓存数据）' : '未知'}
                     </span>
                   </div>
                   <div className="text-xs text-slate-500 mt-2">
                     {dataSourceMode === 'api'
                       ? '系统当前使用真实后端数据，重置操作仅影响本地缓存。'
                       : dataSourceMode === 'mock'
-                      ? '系统当前使用本地演示数据，重置操作将恢复为初始测试状态。'
+                      ? '系统当前使用本地缓存数据，重置操作将恢复为初始状态。'
                       : '数据源模式检测中...'}
                   </div>
                 </div>
               </div>
-              {/* ── 高级调试选项（折叠面板）── */}
+              {/* ── 高级维护选项（折叠面板）── */}
               <div className="pt-4 border-t border-slate-100">
                 <button
                   type="button"
@@ -1459,8 +1459,8 @@ function Settings() {
                   className="w-full flex items-center justify-between text-left hover:bg-slate-50 -mx-2 px-2 py-1 rounded transition-colors"
                 >
                   <div>
-                    <div className="font-medium text-slate-800">高级调试选项</div>
-                    <p className="text-sm text-slate-500 mt-0.5">仅用于本地演示环境排查问题，正式使用时一般不需要操作。</p>
+                    <div className="font-medium text-slate-800">高级维护选项</div>
+                    <p className="text-sm text-slate-500 mt-0.5">仅用于本地运行环境排查问题，正式使用时一般不需要操作。</p>
                   </div>
                   <svg className={`w-5 h-5 text-slate-400 transition-transform shrink-0 ${showDebugOptions ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -1469,7 +1469,7 @@ function Settings() {
                 {showDebugOptions && (
                   <div className="mt-4">
                     <p className="text-sm text-slate-600 mb-3">
-                      重置本地演示数据。此操作将清空当前浏览器中的本地演示数据，恢复为初始状态。仅用于本地演示环境排查问题，正式使用时一般不需要操作。
+                      重置本地缓存数据。此操作将清空当前浏览器中的本地缓存数据，恢复为初始状态。仅用于本地运行环境排查问题，正式使用时一般不需要操作。
                     </p>
                     <button
                       onClick={handleOpenResetConfirm}
@@ -1479,7 +1479,7 @@ function Settings() {
                         !canWrite ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
                     >
-                      重置本地演示数据
+                      重置本地缓存数据
                     </button>
                   </div>
                 )}
@@ -1694,7 +1694,7 @@ function Settings() {
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
             <div className="px-6 py-4 border-b border-slate-200">
               <h2 className="text-xl font-semibold text-slate-800">
-                确认重置本地测试数据
+                确认重置本地缓存数据
               </h2>
             </div>
             <div className="p-4 md:p-6">
@@ -1711,12 +1711,12 @@ function Settings() {
                       <div className="text-sm font-medium text-rose-800 mb-1">
                         {dataSourceMode === 'api'
                           ? '当前为 API 模式，重置操作仅影响本地缓存'
-                          : '此操作将清空当前浏览器中的本地演示数据'}
+                          : '此操作将清空当前浏览器中的本地缓存数据'}
                       </div>
                       <div className="text-sm text-rose-700">
                         {dataSourceMode === 'api'
                           ? '系统数据来自真实后端，重置不会影响真实业务数据'
-                          : '系统会恢复为初始测试状态，请谨慎操作'}
+                          : '系统会恢复为初始状态，请谨慎操作'}
                       </div>
                     </div>
                   </div>
@@ -1752,7 +1752,7 @@ function Settings() {
                         </li>
                         <li className="flex items-start">
                           <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-500 mt-1.5 mr-2"></span>
-                          <span>恢复为初始 mock 测试数据</span>
+                          <span>恢复为初始缓存数据</span>
                         </li>
                         <li className="flex items-start">
                           <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 mr-2"></span>
@@ -1838,7 +1838,7 @@ function Settings() {
       {/* 底部提示 */}
       <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
         <div className="text-sm text-slate-600">
-          提示：系统设置功能当前为占位界面。实际使用时，管理员可在此配置系统参数、通知选项和品牌信息。修改设置后需点击“保存设置”生效。
+          提示：系统设置用于集中管理运行状态、数据维护和安全检查。库存预警阈值、通知选项等参数可根据实际需要配置，部分维护操作仅限管理员按需使用。
         </div>
       </div>
     </div>

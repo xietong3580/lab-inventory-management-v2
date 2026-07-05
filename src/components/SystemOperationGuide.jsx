@@ -36,13 +36,12 @@ function StepItem({ number, title, children }) {
   );
 }
 
-// 示意图占位卡
+// 示意图
 function PlaceholderDiagram({ label }) {
   return (
     <div className="my-2 p-4 border border-dashed border-slate-300 rounded-md bg-slate-50 text-center">
       <div className="text-slate-400 text-2xl mb-1">🖼️</div>
       <div className="text-xs text-slate-400">{label}</div>
-      <div className="text-xs text-slate-350">（示意图区域，后续可替换为真实页面截图）</div>
     </div>
   );
 }
