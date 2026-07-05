@@ -409,37 +409,37 @@ function Users() {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="min-w-[900px] md:min-w-full divide-y divide-slate-200">
+              <table className="w-full divide-y divide-slate-200 table-fixed">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">用户名</th>
-                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">显示名称</th>
-                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">邮箱</th>
-                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">角色</th>
-                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">状态</th>
-                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">最后登录</th>
-                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap min-w-[195px]">操作</th>
+                    <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">用户名</th>
+                    <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">显示名称</th>
+                    <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">邮箱</th>
+                    <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">角色</th>
+                    <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">状态</th>
+                    <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">最后登录</th>
+                    <th className="px-3 py-2 md:px-4 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap w-[185px]">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {displayedUsers.map((user) => (
                     <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-slate-800">{user.username}</div>
+                      <td className="px-3 py-3 md:px-4 md:py-4">
+                        <div className="text-sm font-medium text-slate-800 truncate" title={user.username}>{user.username}</div>
                       </td>
-                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                        <div className="text-sm text-slate-700">{user.displayName || user.display_name || '-'}</div>
+                      <td className="px-3 py-3 md:px-4 md:py-4">
+                        <div className="text-sm text-slate-700 truncate" title={user.displayName || user.display_name || ''}>{user.displayName || user.display_name || '-'}</div>
                       </td>
-                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                        <div className="text-sm text-slate-700">{user.email || '-'}</div>
+                      <td className="px-3 py-3 md:px-4 md:py-4">
+                        <div className="text-sm text-slate-700 truncate" title={user.email || ''}>{user.email || '-'}</div>
                       </td>
-                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 md:px-4 md:py-4 whitespace-nowrap">
                         <RoleBadge role={user.role} />
                       </td>
-                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 md:px-4 md:py-4 whitespace-nowrap">
                         <StatusBadge status={user.status} />
                       </td>
-                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 md:px-4 md:py-4 whitespace-nowrap">
                         <div className="text-sm text-slate-700">{(() => {
                           const raw = user.lastLogin;
                           if (!raw || raw === '-' || raw === 'null' || raw === 'undefined') return '从未登录';
@@ -451,14 +451,14 @@ function Users() {
                           } catch { return '从未登录'; }
                         })()}</div>
                       </td>
-                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 md:px-4 md:py-4 whitespace-nowrap">
                         <div className="flex items-center gap-1.5 flex-nowrap">
                           {/* 编辑 */}
                           <button
                             onClick={canWrite ? () => openEditModal(user) : undefined}
                             disabled={!canWrite}
                             title={!canWrite ? adminOnlyTitle : ''}
-                            className={`px-2.5 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors whitespace-nowrap shrink-0 ${disabledBtnClass}`}
+                            className={`px-2 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors whitespace-nowrap shrink-0 ${disabledBtnClass}`}
                           >
                             编辑
                           </button>
@@ -467,7 +467,7 @@ function Users() {
                             onClick={canWrite ? () => handleToggleClick(user) : undefined}
                             disabled={!canWrite}
                             title={!canWrite ? adminOnlyTitle : ''}
-                            className={`px-2.5 py-1.5 text-sm bg-slate-50 text-rose-600 border border-rose-200 rounded hover:bg-rose-50 transition-colors whitespace-nowrap shrink-0 ${disabledBtnClass}`}
+                            className={`px-2 py-1.5 text-sm bg-slate-50 text-rose-600 border border-rose-200 rounded hover:bg-rose-50 transition-colors whitespace-nowrap shrink-0 ${disabledBtnClass}`}
                           >
                             {user.status === '停用' || user.is_active === false ? '启用' : '停用'}
                           </button>
@@ -476,7 +476,7 @@ function Users() {
                             onClick={canWrite ? () => openPwdModal(user) : undefined}
                             disabled={!canWrite}
                             title={!canWrite ? adminOnlyTitle : ''}
-                            className={`px-2.5 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors whitespace-nowrap shrink-0 ${disabledBtnClass}`}
+                            className={`px-2 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors whitespace-nowrap shrink-0 ${disabledBtnClass}`}
                           >
                             重置密码
                           </button>
