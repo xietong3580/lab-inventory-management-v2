@@ -16,7 +16,7 @@ import {
 // 产品状态标签组件
 function StatusBadge({ status }) {
   const config = {
-    正常: { text: '正常', bg: 'bg-emerald-50', textColor: 'text-emerald-700' },
+    正常: { text: '正常', bg: 'bg-slate-50', textColor: 'text-slate-500' },
     低库存: { text: '低库存', bg: 'bg-amber-50', textColor: 'text-amber-700' },
   };
   const { text, bg, textColor } = config[status] || config.正常;
@@ -105,9 +105,9 @@ function getVerificationHints(formData) {
 // 核对状态标签组件
 function VerificationBadge({ status }) {
   const config = {
-    '信息完整': { text: '信息完整', bg: 'bg-emerald-50', textColor: 'text-emerald-700' },
-    '建议补充': { text: '建议补充', bg: 'bg-amber-50', textColor: 'text-amber-700' },
-    '需核对': { text: '需核对', bg: 'bg-rose-50', textColor: 'text-rose-700' },
+    '信息完整': { text: '信息完整', bg: 'bg-slate-50', textColor: 'text-slate-500' },
+    '建议补充': { text: '建议补充', bg: 'bg-amber-50', textColor: 'text-amber-600' },
+    '需核对': { text: '需核对', bg: 'bg-rose-50', textColor: 'text-rose-600' },
   };
   const { text, bg, textColor } = config[status] || config['信息完整'];
 
@@ -1032,15 +1032,15 @@ function Products() {
                   return (
                     <>
                       <div className="text-center">
-                        <div className="text-lg font-semibold text-emerald-700">{okCount}</div>
+                        <div className="text-lg font-semibold text-slate-600">{okCount}</div>
                         <div className="text-xs text-slate-500">信息完整</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-lg font-semibold text-amber-700">{warnCount}</div>
+                        <div className="text-lg font-semibold text-amber-600">{warnCount}</div>
                         <div className="text-xs text-slate-500">建议补充</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-lg font-semibold text-rose-700">{badCount}</div>
+                        <div className="text-lg font-semibold text-rose-600">{badCount}</div>
                         <div className="text-xs text-slate-500">需核对</div>
                       </div>
                     </>
@@ -1176,7 +1176,7 @@ function Products() {
                           </button>
                           <button
                             onClick={() => handleOpenLedgerModal(product.id)}
-                            className="px-3 py-1.5 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors"
+                            className="px-3 py-1.5 text-sm bg-slate-50 text-slate-600 rounded border border-slate-200 hover:bg-slate-100 transition-colors"
                           >
                             台账
                           </button>
@@ -1186,10 +1186,10 @@ function Products() {
                             title={!canWrite ? adminOnlyTitle : ''}
                             className={`px-3 py-1.5 text-sm rounded transition-colors ${
                               !canWrite
-                                ? 'bg-rose-50 text-rose-300 cursor-not-allowed'
+                                ? 'bg-slate-50 text-slate-300 cursor-not-allowed'
                                 : deletingId === product.id
-                                  ? 'bg-rose-100 text-rose-400 cursor-wait'
-                                  : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+                                  ? 'bg-rose-50 text-rose-400 cursor-wait'
+                                  : 'bg-slate-50 text-rose-600 border border-rose-200 hover:bg-rose-50'
                             }`}
                           >
                             {deletingId === product.id ? '删除中...' : '删除'}
