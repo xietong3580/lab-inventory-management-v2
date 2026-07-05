@@ -28,6 +28,88 @@ function StatusBadge({ status }) {
   );
 }
 
+// 产品核对状态计算（纯函数，基于现有字段）
+function calculateVerificationStatus(product) {
+  // 需核对：缺少核心字段或数据异常
+  if (!product.name || !String(product.name).trim()) return '需核对';
+  if (!product.sku || !String(product.sku).trim()) return '需核对';
+  if (typeof product.currentStock === 'number' && product.currentStock < 0) return '需核对';
+  const min = product.minStock;
+  if (min === '' || min === null || min === undefined || isNaN(Number(min)) || Number(min) < 0) return '需核对';
+
+  // 建议补充：缺少常用管理字段
+  if (!product.category || !String(product.category).trim()) return '建议补充';
+  if (!product.location || !String(product.location).trim()) return '建议补充';
+  if (!product.unit || !String(product.unit).trim()) return '建议补充';
+  if (product.purchasePrice === '' || product.purchasePrice === null || product.purchasePrice === undefined) return '建议补充';
+  if (product.salePrice === '' || product.salePrice === null || product.salePrice === undefined) return '建议补充';
+
+  return '信息完整';
+}
+
+// 核对状态提示（用于表单内联展示）
+function getVerificationHints(formData) {
+  const missing = [];
+  const suggestions = [];
+
+  if (!formData.name || !String(formData.name).trim()) missing.push('产品名称');
+  if (!formData.sku || !String(formData.sku).trim()) missing.push('SKU 编码');
+  if (Number(formData.currentStock) < 0) missing.push('当前库存为负数');
+  const min = formData.minStock;
+  if (min === '' || min === null || min === undefined || isNaN(Number(min)) || Number(min) < 0) missing.push('最低库存设置');
+
+  if (!formData.category || !String(formData.category).trim()) suggestions.push('库存分类');
+  if (!formData.location || !String(formData.location).trim()) suggestions.push('存储位置');
+  if (!formData.unit || !String(formData.unit).trim()) suggestions.push('单位');
+  if (formData.purchasePrice === '' || formData.purchasePrice === null || formData.purchasePrice === undefined) suggestions.push('采购价');
+  if (formData.salePrice === '' || formData.salePrice === null || formData.salePrice === undefined) suggestions.push('售价');
+
+  if (missing.length > 0) {
+    return {
+      status: '需核对',
+      bg: 'bg-rose-50',
+      border: 'border-rose-200',
+      textColor: 'text-rose-800',
+      hintColor: 'text-rose-700',
+      message: `该产品缺少 ${missing.join('、')}，请优先核对后再正式使用。`
+    };
+  }
+  if (suggestions.length > 0) {
+    return {
+      status: '建议补充',
+      bg: 'bg-amber-50',
+      border: 'border-amber-200',
+      textColor: 'text-amber-800',
+      hintColor: 'text-amber-700',
+      message: `建议补充${suggestions.join('、')}，便于后续核对。`
+    };
+  }
+  return {
+    status: '信息完整',
+    bg: 'bg-emerald-50',
+    border: 'border-emerald-200',
+    textColor: 'text-emerald-800',
+    hintColor: 'text-emerald-700',
+    message: '该产品资料基本完整，可用于正式库存管理。'
+  };
+}
+
+// 核对状态标签组件
+function VerificationBadge({ status }) {
+  const config = {
+    '信息完整': { text: '信息完整', bg: 'bg-emerald-50', textColor: 'text-emerald-700' },
+    '建议补充': { text: '建议补充', bg: 'bg-amber-50', textColor: 'text-amber-700' },
+    '需核对': { text: '需核对', bg: 'bg-rose-50', textColor: 'text-rose-700' },
+  };
+  const { text, bg, textColor } = config[status] || config['信息完整'];
+
+  return (
+    <span className={`px-2 py-1 rounded text-xs font-medium ${bg} ${textColor}`}>
+      {text}
+    </span>
+  );
+}
+
 // 台账状态标签组件
 function LedgerStatusBadge({ status }) {
   const config = {
@@ -987,6 +1069,9 @@ function Products() {
                       状态
                     </th>
                     <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                      核对状态
+                    </th>
+                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
                       存储位置
                     </th>
                     <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
@@ -1018,6 +1103,9 @@ function Products() {
                       </td>
                       <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
                         <StatusBadge status={product.status} />
+                      </td>
+                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                        <VerificationBadge status={calculateVerificationStatus(product)} />
                       </td>
                       <td className="px-4 py-3 md:px-6 md:py-4">
                         <div className="text-sm text-slate-700">{product.location}</div>
@@ -1573,12 +1661,30 @@ function Products() {
 
               </div>
 
-              {/* Step 10-6D：手动录入提示文案 */}
-              <div className="mx-6 mt-3 p-3 bg-slate-50 border border-slate-200 rounded-md">
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  正式录入建议：SKU / 产品名称 / 当前库存 / 库位优先核对；采购价、售价未知可留空，不要填 0 代替未知。
-                </p>
-              </div>
+              {/* Step 10-9A：正式录入核对提示区 */}
+              {(() => {
+                const hints = getVerificationHints(formData);
+                return (
+                  <div className={`mx-6 mt-3 p-3 rounded-md border ${hints.bg} ${hints.border}`}>
+                    <div className="flex items-start">
+                      <span className={`text-xs font-medium mr-2 mt-0.5 shrink-0 ${hints.textColor}`}>
+                        {hints.status === '信息完整' ? '✓' : hints.status === '建议补充' ? '△' : '!'}
+                      </span>
+                      <div>
+                        <div className={`text-xs font-medium mb-0.5 ${hints.textColor}`}>
+                          核对状态：{hints.status}
+                        </div>
+                        <div className={`text-xs leading-relaxed ${hints.hintColor}`}>
+                          {hints.message}
+                        </div>
+                        <div className="text-xs text-slate-400 mt-1.5 pt-1.5 border-t border-slate-200">
+                          正式录入建议：SKU / 产品名称 / 当前库存 / 库位优先核对；采购价、售价未知可留空，不要填 0 代替未知。
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* 保存错误提示 */}
               {saveError && (
