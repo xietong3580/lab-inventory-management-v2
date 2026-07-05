@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { productService as dataProductService } from '../services/dataService';
 import { getProductsWithCalculatedStatus, calculateProductStatus, updateProduct, addProduct, deleteProduct } from '../services/productService';
 import { getLedgerTypeConfig, formatLedgerTime } from '../utils/inventoryHistoryHelpers';
-import { filterProducts, hasActiveFilters } from '../utils/productFilterHelpers';
+import { filterProducts, hasActiveFilters, calculateVerificationStatus } from '../utils/productFilterHelpers';
 import { exportProductsToCSV } from '../utils/exportHelpers';
 import { runPreflightCheck, createMaintenanceBackup } from '../services/backupService';
 import { usePermission } from '../hooks/usePermission';
@@ -26,23 +26,6 @@ function StatusBadge({ status }) {
       {text}
     </span>
   );
-}
-
-// 产品核对状态计算（纯函数，基于现有字段）
-function calculateVerificationStatus(product) {
-  // 需核对：缺少核心字段或数据异常
-  if (!product.name || !String(product.name).trim()) return '需核对';
-  if (!product.sku || !String(product.sku).trim()) return '需核对';
-  if (typeof product.currentStock === 'number' && product.currentStock < 0) return '需核对';
-  const min = product.minStock;
-  if (min === '' || min === null || min === undefined || isNaN(Number(min)) || Number(min) < 0) return '需核对';
-
-  // 建议补充：缺少常用管理字段（不含价格，价格不影响列表核对状态）
-  if (!product.category || !String(product.category).trim()) return '建议补充';
-  if (!product.location || !String(product.location).trim()) return '建议补充';
-  if (!product.unit || !String(product.unit).trim()) return '建议补充';
-
-  return '信息完整';
 }
 
 // 核对状态提示（用于表单内联展示）

@@ -1,6 +1,27 @@
 // 产品筛选工具函数
 
 /**
+ * 产品核对状态计算（纯函数，基于现有字段）
+ * 返回值：'信息完整' | '建议补充' | '需核对'
+ * 注意：采购价、售价不影响核对状态，仅用于弹窗温和提示
+ */
+export const calculateVerificationStatus = (product) => {
+  // 需核对：缺少核心字段或数据异常
+  if (!product.name || !String(product.name).trim()) return '需核对';
+  if (!product.sku || !String(product.sku).trim()) return '需核对';
+  if (typeof product.currentStock === 'number' && product.currentStock < 0) return '需核对';
+  const min = product.minStock;
+  if (min === '' || min === null || min === undefined || isNaN(Number(min)) || Number(min) < 0) return '需核对';
+
+  // 建议补充：缺少常用管理字段（不含价格）
+  if (!product.category || !String(product.category).trim()) return '建议补充';
+  if (!product.location || !String(product.location).trim()) return '建议补充';
+  if (!product.unit || !String(product.unit).trim()) return '建议补充';
+
+  return '信息完整';
+};
+
+/**
  * 关键词搜索产品（SKU 优先级排序）
  *
  * 搜索优先级：
@@ -131,29 +152,9 @@ export const filterProducts = (
     filtered = filtered.filter(product => product.brand === brand);
   }
 
-  // 5b. 按核对状态筛选
+  // 5b. 按核对状态筛选（复用 calculateVerificationStatus，与产品列表标签用同一套规则）
   if (verificationFilter && verificationFilter !== 'all') {
-    filtered = filtered.filter(product => {
-      const nameOk = product.name && String(product.name).trim();
-      const skuOk = product.sku && String(product.sku).trim();
-      const stockOk = !(typeof product.currentStock === 'number' && product.currentStock < 0);
-      const min = product.minStock;
-      const minOk = !(min === '' || min === null || min === undefined || isNaN(Number(min)) || Number(min) < 0);
-      const categoryOk = product.category && String(product.category).trim();
-      const locationOk = product.location && String(product.location).trim();
-      const unitOk = product.unit && String(product.unit).trim();
-
-      if (verificationFilter === '需核对') {
-        return !nameOk || !skuOk || !stockOk || !minOk;
-      }
-      if (verificationFilter === '建议补充') {
-        return nameOk && skuOk && stockOk && minOk && (!categoryOk || !locationOk || !unitOk);
-      }
-      if (verificationFilter === '信息完整') {
-        return nameOk && skuOk && stockOk && minOk && categoryOk && locationOk && unitOk;
-      }
-      return true;
-    });
+    filtered = filtered.filter(product => calculateVerificationStatus(product) === verificationFilter);
   }
 
   // 6. 按关键词搜索（复用 searchProducts 评分排序）
