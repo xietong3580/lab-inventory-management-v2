@@ -54,6 +54,10 @@ function Alerts() {
   const [selectedUrgency, setSelectedUrgency] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
+  // 弹窗状态
+  const [detailAlert, setDetailAlert] = useState(null);   // 查看详情弹窗
+  const [reminderAlert, setReminderAlert] = useState(null); // 补货提醒弹窗
+  const [copyText, setCopyText] = useState('');            // 复制状态反馈
   const itemsPerPage = 8;
 
   // 计算紧急程度（根据库存百分比）
@@ -121,9 +125,12 @@ function Alerts() {
       .map(product => ({
         id: product.id,
         productName: product.name,
+        sku: product.sku,
         currentStock: product.currentStock,
         minStock: product.minStock,
         category: product.category,
+        location: product.location,
+        unit: product.unit,
         urgency: calculateUrgency(product)
       }));
   }, [productsData.productsWithStatus]); // 依赖产品数据变化
@@ -155,6 +162,37 @@ function Alerts() {
   const handleReset = () => {
     setSelectedUrgency('all');
     setSelectedCategory('all');
+  };
+
+  // 打开详情弹窗
+  const handleOpenDetail = (alert) => setDetailAlert(alert);
+  const handleCloseDetail = () => setDetailAlert(null);
+
+  // 打开补货提醒弹窗
+  const handleOpenReminder = (alert) => {
+    setDetailAlert(null); // 如果从详情弹窗进入，先关闭详情
+    setReminderAlert(alert);
+  };
+  const handleCloseReminder = () => setReminderAlert(null);
+
+  // 生成补货提醒文本
+  const getReminderText = (alert) => {
+    const unit = (alert.unit && String(alert.unit).trim()) || '';
+    const suggestQty = Math.max(Number(alert.minStock || 0) - Number(alert.currentStock || 0), 0);
+    const unitWithSpace = unit ? ` ${unit}` : '';
+    return `【库存提醒】${alert.productName}当前库存 ${alert.currentStock}${unitWithSpace}，低于最低库存 ${alert.minStock}${unitWithSpace}，建议至少补足 ${suggestQty}${unitWithSpace}。请确认是否安排采购。`;
+  };
+
+  // 复制提醒内容
+  const handleCopyReminder = async (alert) => {
+    const text = getReminderText(alert);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyText('提醒内容已复制');
+    } catch {
+      setCopyText('复制失败，请手动复制');
+    }
+    setTimeout(() => setCopyText(''), 2500);
   };
 
   return (
@@ -303,15 +341,19 @@ function Alerts() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col gap-2">
                         <button
+                          onClick={() => handleOpenReminder(alert)}
                           disabled={!canWrite}
-                          title={!canWrite ? adminOnlyTitle : ''}
+                          title={!canWrite ? adminOnlyTitle : '生成补货提醒'}
                           className={`px-3 py-1.5 text-sm bg-slate-50 text-rose-600 border border-rose-200 rounded hover:bg-rose-50 transition-colors font-medium ${
                             !canWrite ? 'opacity-50 cursor-not-allowed' : ''
                           }`}
                         >
-                          安排补货
+                          补货提醒
                         </button>
-                        <button className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors">
+                        <button
+                          onClick={() => handleOpenDetail(alert)}
+                          className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors"
+                        >
                           查看详情
                         </button>
                       </div>
@@ -424,10 +466,162 @@ function Alerts() {
         </div>
       </div>
 
+      {/* 低库存详情弹窗 */}
+      {detailAlert && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="px-6 py-4 border-b border-slate-200">
+              <h2 className="text-lg font-semibold text-slate-800">低库存详情</h2>
+            </div>
+            <div className="p-6 space-y-3">
+              <div className="flex justify-between">
+                <span className="text-sm text-slate-500">产品名称</span>
+                <span className="text-sm font-medium text-slate-800">{detailAlert.productName}</span>
+              </div>
+              {detailAlert.sku && (
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">SKU</span>
+                  <span className="text-sm font-medium text-slate-800">{detailAlert.sku}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-sm text-slate-500">库存分类</span>
+                <span className="text-sm font-medium text-slate-800">{detailAlert.category}</span>
+              </div>
+              {detailAlert.location && (
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">存储位置</span>
+                  <span className="text-sm font-medium text-slate-800">{detailAlert.location}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-sm text-slate-500">当前库存</span>
+                <span className="text-sm font-medium text-slate-800">
+                  {detailAlert.currentStock}{detailAlert.unit ? ` ${detailAlert.unit}` : ''}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-slate-500">最低库存</span>
+                <span className="text-sm font-medium text-slate-800">
+                  {detailAlert.minStock}{detailAlert.unit ? ` ${detailAlert.unit}` : ''}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-slate-500">库存比例</span>
+                <span className="text-sm font-medium text-slate-800">
+                  {Math.round((Number(detailAlert.currentStock) / (Number(detailAlert.minStock) || 1)) * 100)}%
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-slate-500">紧急程度</span>
+                <UrgencyBadge urgency={detailAlert.urgency} />
+              </div>
+              <div className="pt-3 border-t border-slate-100">
+                <div className="text-sm text-slate-700 leading-relaxed">
+                  当前库存低于或接近最低库存标准，建议先核对实物库存和近期出入库记录，再根据实际情况安排补货。
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+              <button
+                onClick={handleCloseDetail}
+                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium"
+              >
+                关闭
+              </button>
+              <button
+                onClick={() => handleOpenReminder(detailAlert)}
+                disabled={!canWrite}
+                title={!canWrite ? adminOnlyTitle : ''}
+                className={`px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium ${
+                  !canWrite ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                生成补货提醒
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 补货提醒弹窗 */}
+      {reminderAlert && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="px-6 py-4 border-b border-slate-200">
+              <h2 className="text-lg font-semibold text-slate-800">补货提醒</h2>
+            </div>
+            <div className="p-6 space-y-3">
+              <div className="flex justify-between">
+                <span className="text-sm text-slate-500">产品名称</span>
+                <span className="text-sm font-medium text-slate-800">{reminderAlert.productName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-slate-500">当前库存</span>
+                <span className="text-sm font-medium text-slate-800">
+                  {reminderAlert.currentStock}{reminderAlert.unit ? ` ${reminderAlert.unit}` : ''}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-slate-500">最低库存</span>
+                <span className="text-sm font-medium text-slate-800">
+                  {reminderAlert.minStock}{reminderAlert.unit ? ` ${reminderAlert.unit}` : ''}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-slate-500">建议补足数量</span>
+                <span className="text-sm font-medium text-slate-800">
+                  {Math.max(Number(reminderAlert.minStock || 0) - Number(reminderAlert.currentStock || 0), 0)}{reminderAlert.unit ? ` ${reminderAlert.unit}` : ''}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-slate-500">库存分类</span>
+                <span className="text-sm font-medium text-slate-800">{reminderAlert.category}</span>
+              </div>
+              {reminderAlert.location && (
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">存储位置</span>
+                  <span className="text-sm font-medium text-slate-800">{reminderAlert.location}</span>
+                </div>
+              )}
+              <div className="pt-3 border-t border-slate-100">
+                <div className="text-xs text-slate-500 mb-2">提醒内容</div>
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-700 leading-relaxed">
+                  {getReminderText(reminderAlert)}
+                </div>
+              </div>
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-md text-xs text-slate-600 leading-relaxed">
+                该提醒仅用于通知采购负责人，不会自动修改库存。实际到货后，请通过出入库记录执行入库。
+              </div>
+            </div>
+            {/* 复制反馈 */}
+            {copyText && (
+              <div className="mx-6 p-2 bg-emerald-50 border border-emerald-200 rounded-md text-xs text-emerald-700 text-center">
+                {copyText}
+              </div>
+            )}
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-between">
+              <button
+                onClick={() => handleCopyReminder(reminderAlert)}
+                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium text-sm"
+              >
+                复制提醒内容
+              </button>
+              <button
+                onClick={handleCloseReminder}
+                className="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium"
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 底部提示 */}
       <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
         <div className="text-sm text-slate-600">
-          低库存预警用于辅助日常库存维护。点击"安排补货"可发起采购流程，"查看详情"可了解产品信息及历史台账。预警不会自动修改库存数量。
+          低库存预警用于辅助日常库存维护。点击"补货提醒"可生成提醒内容方便通知采购负责人，"查看详情"可了解产品信息及历史台账。预警不会自动修改库存数量。
         </div>
       </div>
     </div>
