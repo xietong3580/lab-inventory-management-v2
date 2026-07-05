@@ -1016,6 +1016,47 @@ function Products() {
       )}
 
       {/* 产品表格 */}
+      {allProducts.length > 0 && (
+        <div className="mb-6">
+          <div className="bg-white border border-slate-200 rounded-lg px-4 py-3 md:px-6 md:py-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium text-slate-800">产品核对概览</div>
+                <div className="text-xs text-slate-500 mt-0.5">用于辅助正式录入前核对产品资料完整性，不影响库存计算。</div>
+              </div>
+              <div className="flex items-center gap-4 md:gap-6">
+                {(() => {
+                  const okCount = filteredProducts.filter(p => calculateVerificationStatus(p) === '信息完整').length;
+                  const warnCount = filteredProducts.filter(p => calculateVerificationStatus(p) === '建议补充').length;
+                  const badCount = filteredProducts.filter(p => calculateVerificationStatus(p) === '需核对').length;
+                  return (
+                    <>
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-emerald-700">{okCount}</div>
+                        <div className="text-xs text-slate-500">信息完整</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-amber-700">{warnCount}</div>
+                        <div className="text-xs text-slate-500">建议补充</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-rose-700">{badCount}</div>
+                        <div className="text-xs text-slate-500">需核对</div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+            {filteredProducts.length > 0 && (
+              <div className="text-xs text-slate-400 mt-2 pt-2 border-t border-slate-100">
+                当前筛选结果共 {filteredProducts.length} 个产品
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="bg-white border border-slate-200 rounded-lg">
         {allProducts.length === 0 ? (
           // 系统暂无产品
