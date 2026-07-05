@@ -1084,6 +1084,7 @@ function Products() {
               <p>• 选择不同的库存分类</p>
               <p>• 选择不同的存储位置 / 库位</p>
               <p>• 调整库存状态筛选</p>
+              <p>• 调整核对状态筛选</p>
               <p>• 调整库存数量范围</p>
               <p>• 点击"重置筛选"查看全部产品</p>
             </div>
@@ -1093,7 +1094,7 @@ function Products() {
                 className="mt-6 px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 transition-colors"
                 onClick={handleReset}
               >
-                清空筛选
+                重置筛选
               </button>
             )}
           </div>
