@@ -37,12 +37,10 @@ function calculateVerificationStatus(product) {
   const min = product.minStock;
   if (min === '' || min === null || min === undefined || isNaN(Number(min)) || Number(min) < 0) return '需核对';
 
-  // 建议补充：缺少常用管理字段
+  // 建议补充：缺少常用管理字段（不含价格，价格不影响列表核对状态）
   if (!product.category || !String(product.category).trim()) return '建议补充';
   if (!product.location || !String(product.location).trim()) return '建议补充';
   if (!product.unit || !String(product.unit).trim()) return '建议补充';
-  if (product.purchasePrice === '' || product.purchasePrice === null || product.purchasePrice === undefined) return '建议补充';
-  if (product.salePrice === '' || product.salePrice === null || product.salePrice === undefined) return '建议补充';
 
   return '信息完整';
 }
@@ -51,6 +49,7 @@ function calculateVerificationStatus(product) {
 function getVerificationHints(formData) {
   const missing = [];
   const suggestions = [];
+  const priceHints = [];
 
   if (!formData.name || !String(formData.name).trim()) missing.push('产品名称');
   if (!formData.sku || !String(formData.sku).trim()) missing.push('SKU 编码');
@@ -61,8 +60,14 @@ function getVerificationHints(formData) {
   if (!formData.category || !String(formData.category).trim()) suggestions.push('库存分类');
   if (!formData.location || !String(formData.location).trim()) suggestions.push('存储位置');
   if (!formData.unit || !String(formData.unit).trim()) suggestions.push('单位');
-  if (formData.purchasePrice === '' || formData.purchasePrice === null || formData.purchasePrice === undefined) suggestions.push('采购价');
-  if (formData.salePrice === '' || formData.salePrice === null || formData.salePrice === undefined) suggestions.push('售价');
+
+  // 价格字段仅温和提示，不影响核对状态
+  if (formData.purchasePrice === '' || formData.purchasePrice === null || formData.purchasePrice === undefined) priceHints.push('采购价');
+  if (formData.salePrice === '' || formData.salePrice === null || formData.salePrice === undefined) priceHints.push('售价');
+
+  const priceNote = priceHints.length > 0
+    ? `采购价、售价可在后续核对后补充；如暂时未知，可以留空，不建议用 0 代表未知。`
+    : '';
 
   if (missing.length > 0) {
     return {
@@ -71,7 +76,8 @@ function getVerificationHints(formData) {
       border: 'border-rose-200',
       textColor: 'text-rose-800',
       hintColor: 'text-rose-700',
-      message: `该产品缺少 ${missing.join('、')}，请优先核对后再正式使用。`
+      message: `该产品缺少 ${missing.join('、')}，请优先核对后再正式使用。`,
+      priceNote
     };
   }
   if (suggestions.length > 0) {
@@ -81,7 +87,8 @@ function getVerificationHints(formData) {
       border: 'border-amber-200',
       textColor: 'text-amber-800',
       hintColor: 'text-amber-700',
-      message: `建议补充${suggestions.join('、')}，便于后续核对。`
+      message: `建议补充${suggestions.join('、')}，便于后续核对。`,
+      priceNote
     };
   }
   return {
@@ -90,7 +97,8 @@ function getVerificationHints(formData) {
     border: 'border-emerald-200',
     textColor: 'text-emerald-800',
     hintColor: 'text-emerald-700',
-    message: '该产品资料基本完整，可用于正式库存管理。'
+    message: '该产品资料基本完整，可用于正式库存管理。',
+    priceNote
   };
 }
 
@@ -1677,9 +1685,11 @@ function Products() {
                         <div className={`text-xs leading-relaxed ${hints.hintColor}`}>
                           {hints.message}
                         </div>
-                        <div className="text-xs text-slate-400 mt-1.5 pt-1.5 border-t border-slate-200">
-                          正式录入建议：SKU / 产品名称 / 当前库存 / 库位优先核对；采购价、售价未知可留空，不要填 0 代替未知。
-                        </div>
+                        {hints.priceNote && (
+                          <div className="text-xs text-slate-500 mt-1.5 pt-1.5 border-t border-slate-200">
+                            {hints.priceNote}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
