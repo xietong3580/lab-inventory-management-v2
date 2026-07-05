@@ -36,15 +36,6 @@ function StepItem({ number, title, children }) {
   );
 }
 
-// 示意图
-function PlaceholderDiagram({ label }) {
-  return (
-    <div className="my-2 p-4 border border-dashed border-slate-300 rounded-md bg-slate-50 text-center">
-      <div className="text-slate-400 text-2xl mb-1">🖼️</div>
-      <div className="text-xs text-slate-400">{label}</div>
-    </div>
-  );
-}
 
 export default function SystemOperationGuide({ embedded = false }) {
   const Wrapper = embedded ? 'div' : 'div';
@@ -177,7 +168,6 @@ export default function SystemOperationGuide({ embedded = false }) {
                 单条录入点击「添加产品」。<strong>连续录入时点击「保存并继续新增」</strong>，弹窗不关闭且保留分类、单位、库位，提高效率。
               </StepItem>
             </div>
-            <PlaceholderDiagram label="新增产品弹窗示意：①产品名称 ②SKU ③库存分类和库位 ④保存并继续新增" />
           </div>
 
           {/* 场景 3：编辑产品 */}
@@ -223,7 +213,6 @@ export default function SystemOperationGuide({ embedded = false }) {
                 保存后产品库存自动减少，台账和审计日志同步记录。
               </StepItem>
             </div>
-            <PlaceholderDiagram label="出入库表单示意：选择产品 → 选择类型 → 填写数量 → 填写备注 → 保存" />
           </div>
 
           {/* 场景 6：撤销 */}
