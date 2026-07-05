@@ -215,14 +215,16 @@ function Users() {
   // ============================================================================
   // 启用 / 停用用户
   // ============================================================================
-  const handleToggleStatus = async (user) => {
-    const action = user.status === '停用' || user.is_active === false ? '启用' : '停用';
-    const confirmed = window.confirm(
-      `确认要${action}用户「${user.username}」吗？\n\n` +
-      (action === '停用' ? '停用后该用户将无法登录系统。' : '启用后该用户可正常登录系统。')
-    );
-    if (!confirmed) return;
+  const handleToggleClick = (user) => setStatusConfirmUser(user);
 
+  const handleToggleCancel = () => setStatusConfirmUser(null);
+
+  const handleToggleConfirm = async () => {
+    if (!statusConfirmUser) return;
+    const user = statusConfirmUser;
+    const action = user.status === '停用' || user.is_active === false ? '启用' : '停用';
+
+    setStatusConfirmUser(null);
     clearMessages();
     try {
       const newActive = user.status === '停用' || user.is_active === false;
@@ -242,6 +244,8 @@ function Users() {
   const [newPassword, setNewPassword] = useState('');
   const [pwdSubmitting, setPwdSubmitting] = useState(false);
   const [pwdError, setPwdError] = useState(null);
+  // 停用/启用确认弹窗
+  const [statusConfirmUser, setStatusConfirmUser] = useState(null);
 
   const openPwdModal = (user) => {
     clearMessages();
@@ -414,7 +418,7 @@ function Users() {
                     <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">角色</th>
                     <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">状态</th>
                     <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">最后登录</th>
-                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap min-w-[220px]">操作</th>
+                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap min-w-[195px]">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -448,22 +452,22 @@ function Users() {
                         })()}</div>
                       </td>
                       <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2 flex-nowrap">
+                        <div className="flex items-center gap-1.5 flex-nowrap">
                           {/* 编辑 */}
                           <button
                             onClick={canWrite ? () => openEditModal(user) : undefined}
                             disabled={!canWrite}
                             title={!canWrite ? adminOnlyTitle : ''}
-                            className={`px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors whitespace-nowrap shrink-0 ${disabledBtnClass}`}
+                            className={`px-2.5 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors whitespace-nowrap shrink-0 ${disabledBtnClass}`}
                           >
                             编辑
                           </button>
                           {/* 启用 / 停用 */}
                           <button
-                            onClick={canWrite ? () => handleToggleStatus(user) : undefined}
+                            onClick={canWrite ? () => handleToggleClick(user) : undefined}
                             disabled={!canWrite}
                             title={!canWrite ? adminOnlyTitle : ''}
-                            className={`px-3 py-1.5 text-sm bg-slate-50 text-rose-600 border border-rose-200 rounded hover:bg-rose-50 transition-colors whitespace-nowrap shrink-0 ${disabledBtnClass}`}
+                            className={`px-2.5 py-1.5 text-sm bg-slate-50 text-rose-600 border border-rose-200 rounded hover:bg-rose-50 transition-colors whitespace-nowrap shrink-0 ${disabledBtnClass}`}
                           >
                             {user.status === '停用' || user.is_active === false ? '启用' : '停用'}
                           </button>
@@ -472,7 +476,7 @@ function Users() {
                             onClick={canWrite ? () => openPwdModal(user) : undefined}
                             disabled={!canWrite}
                             title={!canWrite ? adminOnlyTitle : ''}
-                            className={`px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors ${disabledBtnClass}`}
+                            className={`px-2.5 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors whitespace-nowrap shrink-0 ${disabledBtnClass}`}
                           >
                             重置密码
                           </button>
@@ -802,6 +806,68 @@ function Users() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================================== */}
+      {/* 停用/启用确认弹窗 */}
+      {/* ==================================================================== */}
+      {statusConfirmUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={handleToggleCancel}>
+          <div className="absolute inset-0 bg-black/40"></div>
+          <div
+            className="relative bg-white rounded-lg shadow-xl max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-slate-200">
+              <h2 className="text-lg font-semibold text-slate-800">
+                {statusConfirmUser.status === '停用' || statusConfirmUser.is_active === false ? '确认启用用户' : '确认停用用户'}
+              </h2>
+            </div>
+            <div className="px-6 py-4 space-y-3">
+              <div className="text-sm text-slate-700">
+                {statusConfirmUser.status === '停用' || statusConfirmUser.is_active === false
+                  ? '启用后，该用户可以重新登录系统。请确认是否继续。'
+                  : '停用后，该用户将无法登录系统。请确认是否继续。'}
+              </div>
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-md space-y-1.5 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">用户名</span>
+                  <span className="font-medium text-slate-800">{statusConfirmUser.username}</span>
+                </div>
+                {(statusConfirmUser.displayName || statusConfirmUser.display_name) && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">显示名称</span>
+                    <span className="font-medium text-slate-800">{statusConfirmUser.displayName || statusConfirmUser.display_name}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-slate-500">角色</span>
+                  <span className="font-medium text-slate-800">{statusConfirmUser.role === 'admin' ? '管理员' : '只读用户'}</span>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleToggleCancel}
+                className="px-4 py-2 text-sm bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleConfirm}
+                className={`px-4 py-2 text-sm rounded-md transition-colors font-medium ${
+                  statusConfirmUser.status === '停用' || statusConfirmUser.is_active === false
+                    ? 'bg-slate-700 text-white hover:bg-slate-800'
+                    : 'bg-slate-50 text-rose-600 border border-rose-200 hover:bg-rose-50'
+                }`}
+              >
+                {statusConfirmUser.status === '停用' || statusConfirmUser.is_active === false ? '确认启用' : '确认停用'}
+              </button>
+            </div>
           </div>
         </div>
       )}
