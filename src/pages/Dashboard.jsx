@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { productService, transactionService, auditLogService, dashboardService } from '../services/dataService';
 import {
   formatAuditTime,
@@ -305,6 +306,7 @@ function AuditLogStatsChart({ stats, maxCount }) {
 function Dashboard() {
   // 时间范围筛选状态
   const [timeRange, setTimeRange] = useState('7days'); // '7days', '30days', 'all'
+  const navigate = useNavigate();
   // 产品数据状态（通过统一服务层获取）
   const [productsData, setProductsData] = useState({
     productsWithStatus: [],
@@ -915,7 +917,10 @@ function Dashboard() {
               })}
             </div>
             <div className="mt-4 md:mt-6 pt-4 md:pt-5 border-t border-slate-100">
-              <button className="w-full py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 rounded-md transition-colors flex items-center justify-center gap-1">
+              <button
+                onClick={() => navigate('/transactions')}
+                className="w-full py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 rounded-md transition-colors flex items-center justify-center gap-1"
+              >
                 查看全部出入库记录 →
               </button>
             </div>
@@ -983,7 +988,10 @@ function Dashboard() {
               })}
             </div>
             <div className="mt-4 md:mt-6 pt-4 md:pt-5 border-t border-slate-100">
-              <button className="w-full py-2 md:py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 rounded-md transition-colors">
+              <button
+                onClick={() => navigate('/alerts')}
+                className="w-full py-2 md:py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 rounded-md transition-colors"
+              >
                 查看全部{dashboardData.lowStockCount > 0 ? ` ${dashboardData.lowStockCount} 条` : ''}预警信息 →
               </button>
             </div>
@@ -1289,7 +1297,10 @@ function Dashboard() {
           )}
           {dashboardData.recentAuditLogs.length > 0 && (
             <div className="mt-4 md:mt-6 pt-4 md:pt-5 border-t border-slate-100">
-              <button className="w-full py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 rounded-md transition-colors flex items-center justify-center gap-1">
+              <button
+                onClick={() => navigate('/audit-log')}
+                className="w-full py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 rounded-md transition-colors flex items-center justify-center gap-1"
+              >
                 查看完整操作日志 →
               </button>
             </div>
