@@ -3,7 +3,7 @@ import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recha
 function RiskDistributionChart({ lowStockCount = 0, normalStockCount = 0, totalProducts = 0 }) {
   const data = [
     { name: '正常库存', value: normalStockCount, color: '#3b82f6' },
-    { name: '低库存', value: lowStockCount, color: '#f59e0b' },
+    { name: '低库存', value: lowStockCount, color: '#d97706' },
   ];
 
   // 过滤掉值为0的项，避免在图表中显示
@@ -76,7 +76,7 @@ function RiskDistributionChart({ lowStockCount = 0, normalStockCount = 0, totalP
           </div>
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
-              <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+              <div className="w-3 h-3 rounded-full bg-amber-600"></div>
               <div className="text-xs font-medium text-slate-700">低库存</div>
             </div>
             <div className="text-lg font-semibold text-slate-800">{lowStockCount}</div>

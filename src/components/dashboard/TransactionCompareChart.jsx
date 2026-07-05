@@ -68,7 +68,7 @@ function TransactionCompareChart({ data, timeRangeLabel = '当前时间范围' }
           />
           <Bar
             dataKey="outCount"
-            fill="#f59e0b"
+            fill="#0ea5e9"
             radius={[2, 2, 0, 0]}
             name="出库数量"
           />

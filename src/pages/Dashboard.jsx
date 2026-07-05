@@ -33,8 +33,8 @@ function StatCard({ title, value, description, iconColor }) {
 // 状态标签组件
 function StatusBadge({ status }) {
   const config = {
-    completed: { text: '已完成', bg: 'bg-emerald-50', textColor: 'text-emerald-700' },
-    pending: { text: '处理中', bg: 'bg-amber-50', textColor: 'text-amber-700' },
+    completed: { text: '已完成', bg: 'bg-slate-50', textColor: 'text-slate-600' },
+    pending: { text: '处理中', bg: 'bg-amber-50', textColor: 'text-amber-600' },
     reversed: { text: '已撤销', bg: 'bg-slate-100', textColor: 'text-slate-500' },
   };
   const { text, bg, textColor } = config[status] || config.pending;
@@ -49,9 +49,9 @@ function StatusBadge({ status }) {
 // 紧急程度标签
 function UrgencyBadge({ urgency }) {
   const config = {
-    high: { text: '紧急', bg: 'bg-rose-50', textColor: 'text-rose-700' },
-    medium: { text: '中等', bg: 'bg-amber-50', textColor: 'text-amber-700' },
-    low: { text: '较低', bg: 'bg-slate-100', textColor: 'text-slate-700' },
+    high: { text: '紧急', bg: 'bg-rose-50', textColor: 'text-rose-600' },
+    medium: { text: '中等', bg: 'bg-amber-50', textColor: 'text-amber-600' },
+    low: { text: '较低', bg: 'bg-slate-100', textColor: 'text-slate-600' },
   };
   const { text, bg, textColor } = config[urgency] || config.low;
 
@@ -159,7 +159,7 @@ function TransactionTrendChart({ data }) {
                 {hasTransactions ? (
                   <>
                     入库: <span className="font-medium text-emerald-600">{item.inCount}</span> ·
-                    出库: <span className="font-medium text-rose-600">{item.outCount}</span>
+                    出库: <span className="font-medium text-sky-600">{item.outCount}</span>
                   </>
                 ) : (
                   '无交易'
@@ -171,7 +171,7 @@ function TransactionTrendChart({ data }) {
                 {/* 入库条形 */}
                 {item.inCount > 0 && (
                   <div
-                    className="bg-emerald-500"
+                    className="bg-emerald-400"
                     style={{ width: `${item.inCount * scale}%` }}
                     title={`入库: ${item.inCount}`}
                   />
@@ -179,7 +179,7 @@ function TransactionTrendChart({ data }) {
                 {/* 出库条形 */}
                 {item.outCount > 0 && (
                   <div
-                    className="bg-rose-500 ml-0.5"
+                    className="bg-sky-400 ml-0.5"
                     style={{ width: `${item.outCount * scale}%` }}
                     title={`出库: ${item.outCount}`}
                   />
@@ -229,7 +229,7 @@ function LowStockOverview({ lowStockCount, lowStockPercentage, top3Products, tot
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="text-base md:text-lg font-semibold text-rose-600">
+                  <div className="text-base md:text-lg font-semibold text-slate-700">
                     {Math.round((product.currentStock / product.minStock) * 100)}%
                   </div>
                   <div className="mt-1">
@@ -622,12 +622,12 @@ function Dashboard() {
 
     // 审计日志类型统计
     const auditLogStats = {
-      'PRODUCT_ADD': { label: '新增产品', count: 0, color: 'bg-emerald-50 text-emerald-700' },
-      'PRODUCT_UPDATE': { label: '编辑产品', count: 0, color: 'bg-blue-50 text-blue-700' },
-      'PRODUCT_DELETE': { label: '删除产品', count: 0, color: 'bg-rose-50 text-rose-700' },
-      'TRANSACTION_ADD': { label: '出入库', count: 0, color: 'bg-amber-50 text-amber-700' },
-      'TRANSACTION_REVERSE': { label: '撤销交易', count: 0, color: 'bg-slate-50 text-slate-700' },
-      'SYSTEM_RESET': { label: '系统重置', count: 0, color: 'bg-violet-50 text-violet-700' }
+      'PRODUCT_ADD': { label: '新增产品', count: 0, color: 'bg-slate-50 text-slate-600' },
+      'PRODUCT_UPDATE': { label: '编辑产品', count: 0, color: 'bg-slate-100 text-slate-600' },
+      'PRODUCT_DELETE': { label: '删除产品', count: 0, color: 'bg-rose-50 text-rose-600' },
+      'TRANSACTION_ADD': { label: '出入库', count: 0, color: 'bg-amber-50 text-amber-600' },
+      'TRANSACTION_REVERSE': { label: '撤销交易', count: 0, color: 'bg-slate-100 text-slate-500' },
+      'SYSTEM_RESET': { label: '系统重置', count: 0, color: 'bg-slate-100 text-slate-500' }
     };
 
     // 统计选定时间范围内的审计日志类型
@@ -785,7 +785,7 @@ function Dashboard() {
       <div className="mb-4 md:mb-6">
         <h1 className="text-lg md:text-xl lg:text-2xl font-semibold text-slate-800">仪表盘</h1>
         <p className="text-slate-600 mt-1 text-xs sm:text-sm md:text-base">
-          欢迎回来，这里是库存管理系统的核心概览。
+          概览当前库存、预警、出入库和最近操作情况，便于日常核对。
         </p>
       </div>
 
@@ -873,7 +873,7 @@ function Dashboard() {
                             <div className="text-sm font-medium text-slate-800 truncate" title={txn.productName}>
                               {txn.productName}
                             </div>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${txn.type === '入库' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${txn.type === '入库' ? 'bg-emerald-50 text-emerald-600' : 'bg-sky-50 text-sky-600'}`}>
                               {txn.type}
                             </span>
                           </div>
@@ -886,7 +886,7 @@ function Dashboard() {
                           </div>
                         </div>
                         <div className="shrink-0">
-                          <div className={`w-2 h-2 rounded-full ${txn.type === '入库' ? 'bg-emerald-400' : 'bg-rose-400'}`}></div>
+                          <div className={`w-2 h-2 rounded-full ${txn.type === '入库' ? 'bg-emerald-300' : 'bg-sky-300'}`}></div>
                         </div>
                       </div>
                     </div>
@@ -895,7 +895,7 @@ function Dashboard() {
                     <div className="md:hidden py-3">
                       <div className="flex justify-between items-start mb-2">
                         <div className="text-sm font-medium text-slate-700">{timeText}</div>
-                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${txn.type === '入库' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${txn.type === '入库' ? 'bg-emerald-50 text-emerald-600' : 'bg-sky-50 text-sky-600'}`}>
                           {txn.type}
                         </span>
                       </div>
@@ -940,7 +940,7 @@ function Dashboard() {
               {dashboardData.lowStockAlerts.slice(0, 6).map((alert) => {
                 const gap = alert.currentStock - alert.minStock;
                 const gapText = gap >= 0 ? `剩余 ${gap}` : `缺口 ${-gap}`;
-                const gapColorClass = gap >= 0 ? 'text-emerald-600' : 'text-rose-600';
+                const gapColorClass = gap >= 0 ? 'text-slate-600' : 'text-rose-600';
 
                 return (
                   <div key={alert.id} className="bg-slate-50 border border-slate-200 rounded-lg p-3 md:p-4 hover:shadow-sm transition-shadow">
@@ -1030,27 +1030,27 @@ function Dashboard() {
               <div className="grid grid-cols-2 gap-3 md:gap-4">
                 <div className="bg-slate-50 border border-slate-200 rounded p-3 md:p-4">
                   <div className="text-xs md:text-sm text-slate-500 mb-1 flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                    <div className="w-2 h-2 rounded-full bg-emerald-300"></div>
                     入库总量
                   </div>
-                  <div className="text-xl md:text-2xl font-semibold text-emerald-600 mt-1">
+                  <div className="text-xl md:text-2xl font-semibold text-slate-700 mt-1">
                     {dashboardData.transactionSummary.totalInCount}
                   </div>
                   <div className="text-xs text-slate-500 mt-1">件 · 占总交易量</div>
                 </div>
                 <div className="bg-slate-50 border border-slate-200 rounded p-3 md:p-4">
                   <div className="text-xs md:text-sm text-slate-500 mb-1 flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full bg-rose-500"></div>
+                    <div className="w-2 h-2 rounded-full bg-sky-300"></div>
                     出库总量
                   </div>
-                  <div className="text-xl md:text-2xl font-semibold text-rose-600 mt-1">
+                  <div className="text-xl md:text-2xl font-semibold text-slate-700 mt-1">
                     {dashboardData.transactionSummary.totalOutCount}
                   </div>
                   <div className="text-xs text-slate-500 mt-1">件 · 占总交易量</div>
                 </div>
                 <div className="bg-slate-50 border border-slate-200 rounded p-3 md:p-4">
                   <div className="text-xs md:text-sm text-slate-500 mb-1">净变化</div>
-                  <div className={`text-xl md:text-2xl font-semibold mt-1 ${dashboardData.transactionSummary.netChange >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  <div className={`text-xl md:text-2xl font-semibold mt-1 text-slate-700`}>
                     {dashboardData.transactionSummary.netChange >= 0 ? '+' : ''}{dashboardData.transactionSummary.netChange}
                   </div>
                   <div className="text-xs text-slate-500 mt-1">入库 - 出库</div>
@@ -1242,7 +1242,7 @@ function Dashboard() {
                         </div>
                         {/* 右侧快速状态指示 */}
                         <div className="shrink-0">
-                          <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+                          <div className="w-2 h-2 rounded-full bg-slate-300"></div>
                         </div>
                       </div>
                     </div>
@@ -1300,7 +1300,7 @@ function Dashboard() {
       {/* 底部提示 */}
       <div className="mt-6 md:mt-8 p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-lg">
         <div className="text-xs md:text-sm text-slate-600">
-          提示：本系统为独立新版库存管理系统，不影响现有旧版系统。所有数据均为演示用途。
+          提示：统计数据用于辅助管理判断，不会自动修改库存。如发现库存异常，请优先查看产品台账、出入库记录和操作日志。
         </div>
       </div>
     </div>
