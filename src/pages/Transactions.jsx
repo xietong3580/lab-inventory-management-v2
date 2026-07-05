@@ -7,8 +7,8 @@ import { usePermission } from '../hooks/usePermission';
 // 类型标签组件
 function TypeBadge({ type }) {
   const config = {
-    入库: { text: '入库', bg: 'bg-emerald-50', textColor: 'text-emerald-700' },
-    出库: { text: '出库', bg: 'bg-rose-50', textColor: 'text-rose-700' },
+    入库: { text: '入库', bg: 'bg-emerald-50', textColor: 'text-emerald-600' },
+    出库: { text: '出库', bg: 'bg-sky-50', textColor: 'text-sky-600' },
   };
   const { text, bg, textColor } = config[type] || config.入库;
 
@@ -22,8 +22,8 @@ function TypeBadge({ type }) {
 // 状态标签组件
 function StatusBadge({ status }) {
   const config = {
-    completed: { text: '已完成', bg: 'bg-emerald-50', textColor: 'text-emerald-700' },
-    pending: { text: '处理中', bg: 'bg-amber-50', textColor: 'text-amber-700' },
+    completed: { text: '已完成', bg: 'bg-slate-50', textColor: 'text-slate-600' },
+    pending: { text: '处理中', bg: 'bg-amber-50', textColor: 'text-amber-600' },
     reversed: { text: '已撤销', bg: 'bg-slate-100', textColor: 'text-slate-500' },
   };
 
@@ -484,7 +484,7 @@ function Transactions() {
       <div className="mb-4 md:mb-6">
         <h1 className="text-xl md:text-2xl font-semibold text-slate-800">出入库记录</h1>
         <p className="text-slate-600 mt-1 text-sm md:text-base">
-          查看和管理所有产品的入库与出库操作记录。
+          记录产品入库、出库及撤销情况，用于库存变化追溯与日常核对。
         </p>
       </div>
 
@@ -688,8 +688,8 @@ function Transactions() {
         ) : errorTransactions ? (
           // 错误状态
           <div className="py-12 text-center">
-            <div className="text-rose-600 mb-2">⚠️ {errorTransactions}</div>
-            <div className="text-sm text-slate-600 max-w-md mx-auto">
+            <div className="text-slate-600 mb-2">{errorTransactions}</div>
+            <div className="text-sm text-slate-500 max-w-md mx-auto">
               将显示降级数据或空列表，页面功能可能受限。
             </div>
           </div>
@@ -805,7 +805,7 @@ function Transactions() {
                                 className={`px-2 py-1 text-xs rounded transition-colors ${
                                   !canWrite
                                     ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                    : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+                                    : 'bg-slate-50 text-rose-600 border border-rose-200 hover:bg-rose-50'
                                 }`}
                               >
                                 撤销
@@ -900,7 +900,7 @@ function Transactions() {
                         className={`px-3 py-1.5 text-sm rounded transition-colors flex-1 ${
                           !canWrite
                             ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                            : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+                            : 'bg-slate-50 text-rose-600 border border-rose-200 hover:bg-rose-50'
                         }`}
                       >
                         撤销
@@ -997,7 +997,7 @@ function Transactions() {
       {/* 底部提示 */}
       <div className="mt-6 p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-lg">
         <div className="text-sm text-slate-600">
-          提示：出入库记录用于追踪库存变动。状态为“处理中”的记录可能尚未完成库存更新。点击“详情”查看完整信息，“撤销”可取消未完成的记录。
+          出入库记录用于库存变化追溯。已撤销记录仅用于历史参考，不再参与有效库存变动。撤销操作会按原交易方向回滚库存，请确认记录无误后再操作。
         </div>
       </div>
 
@@ -1085,8 +1085,8 @@ function Transactions() {
                                 </div>
                                 <span className={`shrink-0 ml-3 px-1.5 py-0.5 rounded text-xs font-medium ${
                                   (product.status === '低库存' || product.currentStock <= product.minStock)
-                                    ? 'bg-amber-50 text-amber-700'
-                                    : 'bg-emerald-50 text-emerald-700'
+                                    ? 'bg-amber-50 text-amber-600'
+                                    : 'bg-slate-50 text-slate-500'
                                 }`}>
                                   {product.currentStock <= product.minStock ? '低库存' : '正常'}
                                 </span>
@@ -1111,7 +1111,7 @@ function Transactions() {
                           <span className="text-slate-500">当前库存：</span>
                           <span className={`font-medium ${
                             selectedProduct.currentStock <= selectedProduct.minStock
-                              ? 'text-amber-700'
+                              ? 'text-amber-600'
                               : 'text-slate-800'
                           }`}>
                             {selectedProduct.currentStock} {selectedProduct.unit}
@@ -1129,8 +1129,8 @@ function Transactions() {
                           <span className="text-slate-500">库存状态：</span>
                           <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
                             selectedProduct.currentStock <= selectedProduct.minStock
-                              ? 'bg-amber-50 text-amber-700'
-                              : 'bg-emerald-50 text-emerald-700'
+                              ? 'bg-amber-50 text-amber-600'
+                              : 'bg-slate-50 text-slate-500'
                           }`}>
                             {selectedProduct.currentStock <= selectedProduct.minStock ? '低库存' : '正常'}
                           </span>
@@ -1261,7 +1261,7 @@ function Transactions() {
             <div className="p-6">
               {/* 错误提示 */}
               {reversalError && (
-                <div className="mb-4 p-3.5 bg-rose-50 border border-rose-300 rounded-md">
+                <div className="mb-4 p-3.5 bg-rose-50 border border-rose-200 rounded-md">
                   <div className="flex items-start">
                     <div className="shrink-0 mr-3 mt-0.5">
                       <div className="w-5 h-5 rounded-full bg-rose-100 flex items-center justify-center">
@@ -1321,8 +1321,8 @@ function Transactions() {
                   disabled={isReversing}
                   className={`px-4 py-2 rounded-md transition-colors font-medium ${
                     isReversing
-                      ? 'bg-rose-400 text-white cursor-not-allowed'
-                      : 'bg-rose-600 text-white hover:bg-rose-700'
+                      ? 'bg-rose-300 text-white cursor-not-allowed'
+                      : 'bg-slate-50 text-rose-600 border border-rose-200 hover:bg-rose-50'
                   }`}
                 >
                   {isReversing ? '撤销中...' : '确认撤销'}
