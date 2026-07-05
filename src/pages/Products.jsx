@@ -147,6 +147,7 @@ function Products() {
   const [maxStock, setMaxStock] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [selectedBrand, setSelectedBrand] = useState('all');
+  const [verificationFilter, setVerificationFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
   const searchInputRef = useRef(null);
@@ -159,7 +160,8 @@ function Products() {
     minStock,
     maxStock,
     location: selectedLocation,
-    brand: selectedBrand
+    brand: selectedBrand,
+    verificationFilter
   });
 
   // 模态框和表单相关状态
@@ -251,7 +253,8 @@ function Products() {
       minStock,
       maxStock,
       selectedLocation,
-      selectedBrand
+      selectedBrand,
+      verificationFilter
     );
     setFilteredProducts(filtered);
     // 如果筛选后当前页超出范围，重置到第一页
@@ -259,12 +262,12 @@ function Products() {
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(1);
     }
-  }, [allProducts, searchTerm, selectedCategory, selectedStatus, minStock, maxStock, selectedLocation, selectedBrand, currentPage, itemsPerPage]);
+  }, [allProducts, searchTerm, selectedCategory, selectedStatus, minStock, maxStock, selectedLocation, selectedBrand, verificationFilter, currentPage, itemsPerPage]);
 
   // 当筛选条件变化时，重置到第一页（提供更及时的响应）
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedCategory, selectedStatus, minStock, maxStock, selectedLocation, selectedBrand]);
+  }, [searchTerm, selectedCategory, selectedStatus, minStock, maxStock, selectedLocation, selectedBrand, verificationFilter]);
 
   // 分页计算
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -286,6 +289,7 @@ function Products() {
     setSelectedStatus('all');
     setMinStock('');
     setMaxStock('');
+    setVerificationFilter('all');
     setCurrentPage(1);
     // 重置后自动聚焦搜索框，方便继续查下一个产品
     setTimeout(() => {
@@ -906,7 +910,7 @@ function Products() {
         </div>
 
         {/* 第三行：高级筛选 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-slate-100">
           {/* 库存状态筛选 */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">
@@ -932,6 +936,24 @@ function Products() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* 核对状态筛选 */}
+          <div>
+            <label htmlFor="verification-filter" className="block text-sm font-medium text-slate-700 mb-1.5">
+              核对状态
+            </label>
+            <select
+              id="verification-filter"
+              value={verificationFilter}
+              onChange={(e) => setVerificationFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+            >
+              <option value="all">全部核对状态</option>
+              <option value="信息完整">信息完整</option>
+              <option value="建议补充">建议补充</option>
+              <option value="需核对">需核对</option>
+            </select>
           </div>
 
           {/* 当前库存最小值 */}

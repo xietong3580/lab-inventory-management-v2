@@ -85,7 +85,8 @@ export const filterProducts = (
   minStock = null,
   maxStock = null,
   location = 'all',
-  brand = 'all'
+  brand = 'all',
+  verificationFilter = 'all'
 ) => {
   let filtered = [...products];
 
@@ -130,6 +131,31 @@ export const filterProducts = (
     filtered = filtered.filter(product => product.brand === brand);
   }
 
+  // 5b. 按核对状态筛选
+  if (verificationFilter && verificationFilter !== 'all') {
+    filtered = filtered.filter(product => {
+      const nameOk = product.name && String(product.name).trim();
+      const skuOk = product.sku && String(product.sku).trim();
+      const stockOk = !(typeof product.currentStock === 'number' && product.currentStock < 0);
+      const min = product.minStock;
+      const minOk = !(min === '' || min === null || min === undefined || isNaN(Number(min)) || Number(min) < 0);
+      const categoryOk = product.category && String(product.category).trim();
+      const locationOk = product.location && String(product.location).trim();
+      const unitOk = product.unit && String(product.unit).trim();
+
+      if (verificationFilter === '需核对') {
+        return !nameOk || !skuOk || !stockOk || !minOk;
+      }
+      if (verificationFilter === '建议补充') {
+        return nameOk && skuOk && stockOk && minOk && (!categoryOk || !locationOk || !unitOk);
+      }
+      if (verificationFilter === '信息完整') {
+        return nameOk && skuOk && stockOk && minOk && categoryOk && locationOk && unitOk;
+      }
+      return true;
+    });
+  }
+
   // 6. 按关键词搜索（复用 searchProducts 评分排序）
   if (keyword.trim()) {
     return searchProducts(filtered, keyword);
@@ -172,7 +198,8 @@ export const hasActiveFilters = ({
   minStock,
   maxStock,
   location,
-  brand
+  brand,
+  verificationFilter
 }) => {
   return Boolean(
     keyword ||
@@ -181,7 +208,8 @@ export const hasActiveFilters = ({
     (minStock !== null && minStock !== '') ||
     (maxStock !== null && maxStock !== '') ||
     (location && location !== 'all' && location !== '') ||
-    (brand && brand !== 'all' && brand !== '')
+    (brand && brand !== 'all' && brand !== '') ||
+    (verificationFilter && verificationFilter !== 'all')
   );
 };
 
