@@ -47,15 +47,20 @@ function PlaceholderDiagram({ label }) {
   );
 }
 
-export default function SystemOperationGuide() {
+export default function SystemOperationGuide({ embedded = false }) {
+  const Wrapper = embedded ? 'div' : 'div';
+  const wrapperClass = embedded ? '' : 'bg-white border border-slate-200 rounded-lg';
+
   return (
-    <div className="bg-white border border-slate-200 rounded-lg">
-      <div className="px-6 py-4 border-b border-slate-100">
-        <h2 className="text-lg font-semibold text-slate-800">库存系统功能介绍与使用说明</h2>
-        <p className="text-sm text-slate-500 mt-1">
-          面向零基础人员，介绍系统各模块功能及日常操作步骤。
-        </p>
-      </div>
+    <div className={wrapperClass}>
+      {!embedded && (
+        <div className="px-6 py-4 border-b border-slate-100">
+          <h2 className="text-lg font-semibold text-slate-800">库存系统功能介绍与使用说明</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            面向零基础人员，介绍系统各模块功能及日常操作步骤。
+          </p>
+        </div>
+      )}
 
       <div className="p-4 md:p-6 space-y-8">
         {/* ══════════════════════════════════════════ */}
@@ -308,6 +313,38 @@ export default function SystemOperationGuide() {
                 <li>发现录错时优先使用撤销功能或按流程修正，不要直接改库存数字</li>
                 <li>重要操作前建议先创建数据库备份</li>
               </ul>
+            </div>
+          </div>
+
+          {/* 产品核对状态说明 */}
+          <div className="mb-6">
+            <div className="text-sm font-semibold text-slate-700 mb-3">产品核对状态说明</div>
+            <div className="text-xs text-slate-600 mb-3 leading-relaxed">
+              产品管理页面提供「核对状态」功能，帮助管理员在录入或编辑产品后快速判断资料是否完整。核对状态分为以下三种：
+            </div>
+            <div className="space-y-2.5">
+              <div className="flex items-start gap-2.5 p-2.5 bg-emerald-50 border border-emerald-100 rounded-md">
+                <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700 shrink-0 mt-0.5">信息完整</span>
+                <div className="text-xs text-slate-700 leading-relaxed">
+                  产品名称、SKU 编码、库存分类、存储位置、当前库存、最低库存等核心库存管理字段基本完整，可用于正式库存管理。
+                </div>
+              </div>
+              <div className="flex items-start gap-2.5 p-2.5 bg-amber-50 border border-amber-100 rounded-md">
+                <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700 shrink-0 mt-0.5">建议补充</span>
+                <div className="text-xs text-slate-700 leading-relaxed">
+                  产品可以保存和查询，但部分辅助信息建议后续补齐，例如库位、单位等。该状态用于提醒管理员完善资料，不代表系统错误。
+                </div>
+              </div>
+              <div className="flex items-start gap-2.5 p-2.5 bg-rose-50 border border-rose-100 rounded-md">
+                <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-700 shrink-0 mt-0.5">需核对</span>
+                <div className="text-xs text-slate-700 leading-relaxed">
+                  产品缺少关键字段，例如 SKU 编码、产品名称、当前库存或最低库存设置异常。建议管理员优先核对后再正式使用。
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 p-2.5 bg-slate-50 border border-slate-200 rounded-md text-xs text-slate-600 leading-relaxed">
+              <span className="font-medium text-slate-700">补充说明：</span>
+              采购价、售价如果暂时未知，可以先留空，后续核对后再补充。不建议用 0 代表未知价格，避免后续核对时误解。核对状态用于提高正式录入质量，不会强制阻止保存。
             </div>
           </div>
         </div>

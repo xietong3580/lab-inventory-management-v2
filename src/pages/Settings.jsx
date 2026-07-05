@@ -62,6 +62,7 @@ function Settings() {
   // Step 10-8B：折叠面板状态
   const [showDangerZone, setShowDangerZone] = useState(false);
   const [showDebugOptions, setShowDebugOptions] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
 
   // 获取数据源模式
   useEffect(() => {
@@ -386,8 +387,30 @@ function Settings() {
         {/* Step 10-8A：管理员维护检查 */}
         <GoLiveChecklistPanel canWrite={canWrite} />
 
-        {/* Step 10-8A：库存系统功能介绍与使用说明 */}
-        <SystemOperationGuide />
+        {/* Step 10-8A：库存系统功能介绍与使用说明（折叠） */}
+        <div className="bg-white border border-slate-200 rounded-lg">
+          <button
+            type="button"
+            onClick={() => setShowGuide(!showGuide)}
+            className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-slate-50 transition-colors"
+          >
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">库存系统功能介绍与使用说明</h2>
+              <p className="text-sm text-slate-500 mt-1">面向零基础人员，介绍系统各模块功能及日常操作步骤。</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 ml-4">
+              <span className="text-sm font-medium text-slate-500">{showGuide ? '收起说明' : '展开说明'}</span>
+              <svg className={`w-5 h-5 text-slate-400 transition-transform ${showGuide ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </button>
+          {showGuide && (
+            <div className="border-t border-slate-100">
+              <SystemOperationGuide embedded />
+            </div>
+          )}
+        </div>
 
         {/* 库存预警设置 */}
         <div className="bg-white border border-slate-200 rounded-lg">
