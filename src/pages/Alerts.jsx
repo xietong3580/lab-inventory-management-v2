@@ -180,7 +180,7 @@ function Alerts() {
     const unit = (alert.unit && String(alert.unit).trim()) || '';
     const suggestQty = Math.max(Number(alert.minStock || 0) - Number(alert.currentStock || 0), 0);
     const unitWithSpace = unit ? ` ${unit}` : '';
-    return `【库存提醒】${alert.productName}当前库存 ${alert.currentStock}${unitWithSpace}，低于最低库存 ${alert.minStock}${unitWithSpace}，建议至少补足 ${suggestQty}${unitWithSpace}。请确认是否安排采购。`;
+    return `【库存提醒】${alert.productName}当前库存 ${alert.currentStock}${unitWithSpace}，低于最低库存 ${alert.minStock}${unitWithSpace}，建议至少补足 ${suggestQty}${unitWithSpace}。请确认是否需要安排采购或补货。`;
   };
 
   // 复制提醒内容
