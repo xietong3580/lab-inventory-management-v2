@@ -625,8 +625,8 @@ function Dashboard() {
       'PRODUCT_ADD': { label: '新增产品', count: 0, color: 'bg-slate-50 text-slate-600' },
       'PRODUCT_UPDATE': { label: '编辑产品', count: 0, color: 'bg-slate-100 text-slate-600' },
       'PRODUCT_DELETE': { label: '删除产品', count: 0, color: 'bg-rose-50 text-rose-600' },
-      'TRANSACTION_ADD': { label: '出入库', count: 0, color: 'bg-amber-50 text-amber-600' },
-      'TRANSACTION_REVERSE': { label: '撤销交易', count: 0, color: 'bg-slate-100 text-slate-500' },
+      'TRANSACTION_ADD': { label: '出入库', count: 0, color: 'bg-slate-50 text-slate-600' },
+      'TRANSACTION_REVERSE': { label: '撤销交易', count: 0, color: 'bg-amber-50 text-amber-600' },
       'SYSTEM_RESET': { label: '系统重置', count: 0, color: 'bg-slate-100 text-slate-500' }
     };
 
