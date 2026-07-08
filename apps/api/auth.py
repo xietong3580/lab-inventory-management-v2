@@ -2,6 +2,7 @@
 认证模块：JWT token 创建与验证、bcrypt 密码校验、用户依赖注入
 """
 
+import os
 import bcrypt
 from datetime import datetime, timedelta
 from typing import Optional
@@ -14,7 +15,9 @@ from sqlalchemy.orm import Session
 from database import get_db, User
 
 # JWT 配置
-SECRET_KEY = "inventory-v2-jwt-secret-key-2026"  # 生产环境应使用环境变量
+# 生产环境必须通过环境变量 INVENTORY_JWT_SECRET_KEY 配置密钥
+# 以下默认值仅用于本地开发，不得用于生产
+SECRET_KEY = os.getenv("INVENTORY_JWT_SECRET_KEY", "inventory-v2-development-secret-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 480  # 8 小时
 

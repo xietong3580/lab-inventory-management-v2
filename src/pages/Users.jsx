@@ -37,6 +37,21 @@ function Users() {
     return { allowed: true, reason: '' };
   }, [canWrite, adminOnlyTitle, currentUser, activeAdminCount]);
 
+  // Step 10-20G：编辑用户时判断是否允许将角色降级为 viewer
+  const canDemoteToViewer = useCallback((targetUser) => {
+    if (!canWrite) return { allowed: false, reason: adminOnlyTitle };
+    // 不允许将自己降级
+    if (currentUser && targetUser.id === currentUser.id) {
+      return { allowed: false, reason: '不能将当前登录账号降级为只读用户' };
+    }
+    // 不允许将最后一个活跃管理员降级
+    const isActiveNow = targetUser.status !== '停用' && targetUser.is_active !== false;
+    if (targetUser.role === 'admin' && isActiveNow && activeAdminCount <= 1) {
+      return { allowed: false, reason: '至少需要保留一个启用状态的管理员' };
+    }
+    return { allowed: true, reason: '' };
+  }, [canWrite, adminOnlyTitle, currentUser, activeAdminCount]);
+
   // ==== 数据状态 ====
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -204,6 +219,15 @@ function Users() {
     if (!editForm.username.trim()) {
       setEditError('用户名不能为空');
       return;
+    }
+
+    // Step 10-20G：保存前兜底校验 — 阻止危险角色降级
+    if (editForm.role === 'viewer' && editingUser.role === 'admin') {
+      const demoteCheck = canDemoteToViewer(editingUser);
+      if (!demoteCheck.allowed) {
+        setEditError(demoteCheck.reason);
+        return;
+      }
     }
 
     setEditSubmitting(true);
@@ -764,17 +788,32 @@ function Users() {
                   placeholder="可选"
                 />
               </div>
-              {/* 角色 */}
+              {/* 角色 — Step 10-20G：前端提前阻止危险角色降级 */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">角色</label>
-                <select
-                  value={editForm.role}
-                  onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent text-sm bg-white"
-                >
-                  <option value="viewer">只读用户 (viewer)</option>
-                  <option value="admin">管理员 (admin)</option>
-                </select>
+                {(() => {
+                  const demotionCheck = editingUser ? canDemoteToViewer(editingUser) : { allowed: true, reason: '' };
+                  return (
+                    <>
+                      <select
+                        value={editForm.role}
+                        onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent text-sm bg-white"
+                        title={!demotionCheck.allowed && editForm.role === 'admin' ? demotionCheck.reason : ''}
+                      >
+                        <option value="viewer" disabled={!demotionCheck.allowed}>
+                          只读用户 (viewer){!demotionCheck.allowed ? ' — 不可用' : ''}
+                        </option>
+                        <option value="admin">管理员 (admin)</option>
+                      </select>
+                      {!demotionCheck.allowed && (
+                        <p className="mt-1.5 text-sm text-amber-600 font-medium">
+                          {demotionCheck.reason}
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
               {/* 按钮 */}
               <div className="flex justify-end gap-3 pt-2">
