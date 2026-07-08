@@ -88,6 +88,23 @@ def create_product(product_data: ProductCreate, db: Session = Depends(get_db), c
     )
 
     db.add(db_product)
+    db.flush()  # 获取自增 ID
+
+    # Step 10-21B：审计日志 — PRODUCT_ADD
+    operator = current_user.display_name or current_user.username
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    audit_log = AuditLog(
+        action_type="PRODUCT_ADD",
+        product_name=db_product.name,
+        product_id=f"prod-{db_product.id:06d}",
+        operator=operator,
+        timestamp=now_str,
+        details=f"新增产品：{db_product.name}（SKU: {db_product.sku}），"
+                f"当前库存: {db_product.current_stock} {db_product.unit}，"
+                f"分类: {db_product.category or '-'}",
+    )
+    db.add(audit_log)
+
     db.commit()
     db.refresh(db_product)
 
@@ -154,6 +171,21 @@ def update_product(
     # 重新计算状态
     product.status = "低库存" if product.current_stock <= product.min_stock else "正常"
     product.last_updated = datetime.now().strftime("%Y-%m-%d")
+
+    # Step 10-21B：审计日志 — PRODUCT_UPDATE
+    operator = current_user.display_name or current_user.username
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    audit_log = AuditLog(
+        action_type="PRODUCT_UPDATE",
+        product_name=product.name,
+        product_id=product_id,
+        operator=operator,
+        timestamp=now_str,
+        details=f"编辑产品：{product.name}（SKU: {product.sku}），"
+                f"当前库存: {product.current_stock} {product.unit}，"
+                f"分类: {product.category or '-'}",
+    )
+    db.add(audit_log)
 
     db.commit()
     db.refresh(product)
