@@ -632,7 +632,7 @@ const getProductByName = (productName) => {
 };
 
 /**
- * 重置本地存储数据到初始 mock 数据
+ * 重置本地缓存数据到初始状态
  * @returns {Object} 重置结果
  */
 export const resetStorageData = () => {
@@ -657,24 +657,24 @@ export const resetStorageData = () => {
         resetTime: getCurrentDateTimeWithSeconds(),
         initialProductsCount: products.length,
         initialTransactionsCount: transactions.length,
-        summary: '系统数据已重置为初始 mock 数据'
+        summary: '本地缓存数据已恢复为初始状态'
       }
     );
 
-    console.log('[productService] 本地存储数据已重置为初始 mock 数据');
+    console.log('[productService] 本地缓存数据已恢复为初始状态');
 
     return {
       success: true,
-      message: '本地存储数据已重置为初始 mock 数据',
+      message: '本地缓存数据已恢复为初始状态',
       productsCount: products.length,
       transactionsCount: transactions.length,
       auditLogsCount: auditLogs.length
     };
   } catch (error) {
-    console.error('[productService] 重置本地存储数据失败:', error);
+    console.error('[productService] 恢复本地缓存数据失败:', error);
     return {
       success: false,
-      message: `重置失败: ${error.message}`,
+      message: `恢复失败: ${error.message}`,
       error: error
     };
   }

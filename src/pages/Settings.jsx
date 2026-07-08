@@ -43,11 +43,13 @@ function Settings() {
   const [resetPreviewResult, setResetPreviewResult] = useState(null);
   const [isLoadingResetPreview, setIsLoadingResetPreview] = useState(false);
   const [resetPreviewError, setResetPreviewError] = useState('');
-  // 清空测试业务数据相关状态
+  // 清空当前业务数据相关状态
   const [resetBusinessConfirmText, setResetBusinessConfirmText] = useState('');
   const [isResettingBusiness, setIsResettingBusiness] = useState(false);
   const [resetBusinessResult, setResetBusinessResult] = useState(null);
   const [resetBusinessError, setResetBusinessError] = useState('');
+  // Step 10-20F：清空业务数据最终确认弹窗（替代 window.confirm）
+  const [showBusinessClearConfirm, setShowBusinessClearConfirm] = useState(false);
   // Step 10-7A：恢复预检相关状态
   const [restoreCandidates, setRestoreCandidates] = useState([]);
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
@@ -340,22 +342,22 @@ function Settings() {
     }
   };
 
-  // 执行清空测试业务数据
-  const handleResetBusinessData = async () => {
-    // 浏览器二次确认
-    const confirmed = window.confirm(
-      '⚠️ 危险操作确认\n\n' +
-      '即将清空当前系统中的所有业务数据，包括：\n' +
-      '• 产品与库存数据\n' +
-      '• 出入库记录\n' +
-      '• 库存台账\n' +
-      '• 审计日志\n\n' +
-      '系统会先自动创建数据库备份，成功后才执行清空。\n' +
-      '用户账号、系统设置和备份文件不会被清空。\n\n' +
-      '此操作不可撤销，确定要继续吗？'
-    );
-    if (!confirmed) return;
+  // Step 10-20F：打开清空业务数据最终确认弹窗（替代 window.confirm）
+  const handleResetBusinessData = () => {
+    setResetBusinessError('');
+    setResetBusinessResult(null);
+    setShowBusinessClearConfirm(true);
+  };
 
+  // 关闭清空最终确认弹窗
+  const handleCancelBusinessClear = () => {
+    setShowBusinessClearConfirm(false);
+    setResetBusinessError('');
+  };
+
+  // 确认执行清空当前业务数据
+  const handleConfirmBusinessClear = async () => {
+    setShowBusinessClearConfirm(false);
     setIsResettingBusiness(true);
     setResetBusinessResult(null);
     setResetBusinessError('');
@@ -1474,7 +1476,7 @@ function Settings() {
                 {showDebugOptions && (
                   <div className="mt-4">
                     <p className="text-sm text-slate-600 mb-3">
-                      重置本地缓存数据。此操作将清空当前浏览器中的本地缓存数据，恢复为初始状态。仅用于本地运行环境排查问题，正式使用时一般不需要操作。
+                      恢复本地缓存初始状态。此操作将清空当前浏览器中的本地缓存数据，恢复为初始状态。仅用于本地运行环境排查问题，正式使用时一般不需要操作。
                     </p>
                     <button
                       onClick={handleOpenResetConfirm}
@@ -1484,7 +1486,7 @@ function Settings() {
                         !canWrite ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
                     >
-                      重置本地缓存数据
+                      恢复本地缓存初始状态
                     </button>
                   </div>
                 )}
@@ -1644,7 +1646,7 @@ function Settings() {
                     </li>
                     <li className="flex items-start">
                       <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 mr-2"></span>
-                      <span>此操作不可逆，备份文件需手动管理</span>
+                      <span>备份文件需妥善保管，建议定期下载至本地</span>
                     </li>
                   </ul>
                 </div>
@@ -1693,13 +1695,81 @@ function Settings() {
         </div>
       )}
 
+      {/* Step 10-20F：清空当前业务数据最终确认弹窗（替代 window.confirm） */}
+      {showBusinessClearConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="px-6 py-4 border-b border-slate-200">
+              <h2 className="text-lg font-semibold text-slate-800">最终确认清空当前业务数据</h2>
+            </div>
+            <div className="p-4 md:p-6">
+              <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-md mb-4">
+                <div className="flex items-start">
+                  <div className="shrink-0 mr-3 mt-0.5">
+                    <div className="w-5 h-5 rounded-full bg-rose-100 flex items-center justify-center">
+                      <span className="text-xs font-bold text-rose-600">!</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-rose-800 mb-1">高风险操作</div>
+                    <div className="text-sm text-rose-700">
+                      该操作将清空当前业务数据且不可撤销。系统已要求先创建备份并校验确认短语，请确认是否继续。
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="text-sm text-slate-700 mb-4">
+                <p className="font-medium text-slate-800 mb-2">清空范围：</p>
+                <ul className="space-y-2 pl-5">
+                  <li className="flex items-start">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-500 mt-1.5 mr-2"></span>
+                    <span>产品与库存数据</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-500 mt-1.5 mr-2"></span>
+                    <span>出入库记录</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-500 mt-1.5 mr-2"></span>
+                    <span>库存台账</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-500 mt-1.5 mr-2"></span>
+                    <span>审计日志</span>
+                  </li>
+                </ul>
+                <div className="mt-3 text-sm text-slate-500">
+                  系统会先自动创建数据库备份，成功后才执行清空。用户账号、系统设置和备份文件不会被清空。
+                </div>
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={handleCancelBusinessClear}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmBusinessClear}
+                  className="px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-700 transition-colors font-medium"
+                >
+                  确认清空
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 重置确认对话框 */}
       {showResetConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
             <div className="px-6 py-4 border-b border-slate-200">
               <h2 className="text-xl font-semibold text-slate-800">
-                确认重置本地缓存数据
+                确认恢复本地缓存初始状态
               </h2>
             </div>
             <div className="p-4 md:p-6">
@@ -1804,10 +1874,10 @@ function Settings() {
                   {isResetting ? (
                     <>
                       <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                      重置中...
+                      恢复中...
                     </>
                   ) : (
-                    '确认重置'
+                    '确认恢复'
                   )}
                 </button>
               </div>
