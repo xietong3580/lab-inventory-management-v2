@@ -646,13 +646,13 @@ def reset_business_data(req: ResetBusinessDataRequest, admin=Depends(require_adm
     清空范围：products / transactions / audit_logs
     保留范围：users / settings / 备份文件
     """
-    CONFIRMATION_PHRASE = "清空测试业务数据"
+    CONFIRMATION_PHRASE = "清空当前业务数据"
 
     # ── 1. 校验 confirmation 短语 ──
     if req.confirmation != CONFIRMATION_PHRASE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="确认短语不匹配，操作已拒绝。请输入「清空测试业务数据」。",
+            detail="确认短语不匹配，操作已拒绝。请输入「清空当前业务数据」。",
         )
 
     # ── 2. 数据库文件存在检查 ──
@@ -1521,7 +1521,7 @@ def restore_prepare(
 # ═══════════════════════════════════════════════════════════
 
 @router.get("/go-live-checklist", response_model=GoLiveChecklistResponse)
-def go_live_checklist():
+def go_live_checklist(user=Depends(get_current_user)):
     """
     管理员维护检查：只读状态总览（所有登录用户可访问，只读）。
 

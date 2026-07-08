@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { userService } from '../services/dataService';
 import { usePermission } from '../hooks/usePermission';
+import { useAuth } from '../contexts/AuthContext';
 
 // 角色值英文 → 中文显示映射
 const ROLE_DISPLAY = {
@@ -10,6 +11,31 @@ const ROLE_DISPLAY = {
 
 function Users() {
   const { canWrite, adminOnlyTitle, isAdmin } = usePermission();
+  const { currentUser } = useAuth();
+
+  // Step 10-20B：活跃管理员计数（用于最后管理员停用防护）
+  const activeAdminCount = useMemo(() => {
+    return users.filter(u =>
+      u.role === 'admin' &&
+      u.status !== '停用' &&
+      u.is_active !== false
+    ).length;
+  }, [users]);
+
+  // Step 10-20B：判断是否允许停用/启用目标用户
+  const canToggleUserStatus = useCallback((user) => {
+    if (!canWrite) return { allowed: false, reason: adminOnlyTitle };
+    // 不允许停用当前登录账号
+    if (currentUser && user.id === currentUser.id) {
+      return { allowed: false, reason: '不能停用当前登录账号' };
+    }
+    // 不允许停用最后一个活跃管理员
+    const isActiveNow = user.status !== '停用' && user.is_active !== false;
+    if (user.role === 'admin' && isActiveNow && activeAdminCount <= 1) {
+      return { allowed: false, reason: '至少需要保留一个启用状态的管理员' };
+    }
+    return { allowed: true, reason: '' };
+  }, [canWrite, adminOnlyTitle, currentUser, activeAdminCount]);
 
   // ==== 数据状态 ====
   const [users, setUsers] = useState([]);
@@ -215,7 +241,12 @@ function Users() {
   // ============================================================================
   // 启用 / 停用用户
   // ============================================================================
-  const handleToggleClick = (user) => setStatusConfirmUser(user);
+  const handleToggleClick = (user) => {
+    // Step 10-20B：前端自停用与最后管理员停用防护
+    const { allowed } = canToggleUserStatus(user);
+    if (!allowed) return;
+    setStatusConfirmUser(user);
+  };
 
   const handleToggleCancel = () => setStatusConfirmUser(null);
 
@@ -471,15 +502,20 @@ function Users() {
                           >
                             编辑
                           </button>
-                          {/* 启用 / 停用 */}
-                          <button
-                            onClick={canWrite ? () => handleToggleClick(user) : undefined}
-                            disabled={!canWrite}
-                            title={!canWrite ? adminOnlyTitle : ''}
-                            className={`px-2 py-1.5 text-sm bg-slate-50 text-rose-600 border border-rose-200 rounded hover:bg-rose-50 transition-colors whitespace-nowrap shrink-0 ${disabledBtnClass}`}
-                          >
-                            {user.status === '停用' || user.is_active === false ? '启用' : '停用'}
-                          </button>
+                          {/* 启用 / 停用 — Step 10-20B：前端自停用与最后管理员停用防护 */}
+                          {(() => {
+                            const t = canToggleUserStatus(user);
+                            return (
+                              <button
+                                onClick={t.allowed ? () => handleToggleClick(user) : undefined}
+                                disabled={!t.allowed}
+                                title={!t.allowed ? t.reason : ''}
+                                className={`px-2 py-1.5 text-sm bg-slate-50 text-rose-600 border border-rose-200 rounded hover:bg-rose-50 transition-colors whitespace-nowrap shrink-0 ${disabledBtnClass}`}
+                              >
+                                {user.status === '停用' || user.is_active === false ? '启用' : '停用'}
+                              </button>
+                            );
+                          })()}
                           {/* 重置密码 */}
                           <button
                             onClick={canWrite ? () => openPwdModal(user) : undefined}
