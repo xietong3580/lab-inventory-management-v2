@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
 
-from database import get_db, Product, User
+from database import get_db, Product, User, Transaction, AuditLog
 from schemas import ProductCreate, ProductUpdate, ProductResponse
 from auth import get_current_user, require_admin
 
@@ -162,7 +162,7 @@ def update_product(
 
 @router.delete("/{product_id}")
 def delete_product(product_id: str, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
-    """删除产品（需管理员权限）"""
+    """删除产品（需管理员权限，有关联交易记录时禁止删除）"""
     try:
         if product_id.startswith("prod-"):
             db_id = int(product_id[5:])
@@ -174,6 +174,38 @@ def delete_product(product_id: str, db: Session = Depends(get_db), current_user:
     product = db.query(Product).filter(Product.id == db_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="产品未找到")
+
+    # Step 10-20C：删除前检查关联交易记录
+    related_txn_count = db.query(Transaction).filter(
+        Transaction.product_id == db_id
+    ).count()
+
+    if related_txn_count > 0:
+        raise HTTPException(
+            status_code=409,
+            detail="该产品已有出入库记录，不能直接删除。请保留产品档案以保证库存台账和审计记录完整。",
+        )
+
+    # 记录删除前产品信息（用于审计日志）
+    operator = current_user.display_name or current_user.username
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    audit_details = (
+        f"删除产品：{product.name}（SKU: {product.sku}），"
+        f"当前库存: {product.current_stock} {product.unit}，"
+        f"分类: {product.category or '-'}，"
+        f"操作人: {operator}"
+    )
+
+    # 在同一事务中：写审计日志 → 删除产品 → 提交
+    audit_log = AuditLog(
+        action_type="PRODUCT_DELETE",
+        product_name=product.name,
+        product_id=product_id,
+        operator=operator,
+        timestamp=now_str,
+        details=audit_details,
+    )
+    db.add(audit_log)
 
     db.delete(product)
     db.commit()

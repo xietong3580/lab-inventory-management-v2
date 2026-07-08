@@ -161,6 +161,8 @@ function Products() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [deletingId, setDeletingId] = useState(null); // 正在删除的产品 ID
+  const [deleteConfirmProduct, setDeleteConfirmProduct] = useState(null); // Step 10-20C：删除确认弹窗
+  const [deleteError, setDeleteError] = useState(''); // Step 10-20C：删除错误提示
   const [actionMessage, setActionMessage] = useState(null); // { type: 'success'|'error', text: '...' }
 
   // 导出前安全检查相关状态
@@ -677,42 +679,47 @@ function Products() {
     }
   };
 
-  const handleDeleteProduct = async (productId) => {
-    if (!canWrite || deletingId) return; // viewer 不可删除，防重复点击
+  const handleDeleteProduct = (productId) => {
+    if (!canWrite) return; // viewer 不可删除
     const product = allProducts.find(p => p.id === productId);
     if (!product) return;
+    // Step 10-20C：打开系统内确认弹窗，代替原生 confirm
+    setDeleteError('');
+    setDeleteConfirmProduct(product);
+  };
 
-    if (!confirm(`确定要删除产品 "${product.name}"(${product.sku}) 吗？此操作不可撤销。`)) {
-      return;
-    }
+  // Step 10-20C：确认删除（弹窗内点击"确认删除"后调用）
+  const handleConfirmDelete = async () => {
+    if (!canWrite || deletingId) return;
+    const product = deleteConfirmProduct;
+    if (!product) return;
 
-    setDeletingId(productId);
+    setDeleteError('');
+    setDeletingId(product.id);
     try {
-      const success = await dataProductService.deleteProduct(productId);
-      if (success) {
-        setAllProducts(allProducts.filter(p => p.id !== productId));
-        setActionMessage({ type: 'success', text: `已删除「${product.name}」` });
-        setTimeout(() => setActionMessage(null), 3000);
-      }
+      await dataProductService.deleteProduct(product.id);
+      // API 删除成功
+      setAllProducts(prev => prev.filter(p => p.id !== product.id));
+      setActionMessage({ type: 'success', text: '产品已删除' });
+      setTimeout(() => setActionMessage(null), 3000);
+      setDeleteConfirmProduct(null);
     } catch (error) {
-      console.error('删除产品失败:', error);
-      // 降级使用原同步方法
-      try {
-        const fallbackSuccess = deleteProduct(productId);
-        if (fallbackSuccess) {
-          setAllProducts(allProducts.filter(p => p.id !== productId));
-          setActionMessage({ type: 'success', text: `已删除「${product.name}」` });
-          setTimeout(() => setActionMessage(null), 3000);
-        } else {
-          setActionMessage({ type: 'error', text: '删除失败，请稍后重试' });
-        }
-      } catch (fallbackErr) {
-        console.error('降级删除也失败:', fallbackErr);
-        setActionMessage({ type: 'error', text: '删除失败，请稍后重试' });
+      // Step 10-20C：API 失败时不再静默降级到 localStorage
+      const errMsg = error.message || '';
+      if (errMsg.includes('409') || errMsg.includes('出入库记录') || errMsg.includes('不能直接删除')) {
+        setDeleteError('该产品已有出入库记录，不能直接删除。请保留产品档案以保证库存台账完整。');
+      } else {
+        setDeleteError(errMsg || '删除失败，请稍后重试或联系管理员。');
       }
     } finally {
       setDeletingId(null);
     }
+  };
+
+  // Step 10-20C：关闭删除确认弹窗
+  const handleCancelDelete = () => {
+    setDeleteConfirmProduct(null);
+    setDeleteError('');
   };
 
   // 打开台账弹窗
@@ -1994,6 +2001,70 @@ function Products() {
                 className="px-4 py-2 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors font-medium"
               >
                 关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 10-20C：删除产品确认弹窗 */}
+      {deleteConfirmProduct && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="px-6 py-4 border-b border-slate-200">
+              <h2 className="text-lg font-semibold text-slate-800">确认删除产品</h2>
+            </div>
+            <div className="p-6 space-y-3">
+              {/* 产品信息 */}
+              <div className="flex justify-between">
+                <span className="text-sm text-slate-500">产品名称</span>
+                <span className="text-sm font-medium text-slate-800">{deleteConfirmProduct.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-slate-500">SKU</span>
+                <span className="text-sm font-medium text-slate-800">{deleteConfirmProduct.sku || '—'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-slate-500">当前库存</span>
+                <span className="text-sm font-medium text-slate-800">
+                  {deleteConfirmProduct.currentStock}{deleteConfirmProduct.unit ? ` ${deleteConfirmProduct.unit}` : ''}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-slate-500">库存分类</span>
+                <span className="text-sm font-medium text-slate-800">{deleteConfirmProduct.category || '—'}</span>
+              </div>
+              {/* 风险提示 */}
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
+                <div className="text-sm text-amber-800 leading-relaxed">
+                  删除后该产品将不再出现在产品列表中。已有出入库记录的产品系统会阻止删除，以保证台账完整。
+                </div>
+              </div>
+              {/* 删除错误 */}
+              {deleteError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-md">
+                  <div className="text-sm text-rose-700 leading-relaxed">{deleteError}</div>
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+              <button
+                onClick={handleCancelDelete}
+                disabled={!!deletingId}
+                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={!!deletingId}
+                className={`px-4 py-2 text-white rounded-md transition-colors font-medium ${
+                  deletingId
+                    ? 'bg-rose-300 cursor-wait'
+                    : 'bg-rose-600 hover:bg-rose-700'
+                }`}
+              >
+                {deletingId ? '删除中...' : '确认删除'}
               </button>
             </div>
           </div>
