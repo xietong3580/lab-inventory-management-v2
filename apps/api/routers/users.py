@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime
 
-from database import get_db, User
+from database import get_db, User, AuditLog
 from auth import get_current_user, require_admin, get_password_hash
 from schemas import UserCreate, UserUpdate, UserStatusUpdate, UserPasswordReset
 
@@ -136,6 +136,23 @@ def create_user(
         status="活跃",
     )
     db.add(new_user)
+    db.flush()  # 获取自增 ID，确保审计日志与用户创建同一事务
+
+    # Step 10-20D：审计日志
+    operator = current_user.display_name or current_user.username
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    audit_log = AuditLog(
+        action_type="USER_CREATE",
+        product_name=new_user.username,
+        product_id=f"user-{new_user.id:06d}",
+        operator=operator,
+        timestamp=now_str,
+        details=f"新增用户：{new_user.username}，"
+                f"显示名称: {new_user.display_name or new_user.username}，"
+                f"角色: {new_user.role}",
+    )
+    db.add(audit_log)
+
     db.commit()
     db.refresh(new_user)
 
@@ -195,6 +212,21 @@ def update_user(
     if body.role is not None:
         user.role = body.role
 
+    # Step 10-20D：审计日志
+    operator = current_user.display_name or current_user.username
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    audit_log = AuditLog(
+        action_type="USER_UPDATE",
+        product_name=user.username,
+        product_id=user_id,
+        operator=operator,
+        timestamp=now_str,
+        details=f"编辑用户：{user.username}，"
+                f"显示名称: {user.display_name or user.username}，"
+                f"角色: {user.role}",
+    )
+    db.add(audit_log)
+
     db.commit()
     db.refresh(user)
 
@@ -230,6 +262,21 @@ def update_user_status(
     user.is_active = body.is_active
     user.status = "活跃" if body.is_active else "停用"
 
+    # Step 10-20D：审计日志
+    operator = current_user.display_name or current_user.username
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    new_status = "启用" if body.is_active else "停用"
+    audit_log = AuditLog(
+        action_type="USER_STATUS_CHANGE",
+        product_name=user.username,
+        product_id=user_id,
+        operator=operator,
+        timestamp=now_str,
+        details=f"用户状态变更：{user.username} → {new_status}，"
+                f"角色: {user.role}",
+    )
+    db.add(audit_log)
+
     db.commit()
     db.refresh(user)
 
@@ -248,6 +295,20 @@ def reset_user_password(
 
     # 使用与认证模块一致的 bcrypt 哈希
     user.password_hash = get_password_hash(body.new_password)
+
+    # Step 10-20D：审计日志（不记录密码）
+    operator = current_user.display_name or current_user.username
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    audit_log = AuditLog(
+        action_type="USER_PASSWORD_RESET",
+        product_name=user.username,
+        product_id=user_id,
+        operator=operator,
+        timestamp=now_str,
+        details=f"重置密码：{user.username}，"
+                f"角色: {user.role}",
+    )
+    db.add(audit_log)
 
     db.commit()
     db.refresh(user)

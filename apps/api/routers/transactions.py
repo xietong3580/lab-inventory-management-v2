@@ -183,10 +183,7 @@ def reverse_transaction(transaction_id: str, request_data: dict = None, db: Sess
     transaction.reversed_at = datetime.now().strftime("%Y-%m-%d %H:%M")
     transaction.reversed_by = reversed_by
 
-    db.commit()
-    db.refresh(transaction)
-
-    # 创建审计日志（交易撤销）
+    # Step 10-20D：审计日志与撤销在同一事务中提交
     audit_log = AuditLog(
         action_type='TRANSACTION_REVERSE',
         product_name=product.name,
@@ -196,6 +193,8 @@ def reverse_transaction(transaction_id: str, request_data: dict = None, db: Sess
         details=f"撤销{transaction.type}交易，数量: {transaction.quantity} {product.unit}"
     )
     db.add(audit_log)
+
     db.commit()
+    db.refresh(transaction)
 
     return transaction.to_dict()

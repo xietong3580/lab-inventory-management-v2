@@ -13,8 +13,9 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from database import BASE_DIR
+from database import BASE_DIR, get_db, AuditLog
 from auth import require_admin
 
 router = APIRouter()
@@ -144,7 +145,7 @@ def _safe_validate_filename(filename: str) -> str:
 
 
 @router.post("/manual", response_model=BackupResponse)
-def manual_backup(admin: str = Depends(require_admin)):
+def manual_backup(admin=Depends(require_admin), db: Session = Depends(get_db)):
     """
     手动触发数据库备份（仅管理员）
 
@@ -206,6 +207,20 @@ def manual_backup(admin: str = Depends(require_admin)):
 
     # 相对路径（相对于 BASE_DIR）
     relative_path = f"backups/{filename}"
+
+    # Step 10-20D：审计日志
+    operator = admin.display_name or admin.username
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    audit_log = AuditLog(
+        action_type="BACKUP_CREATE",
+        product_name=f"数据库备份: {filename}",
+        product_id="",
+        operator=operator,
+        timestamp=now_str,
+        details=f"创建数据库备份：{filename}，大小: {final_size:,} 字节",
+    )
+    db.add(audit_log)
+    db.commit()
 
     return BackupResponse(
         success=True,

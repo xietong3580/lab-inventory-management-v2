@@ -10,6 +10,13 @@ export const actionTypeMap = {
   SYSTEM_RESET: { label: '系统重置', color: 'bg-slate-100 text-slate-500' },
   PRODUCTS_CSV_IMPORT: { label: '批量导入', color: 'bg-slate-100 text-slate-600 border border-slate-200' },
   RESTORE_PREPARE: { label: '恢复准备', color: 'bg-slate-50 text-slate-600' },
+  // Step 10-20D：新增操作类型
+  USER_CREATE: { label: '新增用户', color: 'bg-slate-50 text-slate-600' },
+  USER_UPDATE: { label: '编辑用户', color: 'bg-slate-100 text-slate-600' },
+  USER_STATUS_CHANGE: { label: '用户状态变更', color: 'bg-amber-50 text-amber-600' },
+  USER_PASSWORD_RESET: { label: '重置密码', color: 'bg-amber-50 text-amber-600' },
+  BACKUP_CREATE: { label: '创建备份', color: 'bg-slate-50 text-slate-600' },
+  BUSINESS_DATA_CLEAR: { label: '清空当前业务数据', color: 'bg-rose-50 text-rose-600' },
 };
 
 /**
@@ -96,6 +103,19 @@ export const generateAuditSummary = (log, compact = false) => {
       parts.push('未执行真实恢复');
       return parts.join('，');
     }
+    // Step 10-20D：新增操作类型摘要
+    case 'USER_CREATE':
+      return compact ? `新增用户「${productName || ''}」` : `新增用户「${productName || ''}」`;
+    case 'USER_UPDATE':
+      return compact ? `编辑用户「${productName || ''}」` : `编辑用户「${productName || ''}」`;
+    case 'USER_STATUS_CHANGE':
+      return compact ? `变更用户状态「${productName || ''}」` : `变更用户状态「${productName || ''}」`;
+    case 'USER_PASSWORD_RESET':
+      return compact ? `重置密码「${productName || ''}」` : `重置密码「${productName || ''}」`;
+    case 'BACKUP_CREATE':
+      return compact ? `创建数据库备份` : `创建数据库备份${productName ? `「${productName}」` : ''}`;
+    case 'BUSINESS_DATA_CLEAR':
+      return `清空当前业务数据（操作人: ${log.operator || ''}）`;
     default:
       return `${actionLabel}操作`;
   }

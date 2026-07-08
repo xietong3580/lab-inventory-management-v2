@@ -19,8 +19,9 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
-from database import BASE_DIR
+from database import BASE_DIR, get_db, AuditLog
 from auth import get_current_user, require_admin
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -401,7 +402,7 @@ def preflight_check(user=Depends(get_current_user)):
 
 
 @router.post("/backups", response_model=MaintenanceBackupResponse)
-def create_backup(admin=Depends(require_admin)):
+def create_backup(admin=Depends(require_admin), db: Session = Depends(get_db)):
     """
     创建数据库物理备份（仅管理员）。
 
@@ -444,6 +445,20 @@ def create_backup(admin=Depends(require_admin)):
 
     # ── 5. 确认备份文件大小 ──
     size_bytes = backup_path.stat().st_size
+
+    # Step 10-20D：审计日志
+    operator = admin.display_name or admin.username
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    audit_log = AuditLog(
+        action_type="BACKUP_CREATE",
+        product_name=f"数据库备份: {filename}",
+        product_id="",
+        operator=operator,
+        timestamp=now_str,
+        details=f"创建数据库备份：{filename}，大小: {size_bytes:,} 字节",
+    )
+    db.add(audit_log)
+    db.commit()
 
     return MaintenanceBackupResponse(
         success=True,
@@ -748,6 +763,35 @@ def reset_business_data(req: ResetBusinessDataRequest, admin=Depends(require_adm
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"清空后数据统计失败：{e}",
         )
+
+    # ── 7.5 Step 10-20D：写入清空审计日志（在 audit_logs 清空之后）──
+    operator = admin.display_name or admin.username
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    clear_details = json.dumps({
+        "action": "business_data_clear",
+        "before": before_counts,
+        "backup_filename": backup_filename,
+        "operator": operator,
+    }, ensure_ascii=False)
+    try:
+        audit_conn = sqlite3.connect(str(DB_PATH))
+        audit_conn.execute(
+            "INSERT INTO audit_logs (action_type, product_name, product_id, operator, timestamp, details, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                "BUSINESS_DATA_CLEAR",
+                "清空当前业务数据",
+                "",
+                operator,
+                now_str,
+                clear_details,
+                now_str,
+            ),
+        )
+        audit_conn.commit()
+        audit_conn.close()
+    except sqlite3.Error:
+        pass  # 审计日志写入失败不影响清空流程返回
 
     # ── 8. 运行 preflight 检查 ──
     preflight_warnings: List[str] = []
