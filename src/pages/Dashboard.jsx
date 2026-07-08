@@ -8,6 +8,7 @@ import {
   getActionConfig,
   actionTypeMap
 } from '../utils/auditLogHelpers';
+import { calculateUrgency, getRecentDates, extractDatePart } from '../utils/inventoryHelpers';
 import InventoryTrendChart from '../components/dashboard/InventoryTrendChart';
 import TransactionCompareChart from '../components/dashboard/TransactionCompareChart';
 import RiskDistributionChart from '../components/dashboard/RiskDistributionChart';
@@ -330,13 +331,7 @@ function Dashboard() {
     error: null
   });
 
-  // 计算紧急程度（根据库存百分比）
-  const calculateUrgency = (product) => {
-    const ratio = product.currentStock / product.minStock;
-    if (ratio <= 0.2) return 'high';
-    if (ratio <= 0.5) return 'medium';
-    return 'low';
-  };
+  // Step 10-21D：calculateUrgency 从 inventoryHelpers 导入，不再内联定义
 
   // 通过统一服务层获取产品数据
   useEffect(() => {
@@ -504,28 +499,7 @@ function Dashboard() {
       urgency: calculateUrgency(product)
     }));
 
-    // 获取最近N天的日期范围
-    const getRecentDates = (days = 7) => {
-      const dates = [];
-      for (let i = days - 1; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        dates.push(date.toISOString().split('T')[0]); // YYYY-MM-DD
-      }
-      return dates;
-    };
-
-    // 从日期时间字符串中提取日期部分（YYYY-MM-DD）
-    const extractDatePart = (dateTimeStr) => {
-      if (!dateTimeStr) return '';
-      // 支持多种格式: "2026-03-29 14:30"、"2026-03-29"、ISO格式 "2026-03-29T14:30:00Z"
-      if (dateTimeStr.includes(' ')) {
-        return dateTimeStr.split(' ')[0];
-      } else if (dateTimeStr.includes('T')) {
-        return dateTimeStr.split('T')[0];
-      }
-      return dateTimeStr; // 已经是日期格式
-    };
+    // Step 10-21D：getRecentDates / extractDatePart 从 inventoryHelpers 导入
 
     // 根据时间范围获取要统计的日期列表
     let dateRange = [];

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { productService } from '../services/dataService';
 import { usePermission } from '../hooks/usePermission';
+import { calculateUrgency } from '../utils/inventoryHelpers';
 
 // 紧急程度标签组件
 function UrgencyBadge({ urgency }) {
@@ -60,15 +61,7 @@ function Alerts() {
   const [copyText, setCopyText] = useState('');            // 复制状态反馈
   const itemsPerPage = 8;
 
-  // 计算紧急程度（根据库存百分比）
-  const calculateUrgency = (product) => {
-    const current = Number(product.currentStock) || 0;
-    const min = Number(product.minStock) || 1; // 避免除以0
-    const ratio = current / min;
-    if (ratio <= 0.2) return 'high';
-    if (ratio <= 0.5) return 'medium';
-    return 'low';
-  };
+  // Step 10-21D：calculateUrgency 从 inventoryHelpers 导入，不再内联定义
 
   // 产品数据状态（通过统一服务层获取）
   const [productsData, setProductsData] = useState({
