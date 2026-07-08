@@ -116,6 +116,13 @@ function Transactions() {
   }, []);
 
   // 筛选交易记录
+  // Step 10-20E：出库库存不足计算（用于提交按钮禁用和即时提示）
+  const stockInsufficient = useMemo(() => {
+    if (formData.type !== '出库') return false;
+    if (!selectedProduct) return false;
+    return Number(formData.quantity) > selectedProduct.currentStock;
+  }, [formData.type, formData.quantity, selectedProduct]);
+
   const filteredRecords = useMemo(() => {
     let filtered = [...transactionRecords];
 
@@ -374,6 +381,19 @@ function Transactions() {
     if (!formData.operator.trim()) {
       setFormError('请输入操作人');
       return;
+    }
+
+    // Step 10-20E：出库库存不足时前端直接禁止提交
+    if (formData.type === '出库' && selectedProduct) {
+      if (Number(formData.quantity) > selectedProduct.currentStock) {
+        setFormError(
+          `当前库存不足，无法提交出库记录。` +
+          `当前库存: ${selectedProduct.currentStock} ${selectedProduct.unit || ''}，` +
+          `出库数量: ${formData.quantity} ${selectedProduct.unit || ''}。` +
+          `请调整数量或先完成入库。`
+        );
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -1136,16 +1156,21 @@ function Transactions() {
                           </span>
                         </div>
                       </div>
-                      {/* 出库操作库存不足即时提示 */}
-                      {formData.type === '出库' && selectedProduct.currentStock < Number(formData.quantity) && (
+                      {/* Step 10-20E：出库操作库存不足即时提示 + 提交拦截 */}
+                      {stockInsufficient && (
                         <div className="mt-2 pt-2 border-t border-slate-200">
-                          <div className="flex items-start">
-                            <svg className="w-4 h-4 text-rose-500 mt-0.5 mr-1.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                            </svg>
-                            <span className="text-xs text-rose-700">
-                              库存不足，当前库存 {selectedProduct.currentStock} {selectedProduct.unit}，无法满足出库数量
-                            </span>
+                          <div className="p-3 bg-rose-50 border border-rose-200 rounded-md">
+                            <div className="flex items-start">
+                              <svg className="w-4 h-4 text-rose-500 mt-0.5 mr-1.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                              </svg>
+                              <div>
+                                <div className="text-sm font-medium text-rose-800 mb-0.5">库存不足，无法提交出库记录</div>
+                                <div className="text-sm text-rose-700">
+                                  当前库存 {selectedProduct.currentStock} {selectedProduct.unit}，无法满足出库数量 {formData.quantity} {selectedProduct.unit}。请调整数量或先完成入库。
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -1233,7 +1258,8 @@ function Transactions() {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSaving}
+                  disabled={isSaving || stockInsufficient}
+                  title={stockInsufficient ? `当前库存不足，无法提交出库记录。当前库存: ${selectedProduct?.currentStock || 0} ${selectedProduct?.unit || ''}，出库数量: ${formData.quantity} ${selectedProduct?.unit || ''}。请调整数量或先完成入库。` : ''}
                   className={`px-4 py-2 rounded-md transition-colors font-medium ${
                     isSaving
                       ? 'bg-slate-400 text-white cursor-not-allowed'
@@ -1277,29 +1303,74 @@ function Transactions() {
               )}
 
               <div className="text-slate-700 mb-6">
-                <p className="font-medium text-slate-800 mb-3">您确定要撤销此交易记录吗？</p>
-                <div className="bg-slate-50 border border-slate-200 rounded-md p-4 mb-4">
-                  <div className="text-sm font-medium text-slate-700 mb-2">此操作将执行以下业务规则：</div>
-                  <ul className="text-sm space-y-2">
-                    <li className="flex items-start">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 mr-2"></span>
-                      <span><span className="font-medium">库存回滚：</span>根据交易类型调整产品库存</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 mr-2"></span>
-                      <span><span className="font-medium">状态更新：</span>交易记录状态将改为"已撤销"</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 mr-2"></span>
-                      <span><span className="font-medium">业务验证：</span>系统将检查库存安全规则（库存不能为负数）</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 mr-2"></span>
-                      <span><span className="font-medium">不可逆：</span>撤销后无法恢复，请谨慎操作</span>
-                    </li>
-                  </ul>
-                </div>
-                <p className="text-sm text-slate-600">如果遇到库存不足等情况，系统会显示明确的业务规则提示。</p>
+                {/* Step 10-20E：显示具体交易信息 */}
+                {(() => {
+                  const reversingTx = transactionRecords.find(t => t.id === reversingTransactionId);
+                  if (!reversingTx) {
+                    return <p className="text-sm text-rose-600 font-medium mb-3">无法找到该交易记录，请刷新后重试。</p>;
+                  }
+                  return (
+                    <>
+                      <p className="font-medium text-slate-800 mb-3">您确定要撤销以下交易记录吗？</p>
+                      <div className="bg-slate-50 border border-slate-200 rounded-md p-4 mb-4">
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">产品名称</span>
+                            <span className="font-medium text-slate-800">{reversingTx.productName}</span>
+                          </div>
+                          {reversingTx.sku && (
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">SKU</span>
+                              <span className="font-medium text-slate-800">{reversingTx.sku}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">操作类型</span>
+                            <TypeBadge type={reversingTx.type} />
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">数量</span>
+                            <span className="font-medium text-slate-800">{reversingTx.quantity} {reversingTx.unit}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">操作日期</span>
+                            <span className="font-medium text-slate-800">{reversingTx.date || reversingTx.createdAt || '—'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">操作人</span>
+                            <span className="font-medium text-slate-800">{reversingTx.operator || '—'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">当前状态</span>
+                            <StatusBadge status={reversingTx.status} />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-slate-50 border border-slate-200 rounded-md p-4 mb-4">
+                        <div className="text-sm font-medium text-slate-700 mb-2">此操作将执行以下业务规则：</div>
+                        <ul className="text-sm space-y-2">
+                          <li className="flex items-start">
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 mr-2"></span>
+                            <span><span className="font-medium">库存回滚：</span>撤销后将自动回滚库存，{reversingTx.type === '入库' ? '减少' : '增加'} {reversingTx.quantity} {reversingTx.unit}</span>
+                          </li>
+                          <li className="flex items-start">
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 mr-2"></span>
+                            <span><span className="font-medium">状态更新：</span>交易记录状态将改为"已撤销"</span>
+                          </li>
+                          <li className="flex items-start">
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-slate-400 mt-1.5 mr-2"></span>
+                            <span><span className="font-medium">业务验证：</span>系统将检查库存安全规则（库存不能为负数）</span>
+                          </li>
+                          <li className="flex items-start">
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 mr-2"></span>
+                            <span><span className="font-medium">不可逆：</span>撤销后无法恢复，请谨慎操作</span>
+                          </li>
+                        </ul>
+                      </div>
+                      <p className="text-sm text-slate-600">如果遇到库存不足等情况，系统会显示明确的业务规则提示。</p>
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="flex justify-end gap-3">

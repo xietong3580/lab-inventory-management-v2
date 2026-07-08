@@ -546,31 +546,47 @@ export const reverseTransaction = (transactionId, reversedBy = '系统') => {
     );
   }
 
-  // 6. 更新产品库存
-  const updatedProduct = updateProduct(product.id, {
-    currentStock: newStock,
-    lastUpdated: getCurrentDateTime().split(' ')[0] // 只取日期部分
-  });
+  // 6. Step 10-20E：原子式更新 — 先构造数据，再一次性持久化
+  const now = getCurrentDateTime();
+  const todayStr = now.split(' ')[0];
 
-  if (!updatedProduct) {
-    throw new Error('更新产品库存失败，撤销操作中止');
+  // 6a. 构造更新后的产品对象
+  const productIndex = products.findIndex(p => p.id === product.id);
+  if (productIndex === -1) {
+    throw new Error('产品数据异常，撤销操作中止');
   }
+  const updatedProduct = {
+    ...products[productIndex],
+    currentStock: newStock,
+    lastUpdated: todayStr,
+  };
 
-  // 7. 更新交易记录状态
+  // 6b. 构造更新后的交易记录
   const updatedTransaction = {
     ...transaction,
     status: 'reversed',
-    reversedAt: getCurrentDateTime(),
+    reversedAt: now,
     reversedBy
   };
 
+  // 6c. 一次性替换内存数据
+  products[productIndex] = updatedProduct;
   transactions[transactionIndex] = updatedTransaction;
+
+  // 6d. 一次性持久化产品 + 交易到 localStorage
+  try {
+    saveToStorage(STORAGE_KEYS.PRODUCTS, products);
+    saveToStorage(STORAGE_KEYS.TRANSACTIONS, transactions);
+  } catch (storageErr) {
+    // localStorage 写入失败时回滚内存数据
+    products[productIndex] = { ...product }; // 恢复原始产品
+    transactions[transactionIndex] = { ...transaction }; // 恢复原始交易
+    throw new Error(`数据持久化失败，撤销操作已回滚：${storageErr.message || storageErr}`);
+  }
+
   console.log('[productService] 交易记录已撤销:', updatedTransaction);
 
-  // 8. 保存更新后的交易记录到 localStorage
-  saveToStorage(STORAGE_KEYS.TRANSACTIONS, transactions);
-
-  // 9. 记录审计日志
+  // 7. 持久化成功后记录审计日志
   logAuditAction(
     'TRANSACTION_REVERSE',
     product.name,
