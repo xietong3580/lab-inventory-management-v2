@@ -107,13 +107,11 @@ export const getProductById = (id) => {
  * @returns {Object} 添加的产品（带生成的 ID）
  */
 export const addProduct = (productData) => {
-  console.log('[productService] 添加产品:', productData);
   const newProduct = {
     id: `prod-${Date.now()}`,
     ...productData
   };
   products.push(newProduct);
-  console.log('[productService] 产品已添加:', newProduct);
 
   // 自动保存到 localStorage
   saveToStorage(STORAGE_KEYS.PRODUCTS, products);
@@ -153,7 +151,6 @@ export const addProduct = (productData) => {
  * @returns {Object|null} 更新后的产品或 null
  */
 export const updateProduct = (id, updates) => {
-  console.log('[productService] 更新产品:', id, updates);
   const index = products.findIndex(product => product.id === id);
   if (index === -1) {
     console.warn(`[productService] 未找到产品 ID: ${id}`);
@@ -165,7 +162,6 @@ export const updateProduct = (id, updates) => {
 
   const updatedProduct = { ...oldProduct, ...updates };
   products[index] = updatedProduct;
-  console.log('[productService] 产品已更新:', updatedProduct);
 
   // 自动保存到 localStorage
   saveToStorage(STORAGE_KEYS.PRODUCTS, products);
@@ -372,8 +368,6 @@ const logAuditAction = (actionType, productName, productId, operator, details) =
     details
   };
 
-  console.log('[productService] 记录审计日志:', logEntry);
-
   // 添加到日志数组开头（最新在前）
   auditLogs.unshift(logEntry);
 
@@ -393,8 +387,6 @@ const logAuditAction = (actionType, productName, productId, operator, details) =
  * @throws {Error} 如果产品不存在或库存不足
  */
 export const addTransaction = (transactionData) => {
-  console.log('[productService] 添加交易记录:', transactionData);
-
   const { productId, type, quantity, operator, notes = '' } = transactionData;
 
   // 1. 验证产品存在
@@ -445,7 +437,6 @@ export const addTransaction = (transactionData) => {
 
   // 7. 保存交易记录
   transactions.unshift(newTransaction); // 添加到数组开头，便于最新记录显示在前面
-  console.log('[productService] 交易记录已添加:', newTransaction);
 
   // 自动保存交易记录到 localStorage
   saveToStorage(STORAGE_KEYS.TRANSACTIONS, transactions);
@@ -583,8 +574,6 @@ export const reverseTransaction = (transactionId, reversedBy = '系统') => {
     transactions[transactionIndex] = { ...transaction }; // 恢复原始交易
     throw new Error(`数据持久化失败，撤销操作已回滚：${storageErr.message || storageErr}`);
   }
-
-  console.log('[productService] 交易记录已撤销:', updatedTransaction);
 
   // 7. 持久化成功后记录审计日志
   logAuditAction(

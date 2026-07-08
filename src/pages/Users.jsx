@@ -14,13 +14,14 @@ function Users() {
   const { currentUser } = useAuth();
 
   // Step 10-20B：活跃管理员计数（用于最后管理员停用防护）
+  // Step 10-20I：统一使用 isUserActive 判断启用状态
+  const isUserActive = useCallback((user) => {
+    return user.status !== '停用' && user.is_active !== false;
+  }, []);
+
   const activeAdminCount = useMemo(() => {
-    return users.filter(u =>
-      u.role === 'admin' &&
-      u.status !== '停用' &&
-      u.is_active !== false
-    ).length;
-  }, [users]);
+    return users.filter(u => u.role === 'admin' && isUserActive(u)).length;
+  }, [users, isUserActive]);
 
   // Step 10-20B：判断是否允许停用/启用目标用户
   const canToggleUserStatus = useCallback((user) => {
@@ -30,12 +31,11 @@ function Users() {
       return { allowed: false, reason: '不能停用当前登录账号' };
     }
     // 不允许停用最后一个活跃管理员
-    const isActiveNow = user.status !== '停用' && user.is_active !== false;
-    if (user.role === 'admin' && isActiveNow && activeAdminCount <= 1) {
+    if (user.role === 'admin' && isUserActive(user) && activeAdminCount <= 1) {
       return { allowed: false, reason: '至少需要保留一个启用状态的管理员' };
     }
     return { allowed: true, reason: '' };
-  }, [canWrite, adminOnlyTitle, currentUser, activeAdminCount]);
+  }, [canWrite, adminOnlyTitle, currentUser, activeAdminCount, isUserActive]);
 
   // Step 10-20G：编辑用户时判断是否允许将角色降级为 viewer
   const canDemoteToViewer = useCallback((targetUser) => {
@@ -45,12 +45,11 @@ function Users() {
       return { allowed: false, reason: '不能将当前登录账号降级为只读用户' };
     }
     // 不允许将最后一个活跃管理员降级
-    const isActiveNow = targetUser.status !== '停用' && targetUser.is_active !== false;
-    if (targetUser.role === 'admin' && isActiveNow && activeAdminCount <= 1) {
+    if (targetUser.role === 'admin' && isUserActive(targetUser) && activeAdminCount <= 1) {
       return { allowed: false, reason: '至少需要保留一个启用状态的管理员' };
     }
     return { allowed: true, reason: '' };
-  }, [canWrite, adminOnlyTitle, currentUser, activeAdminCount]);
+  }, [canWrite, adminOnlyTitle, currentUser, activeAdminCount, isUserActive]);
 
   // ==== 数据状态 ====
   const [users, setUsers] = useState([]);
@@ -277,12 +276,12 @@ function Users() {
   const handleToggleConfirm = async () => {
     if (!statusConfirmUser) return;
     const user = statusConfirmUser;
-    const action = user.status === '停用' || user.is_active === false ? '启用' : '停用';
+    const newActive = !isUserActive(user);
+    const action = newActive ? '启用' : '停用';
 
     setStatusConfirmUser(null);
     clearMessages();
     try {
-      const newActive = user.status === '停用' || user.is_active === false;
       await userService.updateUserStatus(user.id, newActive);
       showSuccess(`用户「${user.username}」已${action}`);
       await loadUsers();
@@ -536,7 +535,7 @@ function Users() {
                                 title={!t.allowed ? t.reason : ''}
                                 className={`px-2 py-1.5 text-sm bg-slate-50 text-rose-600 border border-rose-200 rounded hover:bg-rose-50 transition-colors whitespace-nowrap shrink-0 ${disabledBtnClass}`}
                               >
-                                {user.status === '停用' || user.is_active === false ? '启用' : '停用'}
+                                {isUserActive(user) ? '停用' : '启用'}
                               </button>
                             );
                           })()}
@@ -859,6 +858,32 @@ function Users() {
                   {pwdError}
                 </div>
               )}
+              {/* Step 10-20I：目标用户详情卡片，降低误操作风险 */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-md space-y-1.5 text-sm">
+                <div className="text-xs font-medium text-slate-500 mb-2">
+                  正在为以下用户重置密码，请确认目标账号无误。
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">用户名</span>
+                  <span className="font-medium text-slate-800">{pwdTarget.username}</span>
+                </div>
+                {(pwdTarget.displayName || pwdTarget.display_name) && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">显示名称</span>
+                    <span className="font-medium text-slate-800">{pwdTarget.displayName || pwdTarget.display_name}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-slate-500">角色</span>
+                  <span className="font-medium text-slate-800">{pwdTarget.role === 'admin' ? '管理员' : '只读用户'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">当前状态</span>
+                  <span className={`font-medium ${isUserActive(pwdTarget) ? 'text-emerald-700' : 'text-rose-600'}`}>
+                    {isUserActive(pwdTarget) ? '活跃' : '停用'}
+                  </span>
+                </div>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">新密码 *</label>
                 <input
@@ -897,7 +922,9 @@ function Users() {
       {/* ==================================================================== */}
       {/* 停用/启用确认弹窗 */}
       {/* ==================================================================== */}
-      {statusConfirmUser && (
+      {statusConfirmUser && (() => {
+        const isActive = isUserActive(statusConfirmUser);
+        return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={handleToggleCancel}>
           <div className="absolute inset-0 bg-black/40"></div>
           <div
@@ -906,14 +933,14 @@ function Users() {
           >
             <div className="px-6 py-4 border-b border-slate-200">
               <h2 className="text-lg font-semibold text-slate-800">
-                {statusConfirmUser.status === '停用' || statusConfirmUser.is_active === false ? '确认启用用户' : '确认停用用户'}
+                {isActive ? '确认停用用户' : '确认启用用户'}
               </h2>
             </div>
             <div className="px-6 py-4 space-y-3">
               <div className="text-sm text-slate-700">
-                {statusConfirmUser.status === '停用' || statusConfirmUser.is_active === false
-                  ? '启用后，该用户可以重新登录系统。请确认是否继续。'
-                  : '停用后，该用户将无法登录系统。请确认是否继续。'}
+                {isActive
+                  ? '停用后，该用户将无法登录系统。请确认是否继续。'
+                  : '启用后，该用户可以重新登录系统。请确认是否继续。'}
               </div>
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-md space-y-1.5 text-sm">
                 <div className="flex justify-between">
@@ -944,17 +971,18 @@ function Users() {
                 type="button"
                 onClick={handleToggleConfirm}
                 className={`px-4 py-2 text-sm rounded-md transition-colors font-medium ${
-                  statusConfirmUser.status === '停用' || statusConfirmUser.is_active === false
-                    ? 'bg-slate-700 text-white hover:bg-slate-800'
-                    : 'bg-slate-50 text-rose-600 border border-rose-200 hover:bg-rose-50'
+                  isActive
+                    ? 'bg-slate-50 text-rose-600 border border-rose-200 hover:bg-rose-50'
+                    : 'bg-slate-700 text-white hover:bg-slate-800'
                 }`}
               >
-                {statusConfirmUser.status === '停用' || statusConfirmUser.is_active === false ? '确认启用' : '确认停用'}
+                {isActive ? '确认停用' : '确认启用'}
               </button>
             </div>
           </div>
         </div>
-      )}
+      );
+      })()}
     </div>
   );
 }

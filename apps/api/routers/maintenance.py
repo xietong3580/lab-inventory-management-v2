@@ -1,10 +1,10 @@
 """
-维护 API 路由：备份前安全检查 + 数据库物理备份 + 测试业务数据清空 + 恢复预检
+维护 API 路由：备份前安全检查 + 数据库物理备份 + 业务数据清空 + 恢复预检
 
 - GET  /api/maintenance/preflight           备份前安全检查（所有登录用户可访问，只读）
 - POST /api/maintenance/backups            创建 SQLite 数据库物理副本（仅管理员）
-- GET  /api/maintenance/reset-preview      测试业务数据清空预览（所有登录用户可访问，只读）
-- POST /api/maintenance/reset-business-data 清空测试业务数据（仅管理员，需确认短语）
+- GET  /api/maintenance/reset-preview      业务数据清空预览（所有登录用户可访问，只读）
+- POST /api/maintenance/reset-business-data 清空当前业务数据（仅管理员，需确认短语）
 - GET  /api/maintenance/restore-candidates 备份恢复候选列表（仅管理员，只读）
 - GET  /api/maintenance/restore-preflight  备份恢复预检（仅管理员，只读）
 """
@@ -473,9 +473,9 @@ def create_backup(admin=Depends(require_admin), db: Session = Depends(get_db)):
 @router.get("/reset-preview", response_model=ResetPreviewResponse)
 def reset_preview(user=Depends(get_current_user)):
     """
-    正式导入前测试业务数据清空预览（只读，所有登录用户可访问）。
+    正式导入前业务数据清空预览（只读，所有登录用户可访问）。
 
-    返回当前若执行清空测试业务数据时的预期影响范围。
+    返回当前若执行清空当前业务数据时的预期影响范围。
     本接口**只读**，不删除、不修改任何数据。
 
     计数逻辑：
@@ -487,7 +487,7 @@ def reset_preview(user=Depends(get_current_user)):
     """
     warnings: List[str] = [
         "本接口仅用于预览，不会删除或修改任何数据。",
-        "正式清空测试业务数据前必须先创建数据库备份。",
+        "正式清空当前业务数据前必须先创建数据库备份。",
         "后续正式数据应以旧系统导出的真实产品库存数据为准。",
     ]
 
@@ -574,7 +574,7 @@ def reset_preview(user=Depends(get_current_user)):
                 key="users",
                 name="用户账号",
                 count=0,
-                description="admin/viewer 等登录账号不属于业务测试数据，不在本清空范围内。",
+                description="admin/viewer 等登录账号不属于业务数据，不在本清空范围内。",
             ),
             ResetPreviewItem(
                 key="settings",
@@ -645,15 +645,15 @@ def _count_business_data(conn: sqlite3.Connection) -> dict:
 @router.post("/reset-business-data", response_model=ResetBusinessDataResponse)
 def reset_business_data(req: ResetBusinessDataRequest, admin=Depends(require_admin)):
     """
-    清空测试业务数据（仅管理员，需确认短语完全匹配）。
+    清空当前业务数据（仅管理员，需确认短语完全匹配）。
 
     安全流程：
     1. 校验 admin 权限（由 require_admin 保证）
-    2. 校验 confirmation 短语必须为「清空测试业务数据」
+    2. 校验 confirmation 短语必须为「清空当前业务数据」
     3. 统计清空前数据量（before_counts）
     4. 自动创建数据库备份
     5. 确认备份文件真实存在且大小 > 0
-    6. 在数据库事务中按安全顺序清空测试业务数据
+    6. 在数据库事务中按安全顺序清空当前业务数据
     7. 统计清空后数据量（after_counts）
     8. 运行 preflight 检查数据完整性
     9. 返回完整清空结果
@@ -723,7 +723,7 @@ def reset_business_data(req: ResetBusinessDataRequest, admin=Depends(require_adm
             detail="备份文件大小为 0，清空操作已中止",
         )
 
-    # ── 6. 在事务中按安全顺序清空测试业务数据 ──
+    # ── 6. 在事务中按安全顺序清空当前业务数据 ──
     try:
         conn = sqlite3.connect(str(DB_PATH))
         conn.execute("PRAGMA foreign_keys = OFF")
@@ -881,7 +881,7 @@ def reset_business_data(req: ResetBusinessDataRequest, admin=Depends(require_adm
     # ── 9. 组装返回 ──
     return ResetBusinessDataResponse(
         success=True,
-        message="测试业务数据已清空",
+        message="当前业务数据已清空",
         backup=ResetBusinessDataBackup(
             filename=backup_filename,
             size_bytes=backup_size,
@@ -1724,7 +1724,7 @@ def go_live_checklist(user=Depends(get_current_user)):
     recommended_steps = [
         "第一步：创建当前数据库备份，确保操作安全",
         "第二步：确认当前系统中产品与出入库记录是否需要保留",
-        "第三步：如需清空测试业务数据，先在设置页完成备份，再按受控清空流程处理",
+        "第三步：如需清空当前业务数据，先在设置页完成备份，再按受控清空流程处理",
         "第四步：按库存分类或库位分批手动录入正式产品信息",
         "第五步：每批录入完成后导出 CSV 文件，与旧系统或腾讯文档反向核对",
         "第六步：全部产品录入完成后，创建数据库备份",

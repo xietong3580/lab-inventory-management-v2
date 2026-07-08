@@ -126,8 +126,11 @@ def get_transaction(transaction_id: str, db: Session = Depends(get_db), current_
 
 @router.delete("/{transaction_id}")
 def delete_transaction(transaction_id: str, current_user: User = Depends(require_admin)):
-    """删除交易记录（骨架，需管理员权限）"""
-    return {"message": f"删除交易记录 {transaction_id}（骨架）"}
+    """删除交易记录（不支持，请使用撤销功能保留完整审计链路）"""
+    raise HTTPException(
+        status_code=405,
+        detail="系统不支持删除出入库记录，请使用撤销功能保留完整审计链路。",
+    )
 
 @router.post("/{transaction_id}/reverse")
 def reverse_transaction(transaction_id: str, request_data: dict = None, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
