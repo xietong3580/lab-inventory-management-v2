@@ -411,10 +411,11 @@ export const addTransaction = (transactionData) => {
   const stockDelta = type === '入库' ? quantity : -quantity;
   const newStock = product.currentStock + stockDelta;
 
-  // 5. 更新产品库存
+  // 5. 更新产品库存（含状态重算）
   const updatedProduct = updateProduct(productId, {
     currentStock: newStock,
-    lastUpdated: getCurrentDateTime().split(' ')[0] // 只取日期部分
+    lastUpdated: getCurrentDateTime().split(' ')[0], // 只取日期部分
+    status: calculateProductStatus({ ...product, currentStock: newStock }),
   });
 
   if (!updatedProduct) {
@@ -422,6 +423,8 @@ export const addTransaction = (transactionData) => {
   }
 
   // 6. 创建交易记录（绑定 productId，避免撤销时依赖 productName 查找）
+  // operator 使用传入值或兜底「系统用户」，真实 API 模式由后端绑定
+  const finalOperator = operator || '系统用户';
   const newTransaction = {
     id: `txn-${Date.now()}`,
     productId: product.id,
@@ -430,7 +433,7 @@ export const addTransaction = (transactionData) => {
     quantity,
     unit: product.unit,
     date: getCurrentDateTime(),
-    operator,
+    operator: finalOperator,
     status: 'completed',
     notes: notes || ''
   };
@@ -446,7 +449,7 @@ export const addTransaction = (transactionData) => {
     'TRANSACTION_ADD',
     product.name,
     product.id,
-    operator,
+    finalOperator,
     {
       transaction: {
         id: newTransaction.id,
@@ -541,7 +544,7 @@ export const reverseTransaction = (transactionId, reversedBy = '系统') => {
   const now = getCurrentDateTime();
   const todayStr = now.split(' ')[0];
 
-  // 6a. 构造更新后的产品对象
+  // 6a. 构造更新后的产品对象（含状态重算）
   const productIndex = products.findIndex(p => p.id === product.id);
   if (productIndex === -1) {
     throw new Error('产品数据异常，撤销操作中止');
@@ -550,6 +553,7 @@ export const reverseTransaction = (transactionId, reversedBy = '系统') => {
     ...products[productIndex],
     currentStock: newStock,
     lastUpdated: todayStr,
+    status: calculateProductStatus({ ...products[productIndex], currentStock: newStock }),
   };
 
   // 6b. 构造更新后的交易记录

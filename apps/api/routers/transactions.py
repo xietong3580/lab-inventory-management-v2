@@ -89,10 +89,8 @@ def create_transaction(transaction_data: TransactionCreate, db: Session = Depend
     )
 
     db.add(transaction)
-    db.commit()
-    db.refresh(transaction)
 
-    # 创建审计日志
+    # Step 10-21C：审计日志与交易同事务提交
     audit_log = AuditLog(
         action_type='TRANSACTION_ADD',
         product_name=product.name,
@@ -102,7 +100,9 @@ def create_transaction(transaction_data: TransactionCreate, db: Session = Depend
         details=f"创建{type_}交易，数量: {quantity} {product.unit}"
     )
     db.add(audit_log)
+
     db.commit()
+    db.refresh(transaction)
 
     return transaction.to_dict()
 

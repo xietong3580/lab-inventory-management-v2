@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { productService, transactionService, auditLogService, dashboardService } from '../services/dataService';
+import { productService, transactionService, auditLogService } from '../services/dataService';
 import {
   formatAuditTime,
   generateAuditSummary,
@@ -330,13 +330,6 @@ function Dashboard() {
     error: null
   });
 
-  // 仪表盘统计数据状态
-  const [dashboardStatsData, setDashboardStatsData] = useState({
-    stats: [],
-    loading: true,
-    error: null
-  });
-
   // 计算紧急程度（根据库存百分比）
   const calculateUrgency = (product) => {
     const ratio = product.currentStock / product.minStock;
@@ -393,11 +386,10 @@ function Dashboard() {
 
     const fetchAllData = async () => {
       try {
-        // 并行获取交易记录、审计日志和仪表盘统计数据
-        const [transactions, auditLogs, stats] = await Promise.all([
+        // 并行获取交易记录和审计日志
+        const [transactions, auditLogs] = await Promise.all([
           transactionService.getTransactions(),
-          auditLogService.getAuditLogs(),
-          dashboardService.getDashboardStats()
+          auditLogService.getAuditLogs()
         ]);
 
         if (isMounted) {
@@ -408,11 +400,6 @@ function Dashboard() {
           });
           setAuditLogsData({
             auditLogs,
-            loading: false,
-            error: null
-          });
-          setDashboardStatsData({
-            stats,
             loading: false,
             error: null
           });
@@ -730,8 +717,16 @@ function Dashboard() {
   // 时间范围文本
   const rangeText = timeRange === '7days' ? '近7日' : timeRange === '30days' ? '近30日' : '全部';
 
-  // 动态统计卡片数据
-  const dynamicDashboardStats = (dashboardStatsData.stats || []).map(stat => {
+  // Step 10-21C：统计卡片模板来自本地定义，不再请求 /api/dashboard/stats
+  const STAT_CARD_TEMPLATES = [
+    { id: 'total-products', title: '产品总数', iconColor: 'bg-slate-600', change: '+0', changeType: 'neutral' },
+    { id: 'normal-stock', title: '正常库存', iconColor: 'bg-slate-400', change: '+0', changeType: 'neutral' },
+    { id: 'low-stock-alerts', title: '低库存预警', iconColor: 'bg-slate-200', change: '+0', changeType: 'neutral' },
+    { id: 'recent-transactions', title: '交易记录', iconColor: 'bg-slate-600', change: '+0', changeType: 'neutral' },
+    { id: 'recent-audit-logs', title: '审计记录', iconColor: 'bg-slate-400', change: '+0', changeType: 'neutral' },
+  ];
+
+  const dynamicDashboardStats = STAT_CARD_TEMPLATES.map(stat => {
     const {
       totalProducts,
       totalInventory,
