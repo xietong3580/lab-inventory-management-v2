@@ -829,6 +829,22 @@ export const userService = {
     });
     return normalizeUser(data);
   },
+
+  /**
+   * 删除用户（仅管理员，严格防护）
+   * 仅允许删除已停用的非保护账号。
+   * @param {string} userId - 前端格式用户 ID（如 user-000003）
+   * @returns {Promise<Object>} 删除结果
+   */
+  async deleteUser(userId) {
+    if (currentMode === DATA_SOURCE_MODE.MOCK) {
+      throw new Error('Mock 模式暂不支持删除用户，请切换到 API 模式');
+    }
+    const data = await apiRequest(`/users/${userId}`, {
+      method: 'DELETE',
+    });
+    return data;
+  },
 };
 
 /**

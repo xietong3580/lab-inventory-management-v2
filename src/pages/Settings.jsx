@@ -6,6 +6,7 @@ import { changePassword } from '../services/authService';
 import { createManualBackup, getBackups, downloadBackup, formatBytes, runPreflightCheck, createMaintenanceBackup, getResetPreview, resetBusinessData, getRestoreCandidates, getRestorePreflight, prepareRestore } from '../services/backupService';
 import GoLiveChecklistPanel from '../components/GoLiveChecklistPanel';
 import SystemOperationGuide from '../components/SystemOperationGuide';
+import PasswordInput from '../components/common/PasswordInput';
 
 function Settings() {
   const { canWrite, adminOnlyTitle } = usePermission();
@@ -1541,12 +1542,11 @@ function Settings() {
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   当前密码
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
                   value={pwdForm.oldPassword}
                   onChange={(e) => handlePwdChange('oldPassword', e.target.value)}
                   placeholder="请输入当前密码"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                  className="px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
                 />
               </div>
               {/* 新密码 */}
@@ -1554,12 +1554,11 @@ function Settings() {
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   新密码
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
                   value={pwdForm.newPassword}
                   onChange={(e) => handlePwdChange('newPassword', e.target.value)}
                   placeholder="新密码（不少于 6 位）"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                  className="px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
                 />
               </div>
               {/* 确认新密码 */}
@@ -1567,12 +1566,11 @@ function Settings() {
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   确认新密码
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
                   value={pwdForm.confirmPassword}
                   onChange={(e) => handlePwdChange('confirmPassword', e.target.value)}
                   placeholder="请再次输入新密码"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                  className="px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
                 />
               </div>
               {/* 错误提示 */}

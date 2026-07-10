@@ -283,6 +283,82 @@ def update_user_status(
     return user.to_dict()
 
 
+@router.delete("/{user_id}")
+def delete_user(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """删除用户（仅管理员，严格防护）
+
+    规则：
+    1. 仅 admin 角色可删除
+    2. 系统管理员 'admin' 永久保留，不可删除
+    3. 不能删除自己
+    4. 不允许删除最后一个活跃管理员
+    5. 账号必须先停用才能删除
+    """
+    user = _get_user_or_404(db, user_id)
+
+    # 系统管理员账号不可删除
+    if user.username == "admin":
+        raise HTTPException(
+            status_code=400,
+            detail="系统管理员账号不可删除",
+        )
+
+    # 不能删除自己
+    if current_user.id == user.id:
+        raise HTTPException(
+            status_code=400,
+            detail="不能删除当前登录账号",
+        )
+
+    # 必须先停用再删除
+    if user.is_active:
+        raise HTTPException(
+            status_code=400,
+            detail="请先停用该用户，再执行删除操作",
+        )
+
+    # 不允许删除最后一个活跃管理员（虽然已停用，但防御性检查）
+    if user.role == "admin":
+        active_admins = _count_active_admins(db)
+        if active_admins < 1:
+            raise HTTPException(
+                status_code=400,
+                detail="至少需要保留一个启用状态的管理员",
+            )
+
+    deleted_username = user.username
+    deleted_role = user.role
+
+    # 审计日志（在删除前记录）
+    operator = current_user.display_name or current_user.username
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    audit_log = AuditLog(
+        action_type="USER_DELETE",
+        product_name=deleted_username,
+        product_id=user_id,
+        operator=operator,
+        timestamp=now_str,
+        details=f"删除用户：{deleted_username}，"
+                f"角色: {deleted_role}，"
+                f"操作人: {operator}",
+    )
+    db.add(audit_log)
+
+    # 删除用户（审计日志在同一事务中）
+    db.delete(user)
+    db.commit()
+
+    return {
+        "message": f"用户「{deleted_username}」已删除",
+        "deleted_username": deleted_username,
+        "deleted_role": deleted_role,
+    }
+
+
 @router.patch("/{user_id}/password")
 def reset_user_password(
     user_id: str,
