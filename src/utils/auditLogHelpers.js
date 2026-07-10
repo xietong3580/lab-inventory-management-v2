@@ -15,6 +15,7 @@ export const actionTypeMap = {
   USER_UPDATE: { label: '编辑用户', color: 'bg-slate-100 text-slate-600' },
   USER_STATUS_CHANGE: { label: '用户状态变更', color: 'bg-amber-50 text-amber-600' },
   USER_PASSWORD_RESET: { label: '重置密码', color: 'bg-amber-50 text-amber-600' },
+  USER_DELETE: { label: '删除用户', color: 'bg-rose-50 text-rose-600' },
   BACKUP_CREATE: { label: '创建备份', color: 'bg-slate-50 text-slate-600' },
   BUSINESS_DATA_CLEAR: { label: '清空当前业务数据', color: 'bg-rose-50 text-rose-600' },
 };
@@ -112,6 +113,8 @@ export const generateAuditSummary = (log, compact = false) => {
       return compact ? `变更用户状态「${productName || ''}」` : `变更用户状态「${productName || ''}」`;
     case 'USER_PASSWORD_RESET':
       return compact ? `重置密码「${productName || ''}」` : `重置密码「${productName || ''}」`;
+    case 'USER_DELETE':
+      return compact ? `删除用户「${productName || ''}」` : `删除用户「${productName || ''}」，操作人: ${log.operator || '未知'}`;
     case 'BACKUP_CREATE':
       return compact ? `创建数据库备份` : `创建数据库备份${productName ? `「${productName}」` : ''}`;
     case 'BUSINESS_DATA_CLEAR':
