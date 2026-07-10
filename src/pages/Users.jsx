@@ -13,6 +13,15 @@ function Users() {
   const { canWrite, adminOnlyTitle, isAdmin } = usePermission();
   const { currentUser } = useAuth();
 
+  // ==== 数据状态 ====
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // ==== 全局消息 ====
+  const [successMsg, setSuccessMsg] = useState(null);
+  const [errorMsg, setErrorMsg] = useState(null);
+
   // Step 10-20B：活跃管理员计数（用于最后管理员停用防护）
   // Step 10-20I：统一使用 isUserActive 判断启用状态
   const isUserActive = useCallback((user) => {
@@ -50,15 +59,6 @@ function Users() {
     }
     return { allowed: true, reason: '' };
   }, [canWrite, adminOnlyTitle, currentUser, activeAdminCount, isUserActive]);
-
-  // ==== 数据状态 ====
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  // ==== 全局消息 ====
-  const [successMsg, setSuccessMsg] = useState(null);
-  const [errorMsg, setErrorMsg] = useState(null);
 
   // ==== 搜索 ====
   const [searchTerm, setSearchTerm] = useState('');
