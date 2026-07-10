@@ -305,6 +305,21 @@ def _is_local_stock_explicit(normalized_header: str) -> bool:
     return normalized_header in EXPLICIT_LOCAL_STOCK_NORMALIZED
 
 
+def _build_composite_key(normalized: Dict[str, Any], p1_fields: Dict[str, Any]) -> str:
+    """构建完全重复判重键：品牌 + 产品货号 + 产品名称 + 规格 + 单位 + 类别 + 存放位置
+
+    只有当所有 7 个字段完全相同时，才判定为同一库存产品。
+    """
+    brand = (p1_fields.get("brand") or "").strip() if p1_fields else ""
+    sku = (normalized.get("sku") or "").strip() if normalized else ""
+    name = (normalized.get("name") or "").strip() if normalized else ""
+    spec = (p1_fields.get("specification") or "").strip() if p1_fields else ""
+    unit = (normalized.get("unit") or "").strip() if normalized else ""
+    category = (normalized.get("category") or "").strip() if normalized else ""
+    location = (normalized.get("location") or "").strip() if normalized else ""
+    return "|".join([brand, sku, name, spec, unit, category, location])
+
+
 def _parse_and_validate_csv(
     text: str,
     filename: str,
@@ -502,6 +517,7 @@ def _parse_and_validate_csv(
     # ── 7. 逐行校验 ─────────────────────────────────────────
     row_results: List[Dict[str, Any]] = []
     csv_skus: Dict[str, List[int]] = {}
+    csv_composite_keys: Dict[str, List[int]] = {}
 
     for idx, raw_row in enumerate(data_rows):
         row_num = idx + 2
@@ -579,6 +595,10 @@ def _parse_and_validate_csv(
         sku_val = normalized.get("sku")
         if sku_val is not None and sku_val != "":
             csv_skus.setdefault(sku_val, []).append(row_num)
+
+        # 构建完全重复判重键（品牌+货号+名称+规格+单位+类别+位置）
+        comp_key = _build_composite_key(normalized, p1_data)
+        csv_composite_keys.setdefault(comp_key, []).append(row_num)
 
         for fld, default in FIELD_DEFAULTS.items():
             if fld not in field_headers:
@@ -660,45 +680,111 @@ def _parse_and_validate_csv(
                 else:
                     row_result["status"] = "valid"
 
-    # ── 8. CSV 内部 SKU 重复检查 ────────────────────────────
+    # ── 8. CSV 内部完全重复条目检查（复合键）────────────────
+    # 使用品牌+货号+名称+规格+单位+类别+位置的复合键判重。
+    # 仅当全部 7 个字段相同时才判定为完全重复 → error。
+    # 同 SKU 但复合键不同 → warning，不阻止 can_import。
     global_errors: List[str] = []
-    for sku, row_nums in csv_skus.items():
+    for comp_key, row_nums in csv_composite_keys.items():
         if len(row_nums) > 1:
-            msg = f"SKU '{sku}' 在 CSV 内重复出现（行: {row_nums}）"
+            rows_str = "、".join(str(r) for r in row_nums)
+            msg = (
+                f"发现疑似完全重复的库存产品：品牌、产品货号、产品名称、"
+                f"规格、单位、库存分类和存放位置均相同，"
+                f"涉及第 {rows_str} 行。请先确认是否为重复录入。"
+            )
             global_errors.append(msg)
             for rn in row_nums:
                 ri = rn - 2
                 if ri < len(row_results) and msg not in row_results[ri]["errors"]:
                     row_results[ri]["errors"].append(msg)
 
-    # ── 9. 数据库已有 SKU 检查（只读查询）───────────────────
-    # Step 9-5E-fix：DB 已有 SKU 不是阻断 error，
-    # create_only 模式下正式导入时将直接 skipped，不覆盖原数据。
-    # 预览阶段标记为 warning，不阻断正式导入按钮。
+    # ── 8.5. CSV 内部同 SKU 不同产品提示 ────────────────────
+    # 同产品货号出现多次但复合键不同 → warning，允许通过，不阻止导入。
+    csv_sku_reuse_warnings: List[str] = []
+    for sku, row_nums in csv_skus.items():
+        if len(row_nums) > 1:
+            # 检查这些行的复合键是否不一致（不一致说明是不同产品）
+            unique_comp_keys = set()
+            for rn in row_nums:
+                ri = rn - 2
+                if ri < len(row_results):
+                    n = row_results[ri].get("normalized", {})
+                    p1 = row_results[ri].get("p1_fields", {})
+                    ck = _build_composite_key(n, p1)
+                    unique_comp_keys.add(ck)
+            if len(unique_comp_keys) > 1:
+                rows_str = "、".join(str(r) for r in row_nums)
+                msg = (
+                    f"产品货号「{sku}」在 CSV 中出现多次，"
+                    f"涉及第 {rows_str} 行。"
+                    f"系统将允许继续预览/导入；请确认这些记录是否因品牌、规格、"
+                    f"库存分类或存放位置不同而需要分别保留。"
+                )
+                csv_sku_reuse_warnings.append(msg)
+                for rn in row_nums:
+                    ri = rn - 2
+                    if ri < len(row_results):
+                        if msg not in row_results[ri]["warnings"]:
+                            row_results[ri]["warnings"].append(msg)
+                        if row_results[ri]["status"] == "valid":
+                            row_results[ri]["status"] = "warning"
+            # else: 同 SKU + 同复合键 → 已在步骤 8 作为 error 处理
+
+    # ── 9. 数据库已有产品检查（复合键判重）───────────────────
+    # 使用品牌+货号+名称+规格+单位+类别+位置的复合键判重。
+    # 仅复合键完全匹配时才标记为"导入时将跳过"。
+    # 同 SKU 但复合键不同 → 允许作为新产品导入，不产生 warning。
     db_existing_msgs: List[str] = []
     if csv_skus:
         existing = db.query(Product).filter(
             Product.sku.in_(list(csv_skus.keys()))
         ).all()
-        exist_map: Dict[str, Product] = {p.sku: p for p in existing}
+        # 构建 DB 产品复合键映射
+        db_composite_map: Dict[str, Product] = {}
+        for p in existing:
+            db_ck = "|".join([
+                (p.brand or "").strip(),
+                (p.sku or "").strip(),
+                (p.name or "").strip(),
+                (p.specification or "").strip(),
+                (p.unit or "").strip(),
+                (p.category or "").strip(),
+                (p.location or "").strip(),
+            ])
+            db_composite_map[db_ck] = p
 
+        already_processed: set = set()
         for sku, row_nums in csv_skus.items():
-            prod = exist_map.get(sku)
-            if prod is not None:
-                msg = (
-                    f"SKU '{sku}' 已存在于数据库中"
-                    f"（产品 ID: prod-{prod.id:06d}，名称: {prod.name}），"
-                    f"正式导入时将跳过，不会覆盖原数据。"
-                )
-                db_existing_msgs.append(msg)
-                for rn in row_nums:
-                    ri = rn - 2
-                    if ri < len(row_results) and msg not in row_results[ri]["warnings"]:
-                        row_results[ri]["warnings"].append(msg)
-                        # 如果该行原本 status=='valid' 且现在有 warning，
-                        # 将状态更新为 'warning'
-                        if row_results[ri]["status"] == "valid":
-                            row_results[ri]["status"] = "warning"
+            for rn in row_nums:
+                ri = rn - 2
+                if ri >= len(row_results):
+                    continue
+                n = row_results[ri].get("normalized", {})
+                p1 = row_results[ri].get("p1_fields", {})
+                csv_ck = _build_composite_key(n, p1)
+
+                if csv_ck in already_processed:
+                    continue
+                already_processed.add(csv_ck)
+
+                db_prod = db_composite_map.get(csv_ck)
+                if db_prod is not None:
+                    msg = (
+                        f"完全重复库存条目已存在于数据库中"
+                        f"（产品 ID: prod-{db_prod.id:06d}，名称: {db_prod.name}），"
+                        f"正式导入时将跳过，不会覆盖原数据。"
+                    )
+                    db_existing_msgs.append(msg)
+                    for rn2 in row_nums:
+                        ri2 = rn2 - 2
+                        if ri2 < len(row_results) and msg not in row_results[ri2]["warnings"]:
+                            row_results[ri2]["warnings"].append(msg)
+                            if row_results[ri2]["status"] == "valid":
+                                row_results[ri2]["status"] = "warning"
+                else:
+                    # 同 SKU 但复合键不同 → 允许作为新产品，静默通过
+                    pass
 
     # ── 10. 最终统计 ────────────────────────────────────────
     total = len(row_results)
@@ -709,6 +795,10 @@ def _parse_and_validate_csv(
 
     # ── 11. 全局提示 ────────────────────────────────────────
     global_warnings: List[str] = []
+
+    # CSV 内部同产品货号不同产品提示（不阻止导入）
+    if csv_sku_reuse_warnings:
+        global_warnings.extend(csv_sku_reuse_warnings)
 
     # 旧系统无货号产品迁移提示
     if legacy_nocode_counter > 0:
@@ -997,8 +1087,8 @@ async def execute_products_import(
             ),
         }
 
-    # ── 6. 重新查询 DB 已有 SKU（避免并发） ──────────────────
-    existing_skus_in_db: set = set()
+    # ── 6. 重新查询 DB 已有产品（复合键判重，避免并发） ──────
+    existing_composite_keys: set = set()
     rows = preview.get("rows", [])
     if rows:
         all_csv_skus = {
@@ -1010,9 +1100,19 @@ async def execute_products_import(
             existing = db.query(Product).filter(
                 Product.sku.in_(list(all_csv_skus))
             ).all()
-            existing_skus_in_db = {p.sku for p in existing}
+            for p in existing:
+                ck = "|".join([
+                    (p.brand or "").strip(),
+                    (p.sku or "").strip(),
+                    (p.name or "").strip(),
+                    (p.specification or "").strip(),
+                    (p.unit or "").strip(),
+                    (p.category or "").strip(),
+                    (p.location or "").strip(),
+                ])
+                existing_composite_keys.add(ck)
 
-    # ── 7. 分类行：create 或 skip ────────────────────────────
+    # ── 7. 分类行：create 或 skip（复合键判重） ──────────────
     to_create: List[Dict[str, Any]] = []
     skipped_items: List[Dict[str, Any]] = []
     all_warnings: List[str] = list(preview.get("warnings", []))
@@ -1026,9 +1126,15 @@ async def execute_products_import(
             # 不会走到这里（已在步骤 4 拦截），保留防御
             continue
 
-        if sku and sku in existing_skus_in_db:
-            existing_prod = db.query(Product).filter(Product.sku == sku).first()
-            reason = f"SKU '{sku}' 已存在于数据库"
+        # 使用复合键判重（品牌+货号+名称+规格+单位+类别+位置）
+        row_ck = _build_composite_key(norm, row.get("p1_fields") or {})
+
+        if row_ck in existing_composite_keys:
+            # 查找 DB 中匹配的产品以提供详细信息
+            existing_prod = None
+            if sku:
+                existing_prod = db.query(Product).filter(Product.sku == sku).first()
+            reason = f"完全重复库存条目已存在于数据库"
             if existing_prod:
                 reason += (
                     f"（产品 ID: prod-{existing_prod.id:06d}"
