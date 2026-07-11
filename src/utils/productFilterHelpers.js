@@ -81,7 +81,7 @@ export const searchProducts = (products, keyword) => {
 };
 
 /**
- * 筛选产品列表（含 SKU 优先级搜索、库位筛选、品牌筛选）
+ * 筛选产品列表（含 SKU 优先级搜索、多选筛选）
  *
  * 搜索优先级：
  *   SKU 完全匹配 > SKU 开头匹配 > SKU 包含匹配 > 产品名称包含匹配
@@ -90,30 +90,33 @@ export const searchProducts = (products, keyword) => {
  *
  * @param {Array} products - 产品数组
  * @param {string} keyword - 搜索关键词（货号/SKU/产品名称）
- * @param {string} category - 分类筛选条件，'all' 表示全部
+ * @param {string|string[]} categories - 库存分类，字符串 'all' 或字符串数组
  * @param {string} status - 库存状态筛选：'all'（全部）、'正常'、'低库存'
  * @param {number|null} minStock - 当前库存最小值（可为空或null）
  * @param {number|null} maxStock - 当前库存最大值（可为空或null）
- * @param {string} location - 库位筛选条件，'all' 或空字符串表示全部
- * @param {string} brand - 品牌筛选条件，'all' 或空字符串表示全部
+ * @param {string|string[]} locations - 库位，字符串 'all' 或字符串数组
+ * @param {string|string[]} brands - 品牌，字符串 'all' 或字符串数组
+ * @param {string} verificationFilter - 核对状态筛选
  * @returns {Array} 筛选后的产品数组（按搜索匹配度排序）
  */
 export const filterProducts = (
   products,
   keyword = '',
-  category = 'all',
+  categories = 'all',
   status = 'all',
   minStock = null,
   maxStock = null,
-  location = 'all',
-  brand = 'all',
+  locations = 'all',
+  brands = 'all',
   verificationFilter = 'all'
 ) => {
   let filtered = [...products];
 
-  // 1. 按分类筛选
-  if (category && category !== 'all') {
-    filtered = filtered.filter(product => product.category === category);
+  // 1. 按分类筛选（支持数组多选）
+  if (Array.isArray(categories) && categories.length > 0) {
+    filtered = filtered.filter(product => categories.includes(product.category));
+  } else if (categories && categories !== 'all' && !Array.isArray(categories)) {
+    filtered = filtered.filter(product => product.category === categories);
   }
 
   // 2. 按库存状态筛选
@@ -142,14 +145,18 @@ export const filterProducts = (
     }
   }
 
-  // 4. 按库位筛选
-  if (location && location !== 'all' && location !== '') {
-    filtered = filtered.filter(product => product.location === location);
+  // 4. 按库位筛选（支持数组多选）
+  if (Array.isArray(locations) && locations.length > 0) {
+    filtered = filtered.filter(product => locations.includes(product.location));
+  } else if (locations && locations !== 'all' && locations !== '' && !Array.isArray(locations)) {
+    filtered = filtered.filter(product => product.location === locations);
   }
 
-  // 5. 按品牌筛选
-  if (brand && brand !== 'all' && brand !== '') {
-    filtered = filtered.filter(product => product.brand === brand);
+  // 5. 按品牌筛选（支持数组多选）
+  if (Array.isArray(brands) && brands.length > 0) {
+    filtered = filtered.filter(product => brands.includes(product.brand));
+  } else if (brands && brands !== 'all' && brands !== '' && !Array.isArray(brands)) {
+    filtered = filtered.filter(product => product.brand === brands);
   }
 
   // 5b. 按核对状态筛选（复用 calculateVerificationStatus，与产品列表标签用同一套规则）
@@ -195,21 +202,27 @@ const sortProductsByRecent = (products) => {
 export const hasActiveFilters = ({
   keyword,
   category,
+  categories,
   status,
   minStock,
   maxStock,
   location,
+  locations,
   brand,
+  brands,
   verificationFilter
 }) => {
+  const cats = categories || category;
+  const locs = locations || location;
+  const brds = brands || brand;
   return Boolean(
     keyword ||
-    (category && category !== 'all') ||
+    (Array.isArray(cats) ? cats.length > 0 : (cats && cats !== 'all')) ||
     (status && status !== 'all') ||
     (minStock !== null && minStock !== '') ||
     (maxStock !== null && maxStock !== '') ||
-    (location && location !== 'all' && location !== '') ||
-    (brand && brand !== 'all' && brand !== '') ||
+    (Array.isArray(locs) ? locs.length > 0 : (locs && locs !== 'all' && locs !== '')) ||
+    (Array.isArray(brds) ? brds.length > 0 : (brds && brds !== 'all' && brds !== '')) ||
     (verificationFilter && verificationFilter !== 'all')
   );
 };

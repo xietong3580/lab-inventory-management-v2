@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { productService as dataProductService } from '../services/dataService';
 import { getProductsWithCalculatedStatus, calculateProductStatus, updateProduct, addProduct, deleteProduct } from '../services/productService';
 import { getLedgerTypeConfig, formatLedgerTime } from '../utils/inventoryHistoryHelpers';
@@ -6,6 +6,7 @@ import { filterProducts, hasActiveFilters, calculateVerificationStatus } from '.
 import { exportProductsToCSV } from '../utils/exportHelpers';
 import { runPreflightCheck, createMaintenanceBackup } from '../services/backupService';
 import { usePermission } from '../hooks/usePermission';
+import MultiSelectFilter from '../components/common/MultiSelectFilter';
 import {
   INVENTORY_CATEGORIES,
   getLocationOptionsByCategory,
@@ -122,14 +123,14 @@ function Products() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedCategories, setSelectedCategories] = useState([]);
   const { canWrite, adminOnlyTitle } = usePermission();
 
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [minStock, setMinStock] = useState('');
   const [maxStock, setMaxStock] = useState('');
-  const [selectedLocation, setSelectedLocation] = useState('all');
-  const [selectedBrand, setSelectedBrand] = useState('all');
+  const [selectedLocations, setSelectedLocations] = useState([]);
+  const [selectedBrands, setSelectedBrands] = useState([]);
   const [verificationFilter, setVerificationFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
@@ -138,12 +139,12 @@ function Products() {
   // 是否有活跃筛选条件
   const activeFilters = hasActiveFilters({
     keyword: searchTerm,
-    category: selectedCategory,
+    categories: selectedCategories,
     status: selectedStatus,
     minStock,
     maxStock,
-    location: selectedLocation,
-    brand: selectedBrand,
+    locations: selectedLocations,
+    brands: selectedBrands,
     verificationFilter
   });
 
@@ -234,12 +235,12 @@ function Products() {
     const filtered = filterProducts(
       allProducts,
       searchTerm,
-      selectedCategory,
+      selectedCategories,
       selectedStatus,
       minStock,
       maxStock,
-      selectedLocation,
-      selectedBrand,
+      selectedLocations,
+      selectedBrands,
       verificationFilter
     );
     setFilteredProducts(filtered);
@@ -248,12 +249,12 @@ function Products() {
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(1);
     }
-  }, [allProducts, searchTerm, selectedCategory, selectedStatus, minStock, maxStock, selectedLocation, selectedBrand, verificationFilter, currentPage, itemsPerPage]);
+  }, [allProducts, searchTerm, selectedCategories, selectedStatus, minStock, maxStock, selectedLocations, selectedBrands, verificationFilter, currentPage, itemsPerPage]);
 
-  // 当筛选条件变化时，重置到第一页（提供更及时的响应）
+  // 当筛选条件变化时，重置到第一页
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedCategory, selectedStatus, minStock, maxStock, selectedLocation, selectedBrand, verificationFilter]);
+  }, [searchTerm, selectedCategories, selectedStatus, minStock, maxStock, selectedLocations, selectedBrands, verificationFilter]);
 
   // 分页计算
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -269,19 +270,80 @@ function Products() {
 
   const handleReset = () => {
     setSearchTerm('');
-    setSelectedCategory('all');
-    setSelectedLocation('all');
-    setSelectedBrand('all');
+    setSelectedCategories([]);
+    setSelectedLocations([]);
+    setSelectedBrands([]);
     setSelectedStatus('all');
     setMinStock('');
     setMaxStock('');
     setVerificationFilter('all');
     setCurrentPage(1);
-    // 重置后自动聚焦搜索框，方便继续查下一个产品
+    // 重置后自动聚焦搜索框
     setTimeout(() => {
       searchInputRef.current?.focus();
     }, 0);
   };
+
+  // Step 10-28C: 多选筛选选项列表（含数量统计）
+  const brandOptions = useMemo(() => {
+    const counts = {};
+    allProducts.forEach(p => {
+      const b = (p.brand || '').trim();
+      if (b) counts[b] = (counts[b] || 0) + 1;
+    });
+    return Object.keys(counts).sort();
+  }, [allProducts]);
+
+  const categoryOptions = useMemo(() => {
+    const counts = {};
+    allProducts.forEach(p => {
+      const c = (p.category || '').trim();
+      if (c) counts[c] = (counts[c] || 0) + 1;
+    });
+    // 使用 INVENTORY_CATEGORIES 定义的权威顺序，确保显示名称绝对正确
+    // 追加数据中存在但不在标准分类中的旧分类（防御性兼容）
+    const extras = Object.keys(counts)
+      .filter(c => !INVENTORY_CATEGORIES.includes(c))
+      .sort();
+    return [...INVENTORY_CATEGORIES.filter(c => counts[c] !== undefined), ...extras];
+  }, [allProducts]);
+
+  const locationOptions = useMemo(() => {
+    const counts = {};
+    allProducts.forEach(p => {
+      const l = (p.location || '').trim();
+      if (l) counts[l] = (counts[l] || 0) + 1;
+    });
+    return Object.keys(counts).sort();
+  }, [allProducts]);
+
+  // 各选项对应的产品数量
+  const brandOptionCounts = useMemo(() => {
+    const counts = {};
+    allProducts.forEach(p => {
+      const b = (p.brand || '').trim();
+      if (b) counts[b] = (counts[b] || 0) + 1;
+    });
+    return counts;
+  }, [allProducts]);
+
+  const categoryOptionCounts = useMemo(() => {
+    const counts = {};
+    allProducts.forEach(p => {
+      const c = (p.category || '').trim();
+      if (c) counts[c] = (counts[c] || 0) + 1;
+    });
+    return counts;
+  }, [allProducts]);
+
+  const locationOptionCounts = useMemo(() => {
+    const counts = {};
+    allProducts.forEach(p => {
+      const l = (p.location || '').trim();
+      if (l) counts[l] = (counts[l] || 0) + 1;
+    });
+    return counts;
+  }, [allProducts]);
 
   const handleExport = async () => {
     if (filteredProducts.length === 0) {
@@ -830,70 +892,41 @@ function Products() {
             className="w-full sm:w-64 px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
           />
 
-          {/* 品牌筛选 */}
-          <select
-            value={selectedBrand}
-            onChange={(e) => setSelectedBrand(e.target.value)}
-            className="px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
-          >
-            <option value="all">全部品牌</option>
-            {(() => {
-              const brands = [...new Set(
-                allProducts
-                  .map(p => p.brand)
-                  .filter(b => b && b.trim() !== '')
-              )].sort();
-              return brands.map(b => (
-                <option key={b} value={b}>{b}</option>
-              ));
-            })()}
-          </select>
+          {/* 品牌多选筛选 */}
+          <div className="w-full sm:w-44">
+            <MultiSelectFilter
+              label="品牌"
+              placeholder="全部品牌"
+              options={brandOptions}
+              selectedValues={selectedBrands}
+              onChange={setSelectedBrands}
+              optionCounts={brandOptionCounts}
+            />
+          </div>
 
-          {/* 库存分类筛选 */}
-          <select
-            value={selectedCategory}
-            onChange={(e) => {
-              const newCat = e.target.value;
-              setSelectedCategory(newCat);
-              // 切换库存分类时，如果当前库位不属于新分类，自动重置为"全部库位"
-              if (newCat !== 'all' && selectedLocation !== 'all') {
-                const validLocations = getLocationOptionsByCategory(newCat);
-                if (validLocations.length > 0 && !validLocations.includes(selectedLocation)) {
-                  setSelectedLocation('all');
-                }
-              }
-            }}
-            className="px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
-          >
-            {buildCategoryOptions(allProducts).map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
+          {/* 库存分类多选筛选 */}
+          <div className="w-full sm:w-44">
+            <MultiSelectFilter
+              label="库存分类"
+              placeholder="全部库存分类"
+              options={categoryOptions}
+              selectedValues={selectedCategories}
+              onChange={setSelectedCategories}
+              optionCounts={categoryOptionCounts}
+            />
+          </div>
 
-          {/* 库位筛选（随库存分类联动） */}
-          <select
-            value={selectedLocation}
-            onChange={(e) => setSelectedLocation(e.target.value)}
-            className="px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
-          >
-            <option value="all">全部库位</option>
-            {(() => {
-              if (selectedCategory === 'all') {
-                // 全部库存分类：展示所有产品中出现的全部库位
-                const allLocations = [...new Set(
-                  allProducts
-                    .map(p => p.location)
-                    .filter(l => l && l.trim() !== '')
-                )].sort();
-                return allLocations.map(loc => (
-                  <option key={loc} value={loc}>{loc}</option>
-                ));
-              }
-              return getLocationOptionsByCategory(selectedCategory).map(loc => (
-                <option key={loc} value={loc}>{loc}</option>
-              ));
-            })()}
-          </select>
+          {/* 库位多选筛选 */}
+          <div className="w-full sm:w-44">
+            <MultiSelectFilter
+              label="库位"
+              placeholder="全部库位"
+              options={locationOptions}
+              selectedValues={selectedLocations}
+              onChange={setSelectedLocations}
+              optionCounts={locationOptionCounts}
+            />
+          </div>
 
           {/* 操作按钮 */}
           <div className="flex flex-col sm:flex-row gap-2 items-start">
