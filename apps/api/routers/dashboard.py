@@ -54,6 +54,6 @@ def get_recent_transactions(db: Session = Depends(get_db), current_user: User = 
 
 @router.get("/low-stock-alerts")
 def get_low_stock_alerts(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """获取低库存预警（需登录）"""
-    low_stock_products = db.query(Product).filter(Product.current_stock <= Product.min_stock).limit(10).all()
+    """获取低库存预警（需登录，返回全量低库存产品供前端统计与展示）"""
+    low_stock_products = db.query(Product).filter(Product.current_stock <= Product.min_stock).all()
     return [product.to_dict() for product in low_stock_products]

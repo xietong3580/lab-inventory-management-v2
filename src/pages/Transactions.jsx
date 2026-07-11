@@ -197,10 +197,22 @@ function Transactions() {
       filtered = filtered.filter(record => record.status === selectedStatus);
     }
 
-    // 5. 按关键字搜索
+    // 5. 按关键字搜索（产品货号/SKU、产品名称、操作人、备注）
     if (searchTerm.trim()) {
       const keyword = searchTerm.trim().toLowerCase();
+      // Step 10-28A: 支持按产品货号/SKU搜索交易记录
+      // 先找到匹配的产品ID，再按产品ID筛选交易记录
+      const matchingProductIds = new Set(
+        products
+          .filter(p => {
+            const sku = (p.sku || '').toLowerCase();
+            const name = (p.name || '').toLowerCase();
+            return sku.includes(keyword) || name.includes(keyword);
+          })
+          .map(p => p.id)
+      );
       filtered = filtered.filter(record =>
+        matchingProductIds.has(record.productId) ||
         record.productName.toLowerCase().includes(keyword) ||
         record.operator.toLowerCase().includes(keyword) ||
         (record.notes && record.notes.toLowerCase().includes(keyword))
@@ -552,7 +564,7 @@ function Transactions() {
               </label>
               <input
                 type="text"
-                placeholder="产品名称、操作人..."
+                placeholder="产品货号/SKU、产品名称、操作人..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"

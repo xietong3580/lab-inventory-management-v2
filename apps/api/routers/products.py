@@ -15,13 +15,18 @@ router = APIRouter()
 @router.get("/", response_model=list[ProductResponse])
 def get_products(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = None,
     category: str = None,
     status: str = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """获取产品列表（需登录）"""
+    """获取产品列表（需登录）
+
+    - 不传 limit 时返回全量产品（默认行为，Dashboard/Alerts/Products 统计依赖全量数据）
+    - 传 limit 时启用分页（如 limit=20 则每页 20 条）
+    - skip 配合 limit 使用分页偏移
+    """
     query = db.query(Product)
 
     if category and category != "all":
@@ -34,7 +39,10 @@ def get_products(
         elif status == "正常":
             query = query.filter(Product.current_stock > Product.min_stock)
 
-    products = query.offset(skip).limit(limit).all()
+    if limit is not None:
+        products = query.offset(skip).limit(limit).all()
+    else:
+        products = query.offset(skip).all()
     return [product.to_dict() for product in products]
 
 @router.get("/{product_id}")
