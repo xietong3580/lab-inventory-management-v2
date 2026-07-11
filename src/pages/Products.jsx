@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { productService as dataProductService } from '../services/dataService';
 import { getProductsWithCalculatedStatus, calculateProductStatus, updateProduct, addProduct, deleteProduct } from '../services/productService';
 import { getLedgerTypeConfig, formatLedgerTime } from '../utils/inventoryHistoryHelpers';
-import { filterProducts, hasActiveFilters, calculateVerificationStatus } from '../utils/productFilterHelpers';
+import { filterProducts, hasActiveFilters, calculateVerificationStatus, computeFacetOptions } from '../utils/productFilterHelpers';
 import { exportProductsToCSV } from '../utils/exportHelpers';
 import { runPreflightCheck, createMaintenanceBackup } from '../services/backupService';
 import { usePermission } from '../hooks/usePermission';
@@ -241,33 +241,96 @@ function Products() {
     }
   }, [isModalOpen, ledgerModalOpen]);
 
-  // 当产品数据、搜索词或分类变化时，重新筛选（使用 debounced search term）
-  useEffect(() => {
-    const filtered = filterProducts(
-      allProducts,
-      debouncedSearchTerm,
-      selectedCategories,
-      selectedStatus,
-      minStock,
-      maxStock,
-      selectedLocations,
-      selectedBrands,
-      verificationFilter
-    );
-    setFilteredProducts(filtered);
-    // 如果筛选后当前页超出范围，重置到第一页
-    const totalPages = Math.ceil(filtered.length / itemsPerPage);
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(1);
+  // ── Unified faceted filter pipeline (Step 10-30D) ──
+
+  // Current filter state as a plain object for facet computation
+  const currentFilters = useMemo(() => ({
+    keyword: debouncedSearchTerm,
+    categories: selectedCategories,
+    status: selectedStatus,
+    minStock,
+    maxStock,
+    locations: selectedLocations,
+    brands: selectedBrands,
+    verificationFilter,
+  }), [debouncedSearchTerm, selectedCategories, selectedStatus, minStock, maxStock, selectedLocations, selectedBrands, verificationFilter]);
+
+  // Final filtered products (all dimensions applied)
+  const computedFiltered = useMemo(() =>
+    filterProducts(allProducts, debouncedSearchTerm, selectedCategories, selectedStatus, minStock, maxStock, selectedLocations, selectedBrands, verificationFilter),
+    [allProducts, debouncedSearchTerm, selectedCategories, selectedStatus, minStock, maxStock, selectedLocations, selectedBrands, verificationFilter]
+  );
+
+  // Sync filtered products to state
+  useEffect(() => { setFilteredProducts(computedFiltered); }, [computedFiltered]);
+
+  // Reset page to 1 when any filter changes
+  useEffect(() => { setCurrentPage(1); }, [debouncedSearchTerm, selectedCategories, selectedStatus, minStock, maxStock, selectedLocations, selectedBrands, verificationFilter]);
+
+  // ── Faceted candidates (exclude self-dimension) ──
+  const brandFacet = useMemo(() =>
+    computeFacetOptions(allProducts, 'brand', currentFilters),
+    [allProducts, currentFilters]
+  );
+  const categoryFacet = useMemo(() =>
+    computeFacetOptions(allProducts, 'category', currentFilters),
+    [allProducts, currentFilters]
+  );
+  const locationFacet = useMemo(() =>
+    computeFacetOptions(allProducts, 'location', currentFilters),
+    [allProducts, currentFilters]
+  );
+
+  // Brand options: sort alphabetically; always include selected values even if count is 0
+  const brandOptions = useMemo(() => {
+    const keys = Object.keys(brandFacet.counts);
+    for (const b of selectedBrands) {
+      if (!keys.includes(b)) keys.push(b);
     }
-  }, [allProducts, debouncedSearchTerm, selectedCategories, selectedStatus, minStock, maxStock, selectedLocations, selectedBrands, verificationFilter, currentPage, itemsPerPage]);
+    return keys.sort();
+  }, [brandFacet, selectedBrands]);
+  const brandOptionCounts = useMemo(() => {
+    const merged = { ...brandFacet.counts };
+    for (const b of selectedBrands) {
+      if (!(b in merged)) merged[b] = 0;
+    }
+    return merged;
+  }, [brandFacet, selectedBrands]);
 
-  // 当筛选条件变化时，重置到第一页
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedSearchTerm, selectedCategories, selectedStatus, minStock, maxStock, selectedLocations, selectedBrands, verificationFilter]);
+  // Category options: preserve INVENTORY_CATEGORIES authoritative order; always include selected values
+  const categoryOptions = useMemo(() => {
+    const keys = Object.keys(categoryFacet.counts);
+    for (const c of selectedCategories) {
+      if (!keys.includes(c)) keys.push(c);
+    }
+    const extras = keys.filter(c => !INVENTORY_CATEGORIES.includes(c)).sort();
+    return [...INVENTORY_CATEGORIES.filter(c => keys.includes(c)), ...extras];
+  }, [categoryFacet, selectedCategories]);
+  const categoryOptionCounts = useMemo(() => {
+    const merged = { ...categoryFacet.counts };
+    for (const c of selectedCategories) {
+      if (!(c in merged)) merged[c] = 0;
+    }
+    return merged;
+  }, [categoryFacet, selectedCategories]);
 
-  // 分页计算
+  // Location options: sort alphabetically; always include selected values even if count is 0
+  const locationOptions = useMemo(() => {
+    const keys = Object.keys(locationFacet.counts);
+    for (const l of selectedLocations) {
+      if (!keys.includes(l)) keys.push(l);
+    }
+    return keys.sort();
+  }, [locationFacet, selectedLocations]);
+  const locationOptionCounts = useMemo(() => {
+    const merged = { ...locationFacet.counts };
+    for (const l of selectedLocations) {
+      if (!(l in merged)) merged[l] = 0;
+    }
+    return merged;
+  }, [locationFacet, selectedLocations]);
+
+  // ── Pagination ──
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const displayedProducts = filteredProducts.slice(startIndex, endIndex);
@@ -275,7 +338,9 @@ function Products() {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    // 搜索按钮主要用于重置到第一页，筛选逻辑由useEffect自动处理
+    // 搜索：立即刷入 debounced 值并回到第一页
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    setDebouncedSearchTerm(searchTerm);
     setCurrentPage(1);
   };
 
@@ -296,67 +361,6 @@ function Products() {
       searchInputRef.current?.focus();
     }, 0);
   };
-
-  // Step 10-28C: 多选筛选选项列表（含数量统计）
-  const brandOptions = useMemo(() => {
-    const counts = {};
-    allProducts.forEach(p => {
-      const b = (p.brand || '').trim();
-      if (b) counts[b] = (counts[b] || 0) + 1;
-    });
-    return Object.keys(counts).sort();
-  }, [allProducts]);
-
-  const categoryOptions = useMemo(() => {
-    const counts = {};
-    allProducts.forEach(p => {
-      const c = (p.category || '').trim();
-      if (c) counts[c] = (counts[c] || 0) + 1;
-    });
-    // 使用 INVENTORY_CATEGORIES 定义的权威顺序，确保显示名称绝对正确
-    // 追加数据中存在但不在标准分类中的旧分类（防御性兼容）
-    const extras = Object.keys(counts)
-      .filter(c => !INVENTORY_CATEGORIES.includes(c))
-      .sort();
-    return [...INVENTORY_CATEGORIES.filter(c => counts[c] !== undefined), ...extras];
-  }, [allProducts]);
-
-  const locationOptions = useMemo(() => {
-    const counts = {};
-    allProducts.forEach(p => {
-      const l = (p.location || '').trim();
-      if (l) counts[l] = (counts[l] || 0) + 1;
-    });
-    return Object.keys(counts).sort();
-  }, [allProducts]);
-
-  // 各选项对应的产品数量
-  const brandOptionCounts = useMemo(() => {
-    const counts = {};
-    allProducts.forEach(p => {
-      const b = (p.brand || '').trim();
-      if (b) counts[b] = (counts[b] || 0) + 1;
-    });
-    return counts;
-  }, [allProducts]);
-
-  const categoryOptionCounts = useMemo(() => {
-    const counts = {};
-    allProducts.forEach(p => {
-      const c = (p.category || '').trim();
-      if (c) counts[c] = (counts[c] || 0) + 1;
-    });
-    return counts;
-  }, [allProducts]);
-
-  const locationOptionCounts = useMemo(() => {
-    const counts = {};
-    allProducts.forEach(p => {
-      const l = (p.location || '').trim();
-      if (l) counts[l] = (counts[l] || 0) + 1;
-    });
-    return counts;
-  }, [allProducts]);
 
   // Step 10-29A-fix1: Export confirmation state
   const [showExportConfirm, setShowExportConfirm] = useState(false);
@@ -916,12 +920,14 @@ function Products() {
           <input
             ref={searchInputRef}
             type="text"
-            placeholder="搜索货号 / SKU / 产品名称"
+            placeholder="搜索 SKU / 名称 / 品牌 / 规格 / 供应商"
             value={searchTerm}
             onChange={handleSearchChange}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
+                if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+                setDebouncedSearchTerm(searchTerm);
                 setCurrentPage(1);
               }
             }}
@@ -1144,6 +1150,56 @@ function Products() {
                 })()}
               </div>
             </div>
+            {/* Step 10-30D: 当前筛选摘要 */}
+            {activeFilters && (
+              <div className="mt-2 pt-2 border-t border-slate-100">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs text-slate-400 mr-1 shrink-0">筛选：</span>
+                  {debouncedSearchTerm.trim() && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs text-slate-600">
+                      搜索: {debouncedSearchTerm.trim().length > 20 ? debouncedSearchTerm.trim().slice(0,20)+'...' : debouncedSearchTerm.trim()}
+                      <button type="button" onClick={() => { setSearchTerm(''); setDebouncedSearchTerm(''); if(debounceTimerRef.current) clearTimeout(debounceTimerRef.current); }} className="text-slate-400 hover:text-slate-600 ml-0.5">&times;</button>
+                    </span>
+                  )}
+                  {selectedBrands.map(b => (
+                    <span key={'b-'+b} className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs text-slate-600">
+                      {b}
+                      <button type="button" onClick={() => setSelectedBrands(prev => prev.filter(x => x !== b))} className="text-slate-400 hover:text-slate-600 ml-0.5">&times;</button>
+                    </span>
+                  ))}
+                  {selectedCategories.map(c => (
+                    <span key={'c-'+c} className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs text-slate-600">
+                      {c}
+                      <button type="button" onClick={() => setSelectedCategories(prev => prev.filter(x => x !== c))} className="text-slate-400 hover:text-slate-600 ml-0.5">&times;</button>
+                    </span>
+                  ))}
+                  {selectedLocations.map(l => (
+                    <span key={'l-'+l} className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs text-slate-600">
+                      {l}
+                      <button type="button" onClick={() => setSelectedLocations(prev => prev.filter(x => x !== l))} className="text-slate-400 hover:text-slate-600 ml-0.5">&times;</button>
+                    </span>
+                  ))}
+                  {selectedStatus !== 'all' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs text-slate-600">
+                      {selectedStatus}
+                      <button type="button" onClick={() => setSelectedStatus('all')} className="text-slate-400 hover:text-slate-600 ml-0.5">&times;</button>
+                    </span>
+                  )}
+                  {verificationFilter !== 'all' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs text-slate-600">
+                      {verificationFilter}
+                      <button type="button" onClick={() => setVerificationFilter('all')} className="text-slate-400 hover:text-slate-600 ml-0.5">&times;</button>
+                    </span>
+                  )}
+                  {(minStock !== '' || maxStock !== '') && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs text-slate-600">
+                      库存: {minStock || '0'} - {maxStock || '∞'}
+                      <button type="button" onClick={() => { setMinStock(''); setMaxStock(''); }} className="text-slate-400 hover:text-slate-600 ml-0.5">&times;</button>
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
             {filteredProducts.length > 0 && (
               <div className="text-xs text-slate-400 mt-2 pt-2 border-t border-slate-100">
                 当前筛选结果共 {filteredProducts.length} 个产品
@@ -1165,28 +1221,29 @@ function Products() {
         ) : filteredProducts.length === 0 ? (
           // 筛选无结果
           <div className="py-12 text-center">
-            <div className="text-slate-500 mb-2">未找到匹配的产品</div>
+            <div className="text-slate-500 mb-2 text-lg font-medium">当前筛选条件下暂无匹配产品</div>
             <div className="text-sm text-slate-500 max-w-md mx-auto mb-4">
-              当前筛选条件下未找到匹配的产品。请尝试：
+              当前筛选条件组合未匹配到任何产品。您可以通过以下方式调整：
             </div>
-            <div className="text-sm text-slate-600 max-w-md mx-auto space-y-1">
-              <p>• 调整搜索关键词（货号 / SKU / 产品名称）</p>
-              <p>• 选择不同的品牌</p>
-              <p>• 选择不同的库存分类</p>
-              <p>• 选择不同的存储位置 / 库位</p>
-              <p>• 调整库存状态筛选</p>
-              <p>• 调整核对状态筛选</p>
-              <p>• 调整库存数量范围</p>
-              <p>• 点击"重置筛选"查看全部产品</p>
-            </div>
+            {activeFilters && (
+              <div className="text-sm text-slate-600 max-w-md mx-auto space-y-1 mb-6">
+                <p>• 点击上方筛选摘要中的 <span className="text-slate-400">&times;</span> 移除单个条件</p>
+                <p>• 调整搜索关键词</p>
+                <p>• 调整品牌、库存分类、库位选择</p>
+                <p>• 调整库存状态或数量范围</p>
+              </div>
+            )}
             {activeFilters && (
               <button
                 type="button"
-                className="mt-6 px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 transition-colors"
+                className="px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 transition-colors"
                 onClick={handleReset}
               >
-                重置筛选
+                重置全部筛选
               </button>
+            )}
+            {!activeFilters && (
+              <div className="text-sm text-slate-400">请检查数据源或联系管理员。</div>
             )}
           </div>
         ) : (

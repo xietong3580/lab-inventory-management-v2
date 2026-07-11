@@ -8,6 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "check:api-config": "node scripts/check-api-config.cjs",
+    "test": "node --test src/utils/productFilterHelpers.test.js",
+    "check:product-filters": "node --test src/utils/productFilterHelpers.test.js",
     "preview": "vite preview"
   },
   "dependencies": {
