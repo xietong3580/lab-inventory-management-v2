@@ -34,6 +34,7 @@ def init_db():
     migrate_users()
     migrate_products()
     migrate_transactions()
+    migrate_products_sku_nonunique()
 
 def migrate_users():
     """迁移 users 表：检查并逐列添加缺失字段（安全迁移，不删除数据）"""
@@ -123,13 +124,92 @@ def migrate_transactions():
     conn.close()
 
 
+def migrate_products_sku_nonunique():
+    """Step 10-27C: 安全移除 products.sku UNIQUE 约束
+
+    SQLite 不支持 ALTER TABLE DROP CONSTRAINT，通过安全重建表实现。
+    对空表和已有数据表均安全：使用事务 + 完整列映射 + 数据保全。
+    幂等：如果 sku 已无 UNIQUE 约束则跳过。
+    """
+    import sqlite3
+    import os
+
+    db_path = os.path.join(BASE_DIR, 'inventory.db')
+    if not os.path.exists(db_path):
+        return
+
+    conn = sqlite3.connect(db_path)
+
+    # 幂等检查：读取 CREATE TABLE SQL
+    cursor = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='products'"
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return
+
+    create_sql = row[0]
+    if ('"sku"' not in create_sql and 'sku' not in create_sql) or 'UNIQUE' not in create_sql:
+        conn.close()
+        return
+
+    cursor = conn.execute("PRAGMA table_info('products')")
+    columns = [(r[1], r[2]) for r in cursor.fetchall()]
+
+    if not columns:
+        conn.close()
+        return
+
+    try:
+        conn.execute("BEGIN TRANSACTION")
+
+        col_defs = []
+        for col_name, col_type in columns:
+            if col_name == 'sku':
+                col_defs.append(f'"{col_name}" {col_type} NOT NULL')
+            elif col_name == 'id':
+                col_defs.append(f'"{col_name}" {col_type} PRIMARY KEY')
+            else:
+                col_defs.append(f'"{col_name}" {col_type}')
+
+        conn.execute(
+            f"CREATE TABLE products_new ({', '.join(col_defs)})"
+        )
+
+        col_names = [c[0] for c in columns]
+        conn.execute(
+            f"INSERT INTO products_new ({', '.join(col_names)}) "
+            f"SELECT {', '.join(col_names)} FROM products"
+        )
+
+        conn.execute("DROP TABLE products")
+        conn.execute("ALTER TABLE products_new RENAME TO products")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS ix_products_sku ON products (sku)"
+        )
+
+        conn.execute("COMMIT")
+        print("  [迁移] products.sku UNIQUE 约束已安全移除")
+    except sqlite3.Error as e:
+        conn.execute("ROLLBACK")
+        print(f"  [迁移] products.sku UNIQUE 约束移除失败（已回滚）: {e}")
+        raise
+    finally:
+        conn.close()
+
+
 # 模型定义
 class Product(Base):
     """产品模型"""
     __tablename__ = "products"
 
     id = Column(Integer, primary_key=True, index=True)
-    sku = Column(String(50), unique=True, nullable=False, index=True)
+    # Step 10-27C: 移除 unique=True — 产品货号不是全局唯一字段。
+    # 同一货号可在不同品牌/规格/分类/库位下共存。
+    # 唯一性由七字段复合键判定：品牌+货号+名称+规格+单位+类别+存放位置。
+    # 数据库主键 id 是产品的唯一标识。
+    sku = Column(String(50), nullable=False, index=True)
     name = Column(String(100), nullable=False)
     category = Column(String(50), nullable=False, default="耗材")
     current_stock = Column(Integer, nullable=False, default=0)

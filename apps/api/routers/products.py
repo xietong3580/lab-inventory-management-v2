@@ -58,10 +58,23 @@ def get_product(product_id: str, db: Session = Depends(get_db), current_user: Us
 @router.post("/", response_model=ProductResponse)
 def create_product(product_data: ProductCreate, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     """创建新产品（需管理员权限）"""
-    # 检查SKU是否已存在
-    existing = db.query(Product).filter(Product.sku == product_data.sku).first()
+    # Step 10-27C: 七字段复合键判重（品牌+货号+名称+规格+单位+类别+位置）
+    # 只有完全相同才拒绝，同 SKU 不同规格/库位/品牌允许共存。
+    existing = db.query(Product).filter(
+        Product.sku == product_data.sku,
+        Product.name == product_data.name,
+        Product.brand == (product_data.brand or None),
+        Product.specification == (product_data.specification or None),
+        Product.unit == product_data.unit,
+        Product.category == product_data.category,
+        Product.location == (product_data.location or ""),
+    ).first()
     if existing:
-        raise HTTPException(status_code=400, detail="SKU已存在")
+        raise HTTPException(
+            status_code=400,
+            detail=f"完全重复的库存产品（ID: prod-{existing.id:06d}，名称: {existing.name}），"
+                   f"品牌/货号/名称/规格/单位/类别/位置均相同。同货号不同规格/库位可正常创建。"
+        )
 
     # 计算库存状态
     status = "低库存" if product_data.currentStock <= product_data.minStock else "正常"
@@ -139,13 +152,23 @@ def update_product(
     if "minStock" in update_data:
         product.min_stock = update_data["minStock"]
     if "sku" in update_data:
-        # 检查SKU是否重复（排除自身）
+        # Step 10-27C: 七字段复合键判重（排除自身）
         existing = db.query(Product).filter(
             Product.sku == update_data["sku"],
+            Product.name == product.name,
+            Product.brand == (product.brand or None),
+            Product.specification == (product.specification or None),
+            Product.unit == product.unit,
+            Product.category == product.category,
+            Product.location == (product.location or ""),
             Product.id != db_id
         ).first()
         if existing:
-            raise HTTPException(status_code=400, detail="SKU已存在")
+            raise HTTPException(
+                status_code=400,
+                detail=f"完全重复的库存产品（ID: prod-{existing.id:06d}）。"
+                       f"同货号不同规格/库位可正常保存。"
+            )
         product.sku = update_data["sku"]
 
     # 直接更新的字段

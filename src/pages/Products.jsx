@@ -173,7 +173,8 @@ function Products() {
   const [isBackupBeforeExport, setIsBackupBeforeExport] = useState(false);
   const [backupExportError, setBackupExportError] = useState('');
 
-  // Step 10-6D：SKU 重复前端预检查 & 产品名称重复轻提示
+  // Step 10-27C: 七字段复合键完全重复检查（品牌+货号+名称+规格+单位+分类+位置）
+  // 同货号不同规格/库位/品牌不再视为重复。
   const [skuError, setSkuError] = useState(null);
   const [nameWarning, setNameWarning] = useState(null);
   const [nameSpecWarning, setNameSpecWarning] = useState(null);
@@ -403,9 +404,9 @@ function Products() {
       return;
     }
 
-    // Step 10-6D：SKU 重复前端预检查（提交前再次确认）
+    // Step 10-27C: 七字段复合键完全重复前端预检查（提交前再次确认）
     if (skuError) {
-      setSaveError('SKU 已存在，请确认是否重复产品。');
+      setSaveError(skuError);
       return;
     }
 
@@ -507,8 +508,8 @@ function Products() {
       setIsSaving(false);
       // 根据错误类型给出友好提示
       const errMsg = error.message || '';
-      if (errMsg.includes('SKU') || errMsg.includes('sku') || errMsg.includes('已存在') || errMsg.includes('重复')) {
-        setSaveError('SKU 已存在，请检查货号');
+      if (errMsg.includes('完全重复') || errMsg.includes('重复的库存产品')) {
+        setSaveError(error.message);
       } else {
         setSaveError('保存失败，请稍后重试');
       }
@@ -597,18 +598,31 @@ function Products() {
     }
   };
 
-  // Step 10-6D：SKU 重复前端预检查
-  const checkSkuDuplicate = (skuValue, currentProductId = null) => {
-    if (!skuValue || !skuValue.trim()) {
+  // Step 10-27C: 七字段复合键完全重复前端预检查
+  // 品牌+货号+名称+规格+单位+分类+存放位置全部相同时才判定为重复。
+  // 同货号不同规格/库位/品牌允许共存。
+  const checkSkuDuplicate = (currentProductId = null) => {
+    const { sku, name, brand, specification, unit, category, location } = formData;
+    if (!sku || !sku.trim()) {
       setSkuError(null);
       return;
     }
-    const trimmedSku = skuValue.trim().toLowerCase();
+    const norm = (v) => (v || '').trim().toLowerCase();
     const duplicate = allProducts.find(
-      p => p.sku.trim().toLowerCase() === trimmedSku && p.id !== currentProductId
+      p => norm(p.sku) === norm(sku)
+        && norm(p.name) === norm(name)
+        && norm(p.brand) === norm(brand)
+        && norm(p.specification) === norm(specification)
+        && norm(p.unit) === norm(unit)
+        && norm(p.category) === norm(category)
+        && norm(p.location) === norm(location)
+        && p.id !== currentProductId
     );
     if (duplicate) {
-      setSkuError('SKU 已存在，请确认是否重复产品。');
+      setSkuError(
+        `完全重复的库存产品（ID: ${duplicate.id}，名称: ${duplicate.name}），`
+        + '品牌/货号/名称/规格/单位/类别/库位均相同。同货号不同规格/库位可正常创建。'
+      );
     } else {
       setSkuError(null);
     }
@@ -656,9 +670,10 @@ function Products() {
       return updates;
     });
 
-    // Step 10-6D：实时重复检查
-    if (name === 'sku') {
-      checkSkuDuplicate(value, editingProduct ? editingProduct.id : null);
+    // Step 10-27C: 七字段复合键实时重复检查
+    const compositeFields = ['sku', 'name', 'brand', 'specification', 'unit', 'category', 'location'];
+    if (compositeFields.includes(name)) {
+      checkSkuDuplicate(editingProduct ? editingProduct.id : null);
     }
     if (name === 'name' || name === 'specification') {
       const newName = name === 'name' ? value : formData.name;

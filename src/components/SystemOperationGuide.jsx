@@ -161,7 +161,7 @@ export default function SystemOperationGuide({ embedded = false }) {
                 在产品管理页面左上角点击「+ 新增产品」。
               </StepItem>
               <StepItem number={2} title="填写产品信息">
-                必填：<strong>SKU 编码</strong>（唯一标识）、<strong>产品名称</strong>、<strong>库存分类</strong>、<strong>单位</strong>、<strong>当前库存</strong>、<strong>库位</strong>。<br />
+                必填：<strong>SKU 编码</strong>（产品货号，可重复，建议通过品牌/规格/库位区分）、<strong>产品名称</strong>、<strong>库存分类</strong>、<strong>单位</strong>、<strong>当前库存</strong>、<strong>库位</strong>。<br />
                 选填：品牌、规格、供应商、备注、采购价、售价。
               </StepItem>
               <StepItem number={3} title="保存">
@@ -294,7 +294,7 @@ export default function SystemOperationGuide({ embedded = false }) {
             <div className="p-3 rounded-md border bg-slate-50 border-slate-200">
               <div className="text-sm font-medium text-slate-800 mb-2">录入注意事项</div>
               <ul className="text-xs text-slate-600 space-y-1 list-disc list-inside leading-relaxed">
-                <li>SKU 编码不能重复，系统会实时检查</li>
+                <li>产品货号可重复，系统按七字段复合键（品牌+货号+名称+规格+单位+分类+库位）判断完全重复</li>
                 <li>产品没有货号时，可使用内部编号（如 LEGACY-NOCODE-0001），产品名称保持真实</li>
                 <li>采购价、售价未知时请留空，不要填 0，留空表示未知</li>
                 <li>当前库存数量请人工确认后准确填写</li>
@@ -389,8 +389,8 @@ export default function SystemOperationGuide({ embedded = false }) {
               answer="如果还没有正式开始出入库，可以直接编辑产品修改库存。如果已经正式使用，优先通过入库或出库记录来调整数量，并留下备注说明原因。系统会记录所有操作到操作日志和台账中。"
             />
             <FaqItem
-              question="录入产品时 SKU 重复怎么办？"
-              answer="系统会自动检查 SKU 是否重复。如果提示 SKU 已存在，请确认是否确实重复。如果是不同产品，请为其中一个修改 SKU 编码。"
+              question="录入产品时货号重复怎么办？"
+              answer="系统按七字段复合键（品牌+货号+名称+规格+单位+分类+库位）判断是否完全重复。同一货号在不同品牌/规格/库位/分类下属于不同库存产品，可以正常录入。只有当七字段全部相同时才会被系统阻止。"
             />
             <FaqItem
               question="产品名称重复了怎么办？"

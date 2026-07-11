@@ -324,7 +324,7 @@ function ProductImportPreview() {
             <span className="text-emerald-500 mt-0.5 shrink-0">•</span>
             <span>
               正式导入功能已开放（管理员专属）。需先完成预览、
-              <strong>确认数据库备份</strong>后执行，仅新增不覆盖已存在 SKU。
+              <strong>确认数据库备份</strong>后执行，仅新增不覆盖已存在产品（按七字段复合键判重）。
             </span>
           </li>
         </ul>
@@ -1121,7 +1121,7 @@ function ProductImportPreview() {
                     <div className="text-sm text-amber-700 flex items-start gap-2">
                       <span className="text-amber-500 mt-0.5 shrink-0">⚠</span>
                       <span>
-                        <strong>所有 SKU 均已存在，本次导入无新增产品。</strong>
+                        <strong>所有产品均已存在（七字段复合键匹配），本次导入无新增。</strong>
                         {' '}共 {executeResult.skipped_count} 条均已跳过，原产品数据保持不变。
                       </span>
                     </div>
@@ -1133,7 +1133,7 @@ function ProductImportPreview() {
                     <div className="text-sm text-amber-700 flex items-start gap-2">
                       <span className="text-amber-500 mt-0.5 shrink-0">⚠</span>
                       <span>
-                        <strong>部分 SKU 已存在，系统已跳过，未覆盖原数据。</strong>
+                        <strong>部分产品已存在（七字段复合键匹配），系统已跳过，未覆盖原数据。</strong>
                         {' '}共跳过 {executeResult.skipped_count} 条，原产品数据保持不变。下方「跳过产品」表格可查看明细。
                       </span>
                     </div>
@@ -1369,7 +1369,7 @@ function ProductImportPreview() {
               <div className="flex items-start gap-3">
                 <span className="text-amber-500 mt-0.5 shrink-0">⚠</span>
                 <div>
-                  <div className="text-sm font-medium text-slate-700">SKU 已存在的产品将被跳过</div>
+                  <div className="text-sm font-medium text-slate-700">已存在的产品（七字段复合键匹配）将被跳过</div>
                   <div className="text-sm text-slate-500">
                     不会覆盖已有产品的任何字段（库存、名称、分类等），仅以 skipped 记录。
                   </div>

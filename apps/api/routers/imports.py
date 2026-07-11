@@ -962,11 +962,12 @@ async def execute_products_import(
 ):
     """执行产品 CSV 正式导入（仅管理员，Step 9-5B）
 
-    **第一版：仅支持 create_only 模式**
+    **仅支持 create_only 模式**
 
     规则：
-    1. CSV 中 SKU 不存在于数据库时 → 新增产品
-    2. SKU 已存在时 → 跳过（skipped + warning），不覆盖、不更新
+    1. CSV 中七字段复合键不匹配时 → 新增产品
+    2. 七字段复合键已存在时 → 跳过（skipped + warning），不覆盖、不更新
+       复合键：品牌 + 产品货号 + 产品名称 + 规格 + 单位 + 类别 + 存放位置
     3. 存在结构性 error / 行级 error 时 → 禁止整批导入
     4. 同一事务：全部成功或全部失败回滚
 
@@ -1299,7 +1300,7 @@ async def execute_products_import(
         "errors": real_errors,
         "detail": (
             f"导入成功：新增 {len(created_items)} 个产品"
-            f"，跳过 {len(skipped_items)} 个已存在 SKU。"
+            f"，跳过 {len(skipped_items)} 个已存在复合键。"
         ),
         "backup_reminder": None,
     }
