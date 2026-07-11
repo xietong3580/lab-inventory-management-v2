@@ -668,6 +668,10 @@ def _parse_and_validate_csv(
             legacy_nocode_counter += 1
             suggested = f"LEGACY-NOCODE-{legacy_nocode_counter:04d}"
             row_result["suggested_sku"] = suggested
+            # Step 10-27B-fix：将生成的迁移 SKU 回写到 normalized.sku，
+            # 确保正式导入 execute 路径与 preview 路径共用同一套 SKU 判断/生成逻辑，
+            # 避免 execute 路径插入 products.sku=None 导致 NOT NULL constraint failed。
+            norm["sku"] = suggested
             row_result["warnings"].append(
                 f"旧系统产品货号为空，正式导入时将生成迁移 SKU {suggested}，"
                 f"产品名称「{row_name}」保持不变。"
