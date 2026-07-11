@@ -123,6 +123,17 @@ function Products() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  // Step 10-29A-fix1: 250ms debounce for search input
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const debounceTimerRef = useRef(null);
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchTerm(val);
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => setDebouncedSearchTerm(val), 250);
+  };
+  // Cleanup debounce timer on unmount
+  useEffect(() => () => { if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current); }, []);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const { canWrite, adminOnlyTitle } = usePermission();
 
@@ -136,9 +147,9 @@ function Products() {
   const itemsPerPage = 8;
   const searchInputRef = useRef(null);
 
-  // 是否有活跃筛选条件
+  // 是否有活跃筛选条件（使用 debounced search term 判断筛选）
   const activeFilters = hasActiveFilters({
-    keyword: searchTerm,
+    keyword: debouncedSearchTerm,
     categories: selectedCategories,
     status: selectedStatus,
     minStock,
@@ -230,11 +241,11 @@ function Products() {
     }
   }, [isModalOpen, ledgerModalOpen]);
 
-  // 当产品数据、搜索词或分类变化时，重新筛选
+  // 当产品数据、搜索词或分类变化时，重新筛选（使用 debounced search term）
   useEffect(() => {
     const filtered = filterProducts(
       allProducts,
-      searchTerm,
+      debouncedSearchTerm,
       selectedCategories,
       selectedStatus,
       minStock,
@@ -249,12 +260,12 @@ function Products() {
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(1);
     }
-  }, [allProducts, searchTerm, selectedCategories, selectedStatus, minStock, maxStock, selectedLocations, selectedBrands, verificationFilter, currentPage, itemsPerPage]);
+  }, [allProducts, debouncedSearchTerm, selectedCategories, selectedStatus, minStock, maxStock, selectedLocations, selectedBrands, verificationFilter, currentPage, itemsPerPage]);
 
   // 当筛选条件变化时，重置到第一页
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedCategories, selectedStatus, minStock, maxStock, selectedLocations, selectedBrands, verificationFilter]);
+  }, [debouncedSearchTerm, selectedCategories, selectedStatus, minStock, maxStock, selectedLocations, selectedBrands, verificationFilter]);
 
   // 分页计算
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -270,6 +281,8 @@ function Products() {
 
   const handleReset = () => {
     setSearchTerm('');
+    setDebouncedSearchTerm('');
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     setSelectedCategories([]);
     setSelectedLocations([]);
     setSelectedBrands([]);
@@ -345,31 +358,54 @@ function Products() {
     return counts;
   }, [allProducts]);
 
+  // Step 10-29A-fix1: Export confirmation state
+  const [showExportConfirm, setShowExportConfirm] = useState(false);
+  const [exportTarget, setExportTarget] = useState('filtered'); // 'filtered' | 'all'
+
   const handleExport = async () => {
-    if (filteredProducts.length === 0) {
-      alert('没有可导出的数据，请先调整筛选条件或等待数据加载。');
+    if (allProducts.length === 0) {
+      alert('没有可导出的数据，请先等待数据加载。');
       return;
     }
-    // 导出前先运行安全检查
+    if (filteredProducts.length === 0) {
+      alert('当前筛选结果为空，请调整筛选条件。如需导出全部产品请先重置筛选。');
+      return;
+    }
+    // Show confirmation dialog
+    setExportTarget(activeFilters ? 'filtered' : 'all');
+    setShowExportConfirm(true);
+  };
+
+  // Execute export after confirmation
+  const handleConfirmExport = () => {
+    setShowExportConfirm(false);
+    const data = exportTarget === 'all' ? allProducts : filteredProducts;
     setIsPreflightChecking(true);
     setPreflightResult(null);
     setPreflightError('');
     setBackupExportError('');
-    try {
-      const result = await runPreflightCheck();
-      setPreflightResult(result);
-    } catch (err) {
-      setPreflightError(err.message || '安全检查请求失败');
-    } finally {
-      setIsPreflightChecking(false);
-      setShowPreflightModal(true);
-    }
+    runPreflightCheck()
+      .then((result) => {
+        setPreflightResult(result);
+        setIsPreflightChecking(false);
+        setShowPreflightModal(true);
+        // Store pending export target
+        window.__pendingExportData = data;
+      })
+      .catch((err) => {
+        setPreflightError(err.message || '安全检查请求失败');
+        setIsPreflightChecking(false);
+        // Still try to export even if preflight fails
+        exportProductsToCSV(data, 'products-export');
+      });
   };
 
-  // 确认导出（跳过安全检查或检查通过后）
-  const handleConfirmExport = () => {
+  // Confirm export after preflight check
+  const handlePreflightConfirmExport = () => {
     setShowPreflightModal(false);
-    exportProductsToCSV(filteredProducts, 'products-export');
+    const data = window.__pendingExportData || filteredProducts;
+    exportProductsToCSV(data, 'products-export');
+    window.__pendingExportData = null;
   };
 
   // 创建备份后再导出（仅 admin 可用）
@@ -882,7 +918,7 @@ function Products() {
             type="text"
             placeholder="搜索货号 / SKU / 产品名称"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={handleSearchChange}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
@@ -1155,79 +1191,79 @@ function Products() {
           </div>
         ) : (
           <>
-            {/* 表格头部 */}
+            {/* 表格 */}
             <div className="overflow-x-auto">
-              <table className="min-w-[900px] md:min-w-full divide-y divide-slate-200">
+              <table className="w-full table-fixed divide-y divide-slate-200">
+                <colgroup>
+                  <col className="w-[72px]" />
+                  <col className="w-[120px]" />
+                  <col className="w-[220px] lg:w-[260px]" />
+                  <col className="w-[90px]" />
+                  <col className="w-[62px]" />
+                  <col className="w-[66px]" />
+                  <col className="w-[88px]" />
+                  <col className="w-[96px]" />
+                  <col className="w-[106px]" />
+                  <col className="w-[170px]" />
+                </colgroup>
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                      SKU
-                    </th>
-                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                      产品名称
-                    </th>
-                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                      库存分类
-                    </th>
-                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                      库存
-                    </th>
-                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                      最低库存
-                    </th>
-                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                      状态
-                    </th>
-                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                      核对状态
-                    </th>
-                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                      存储位置
-                    </th>
-                    <th className="px-4 py-2 md:px-6 md:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                      操作
-                    </th>
+                    <th className="px-2 py-2 lg:px-3 lg:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">编号</th>
+                    <th className="px-2 py-2 lg:px-3 lg:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">SKU</th>
+                    <th className="px-2 py-2 lg:px-3 lg:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">产品名称</th>
+                    <th className="px-2 py-2 lg:px-3 lg:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">分类</th>
+                    <th className="px-2 py-2 lg:px-3 lg:py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">库存</th>
+                    <th className="px-2 py-2 lg:px-3 lg:py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">最低</th>
+                    <th className="px-2 py-2 lg:px-3 lg:py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">状态</th>
+                    <th className="px-2 py-2 lg:px-3 lg:py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider">核对</th>
+                    <th className="px-2 py-2 lg:px-3 lg:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">库位</th>
+                    <th className="px-2 py-2 lg:px-3 lg:py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {displayedProducts.map((product) => (
                     <tr key={product.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-slate-800">{product.sku}</div>
+                      <td className="px-2 py-2 lg:px-3 lg:py-3">
+                        <span className="text-xs text-slate-400 font-mono" title={product.id}>
+                          {product.id ? '#' + product.id.replace('prod-', '') : '-'}
+                        </span>
                       </td>
-                      <td className="px-4 py-3 md:px-6 md:py-4">
-                        <div className="text-sm font-medium text-slate-800">{product.name}</div>
+                      <td className="px-2 py-2 lg:px-3 lg:py-3">
+                        <div className="text-sm font-medium text-slate-800 truncate" title={product.sku}>{product.sku}</div>
                       </td>
-                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                        <div className="text-sm text-slate-700">{product.category}</div>
+                      <td className="px-2 py-2 lg:px-3 lg:py-3">
+                        <div className="text-sm font-medium text-slate-800 line-clamp-2 leading-snug" title={product.name}>{product.name}</div>
                       </td>
-                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-slate-800">
-                          {product.currentStock} {product.unit}
+                      <td className="px-2 py-2 lg:px-3 lg:py-3">
+                        <div className="text-xs text-slate-700 truncate" title={product.category}>{product.category}</div>
+                      </td>
+                      <td className="px-2 py-2 lg:px-3 lg:py-3 text-right">
+                        <div className="text-sm font-medium text-slate-800 tabular-nums">
+                          {product.currentStock}
                         </div>
                       </td>
-                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                        <div className="text-sm text-slate-700">
-                          {product.minStock} {product.unit}
+                      <td className="px-2 py-2 lg:px-3 lg:py-3 text-right">
+                        <div className="text-sm text-slate-500 tabular-nums">
+                          {product.minStock}
                         </div>
                       </td>
-                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                      <td className="px-2 py-2 lg:px-3 lg:py-3 text-center whitespace-nowrap">
                         <StatusBadge status={product.status} />
                       </td>
-                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                      <td className="px-2 py-2 lg:px-3 lg:py-3 text-center whitespace-nowrap">
                         <VerificationBadge status={calculateVerificationStatus(product)} />
                       </td>
-                      <td className="px-4 py-3 md:px-6 md:py-4">
-                        <div className="text-sm text-slate-700">{product.location}</div>
-                        <div className="text-xs text-slate-500 mt-1">更新: {product.lastUpdated}</div>
+                      <td className="px-2 py-2 lg:px-3 lg:py-3">
+                        <div className="text-xs text-slate-700 truncate" title={product.location}>{product.location || '-'}</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5 truncate">{product.lastUpdated}</div>
                       </td>
-                      <td className="px-4 py-3 md:px-6 md:py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
+                      <td className="px-2 py-2 lg:px-3 lg:py-3">
+                        <div className="flex items-center gap-1">
                           <button
                             onClick={() => handleEditProduct(product.id)}
                             disabled={!canWrite}
-                            title={!canWrite ? adminOnlyTitle : ''}
-                            className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                            title={!canWrite ? adminOnlyTitle : product.id}
+                            className={`px-2 py-1 text-xs rounded transition-colors whitespace-nowrap ${
                               !canWrite
                                 ? 'bg-slate-50 text-slate-400 cursor-not-allowed'
                                 : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -1237,15 +1273,15 @@ function Products() {
                           </button>
                           <button
                             onClick={() => handleOpenLedgerModal(product.id)}
-                            className="px-3 py-1.5 text-sm bg-slate-50 text-slate-600 rounded border border-slate-200 hover:bg-slate-100 transition-colors"
+                            className="px-2 py-1 text-xs bg-slate-50 text-slate-600 rounded border border-slate-200 hover:bg-slate-100 transition-colors whitespace-nowrap"
                           >
                             台账
                           </button>
                           <button
                             onClick={() => handleDeleteProduct(product.id)}
                             disabled={!canWrite || deletingId === product.id}
-                            title={!canWrite ? adminOnlyTitle : ''}
-                            className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                            title={!canWrite ? adminOnlyTitle : product.id}
+                            className={`px-2 py-1 text-xs rounded transition-colors whitespace-nowrap ${
                               !canWrite
                                 ? 'bg-slate-50 text-slate-300 cursor-not-allowed'
                                 : deletingId === product.id
@@ -1336,6 +1372,68 @@ function Products() {
           提示：点击"编辑"可修改产品信息，点击"删除"将移除该产品记录。低库存状态的产品会以橙色标识。
         </div>
       </div>
+
+      {/* Step 10-29A-fix1: 导出确认弹窗 */}
+      {showExportConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="px-6 py-4 border-b border-slate-200">
+              <h2 className="text-lg font-semibold text-slate-800">确认导出范围</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              {activeFilters ? (
+                <>
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <div className="text-sm font-medium text-amber-800 mb-2">检测到筛选条件已生效</div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="bg-white rounded p-2 text-center border border-amber-100">
+                        <div className="text-xs text-slate-500">当前筛选结果</div>
+                        <div className="text-xl font-semibold text-amber-700">{filteredProducts.length}</div>
+                        <div className="text-xs text-slate-400">条</div>
+                      </div>
+                      <div className="bg-white rounded p-2 text-center border border-slate-100">
+                        <div className="text-xs text-slate-500">全部产品</div>
+                        <div className="text-xl font-semibold text-slate-700">{allProducts.length}</div>
+                        <div className="text-xs text-slate-400">条</div>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-600">当前筛选条件下将导出 <strong>{filteredProducts.length}</strong> 条产品。如需导出全部 {allProducts.length} 条，请选择「导出全部产品」或先重置筛选。</p>
+                </>
+              ) : (
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                  <p className="text-sm text-slate-600">当前无筛选条件，将导出全部 <strong>{allProducts.length}</strong> 条产品。</p>
+                </div>
+              )}
+              <div className="flex items-center gap-3 pt-2">
+                {activeFilters && (
+                  <button
+                    type="button"
+                    onClick={() => { setExportTarget('filtered'); handleConfirmExport(); }}
+                    className="flex-1 px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-md hover:bg-slate-800 transition-colors"
+                  >
+                    导出筛选结果 ({filteredProducts.length} 条)
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { setExportTarget('all'); handleConfirmExport(); }}
+                  className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-md hover:bg-slate-50 transition-colors"
+                >
+                  导出全部产品 ({allProducts.length} 条)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowExportConfirm(false)}
+                  className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 transition-colors"
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 导出前安全检查模态框 */}
       {showPreflightModal && (
@@ -1490,7 +1588,7 @@ function Products() {
                 </button>
               )}
               <button
-                onClick={handleConfirmExport}
+                onClick={handlePreflightConfirmExport}
                 disabled={isPreflightChecking}
                 className={`px-4 py-2 rounded-md transition-colors font-medium ${
                   isPreflightChecking
@@ -1513,9 +1611,16 @@ function Products() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="px-4 py-3 md:px-6 md:py-4 border-b border-slate-200">
-              <h2 className="text-xl font-semibold text-slate-800">
-                {editingProduct ? '编辑产品' : '新增产品'}
-              </h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-semibold text-slate-800">
+                  {editingProduct ? '编辑产品' : '新增产品'}
+                </h2>
+                {editingProduct && (
+                  <span className="text-xs text-slate-400 font-mono bg-slate-50 border border-slate-200 px-2 py-0.5 rounded">
+                    {editingProduct.id}
+                  </span>
+                )}
+              </div>
             </div>
 
             <form onSubmit={handleFormSubmit}>

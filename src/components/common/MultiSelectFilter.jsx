@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback, memo } from 'react';
 
 /**
  * Excel / 腾讯文档式多选筛选组件
@@ -11,8 +11,10 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
  * - 确定 / 取消 / 重置
  * - 点击外部关闭
  * - 选项列表可滚动
+ *
+ * Step 10-29A-fix1: React.memo 包裹，避免父组件无关重渲染
  */
-export default function MultiSelectFilter({
+const MultiSelectFilter = memo(function MultiSelectFilter({
   label = '筛选',
   placeholder = '全部',
   options = [],
@@ -237,4 +239,6 @@ export default function MultiSelectFilter({
       )}
     </div>
   );
-}
+});
+
+export default MultiSelectFilter;

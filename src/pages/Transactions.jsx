@@ -1108,6 +1108,7 @@ function Transactions() {
                                   <div className="text-sm font-medium text-slate-800">
                                     {product.name}
                                     <span className="text-xs text-slate-500 ml-1.5">({product.sku || '-'})</span>
+                                    <span className="text-xs text-slate-400 font-mono ml-1.5">{product.id}</span>
                                   </div>
                                   <div className="text-xs text-slate-500 mt-0.5">
                                     当前库存：{product.currentStock} {product.unit}

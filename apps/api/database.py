@@ -35,6 +35,7 @@ def init_db():
     migrate_products()
     migrate_transactions()
     migrate_products_sku_nonunique()
+    migrate_performance_indexes()
 
 def migrate_users():
     """迁移 users 表：检查并逐列添加缺失字段（安全迁移，不删除数据）"""
@@ -245,6 +246,50 @@ def migrate_products_sku_nonunique():
         print(f"  [迁移] 已移除 sku 唯一索引: {', '.join(removed)}，已重建普通索引 ix_products_sku")
     if skipped:
         print(f"  [迁移] 跳过的索引（需人工检查）: {', '.join(skipped)}")
+
+    conn.close()
+
+
+def migrate_performance_indexes():
+    """Step 10-29A-fix1: 安全幂等补充常用查询索引
+
+    所有 INDEX 使用 CREATE INDEX IF NOT EXISTS，多次执行安全。
+    不修改任何数据，不影响已有约束。
+    """
+    import sqlite3
+    import os
+
+    db_path = os.path.join(BASE_DIR, 'inventory.db')
+    if not os.path.exists(db_path):
+        return
+
+    conn = sqlite3.connect(db_path)
+
+    indexes = [
+        # 产品常用筛选字段
+        ("ix_products_category", "products", "category"),
+        ("ix_products_location", "products", "location"),
+        ("ix_products_brand", "products", "brand"),
+        # 交易记录产品关联
+        ("ix_transactions_product_id", "transactions", "product_id"),
+        ("ix_transactions_date", "transactions", "date"),
+        # 审计日志时间与类型
+        ("ix_audit_logs_timestamp", "audit_logs", "timestamp"),
+        ("ix_audit_logs_action_type", "audit_logs", "action_type"),
+    ]
+
+    created = 0
+    for idx_name, table, column in indexes:
+        try:
+            conn.execute(
+                f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table} ({column})"
+            )
+            created += 1
+        except sqlite3.Error as e:
+            print(f"  [索引] {idx_name} 创建失败: {e}")
+
+    if created > 0:
+        print(f"  [索引] 已确保 {created} 个性能索引存在（幂等）")
 
     conn.close()
 
