@@ -1,5 +1,5 @@
-import { useState, useRef, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useRef, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { usePermission } from '../hooks/usePermission';
 import {
   previewProductImport,
@@ -85,6 +85,7 @@ function hasStockCaliberKeyword(text) {
 
 function ProductImportPreview() {
   const { canWrite, adminOnlyTitle } = usePermission();
+  const navigate = useNavigate();
 
   // 文件相关状态
   const [selectedFile, setSelectedFile] = useState(null);
@@ -103,6 +104,20 @@ function ProductImportPreview() {
   const [confirmChecked, setConfirmChecked] = useState(false);
 
   const fileInputRef = useRef(null);
+  const executeResultRef = useRef(null);
+
+  // Step 10-28D: 导入完成后自动滚动到结果区域
+  useEffect(() => {
+    if (executeResult && executeResultRef.current) {
+      // 短暂延迟确保 DOM 已渲染
+      setTimeout(() => {
+        executeResultRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      }, 100);
+    }
+  }, [executeResult]);
 
   /**
    * 处理文件选择
@@ -297,6 +312,76 @@ function ProductImportPreview() {
           上传 CSV 文件进行解析和字段校验，预览导入结果。本轮仅预览，不执行任何数据库写入。
         </p>
       </div>
+
+      {/* Step 10-28D: 导入成功后顶部显著成功横幅 */}
+      {executeResult && executeResult.success && !isExecuting && (
+        <div className="mb-6 p-4 bg-emerald-50 border border-emerald-300 rounded-lg">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl text-emerald-500 mt-0.5 shrink-0">✓</span>
+            <div className="flex-1">
+              <div className="text-lg font-semibold text-emerald-800">导入成功</div>
+              <div className="text-sm text-emerald-700 mt-1">
+                新增 <strong>{executeResult.created_count ?? 0}</strong> 个产品，
+                跳过 <strong>{executeResult.skipped_count ?? 0}</strong> 条，
+                错误 <strong>{executeResult.error_count ?? 0}</strong> 条
+                {executeResult.batch_id && (
+                  <span className="ml-2 text-emerald-600">
+                    · 批次 <span className="font-mono">{executeResult.batch_id}</span>
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-3 mt-3">
+                <button
+                  type="button"
+                  onClick={() => navigate('/products')}
+                  className="px-4 py-1.5 bg-emerald-600 text-white text-sm font-medium rounded-md hover:bg-emerald-700 transition-colors"
+                >
+                  去产品管理查看
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    executeResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  className="px-4 py-1.5 border border-emerald-300 text-emerald-700 text-sm font-medium rounded-md hover:bg-emerald-100 transition-colors"
+                >
+                  查看导入详情
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 10-28D: 导入失败顶部显著错误横幅 */}
+      {((executeResult && !executeResult.success) || executeError) && !isExecuting && (
+        <div className="mb-6 p-4 bg-rose-50 border border-rose-300 rounded-lg">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl text-rose-500 mt-0.5 shrink-0">✗</span>
+            <div className="flex-1">
+              <div className="text-lg font-semibold text-rose-800">导入失败</div>
+              <div className="text-sm text-rose-700 mt-1">
+                {executeError || executeResult?.detail || '事务已回滚，未写入任何数据。'}
+              </div>
+              {executeResult?.errors && executeResult.errors.length > 0 && (
+                <div className="text-xs text-rose-600 mt-1">
+                  {executeResult.errors.slice(0, 3).join('；')}
+                  {executeResult.errors.length > 3 && ` 等 ${executeResult.errors.length} 条错误`}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  executeResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="mt-3 px-4 py-1.5 border border-rose-300 text-rose-700 text-sm font-medium rounded-md hover:bg-rose-100 transition-colors"
+              >
+                查看错误详情
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 安全提示区域 */}
       <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
@@ -1037,6 +1122,7 @@ function ProductImportPreview() {
           )}
 
           {/* ── 正式导入结果展示 ── */}
+          <div ref={executeResultRef} className="scroll-mt-4" />
           {executeResult && !isExecuting && (
             <div className={`mt-6 border rounded-lg overflow-hidden ${
               executeResult.success
@@ -1102,16 +1188,21 @@ function ProductImportPreview() {
 
                 {/* ── 导入结果提示 ── */}
                 {executeResult.success && executeResult.created_count > 0 && (
-                  <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-md">
-                    <div className="text-sm text-emerald-700 flex items-start gap-2">
-                      <span className="text-emerald-500 mt-0.5 shrink-0">✓</span>
-                      <span>
-                        导入已完成，可前往{' '}
-                        <Link to="/products" className="text-emerald-800 underline font-medium hover:text-emerald-900">
-                          产品管理页面
-                        </Link>{' '}
-                        查看新增产品。
-                      </span>
+                  <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-md">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-emerald-700 flex items-start gap-2">
+                        <span className="text-emerald-500 mt-0.5 shrink-0">✓</span>
+                        <span>
+                          导入已完成，新增 <strong>{executeResult.created_count}</strong> 个产品。
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => navigate('/products')}
+                        className="shrink-0 ml-4 px-4 py-1.5 bg-emerald-600 text-white text-sm font-medium rounded-md hover:bg-emerald-700 transition-colors"
+                      >
+                        去产品管理查看
+                      </button>
                     </div>
                   </div>
                 )}
