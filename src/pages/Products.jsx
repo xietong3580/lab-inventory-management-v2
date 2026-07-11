@@ -813,7 +813,7 @@ function Products() {
         </div>
 
         {/* 第二行：搜索与主筛选 */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="flex flex-col sm:flex-row gap-3 mb-4 items-start">
           {/* 搜索框 */}
           <input
             ref={searchInputRef}
@@ -896,7 +896,7 @@ function Products() {
           </select>
 
           {/* 操作按钮 */}
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 items-start">
             <button
               onClick={handleSearch}
               className="px-3 py-2 bg-slate-100 text-slate-700 rounded-md hover:bg-slate-200 transition-colors text-sm font-medium w-full sm:w-auto"
