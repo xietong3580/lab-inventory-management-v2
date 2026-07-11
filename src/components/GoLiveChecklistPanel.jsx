@@ -134,15 +134,22 @@ export default function GoLiveChecklistPanel({ canWrite }) {
                 { label: '低库存', value: db.low_stock_count, warn: db.low_stock_count > 0 },
                 { label: '负库存', value: db.negative_stock_count, error: db.negative_stock_count > 0 },
                 { label: '缺失 SKU', value: db.missing_sku_count, warn: db.missing_sku_count > 0 },
-                { label: '重复 SKU', value: db.duplicate_sku_count, error: db.duplicate_sku_count > 0 },
+                { label: '同货号多库存条目', value: db.duplicate_sku_count, info: db.duplicate_sku_count > 0 },
               ].map(item => (
                 <div key={item.label} className={`p-2.5 rounded border ${
-                  item.error ? 'bg-rose-50 border-rose-200' : item.warn ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'
-                }`}>
+                  item.error ? 'bg-rose-50 border-rose-200' : item.warn ? 'bg-amber-50 border-amber-200' : item.info ? 'bg-slate-50 border-slate-200' : 'bg-slate-50 border-slate-200'
+                }`} title={
+                  item.info && item.label === '同货号多库存条目'
+                    ? '同一货号可在不同库位、库存分类、来源或规格下并存，属于正常业务现象'
+                    : undefined
+                }>
                   <div className="text-xs text-slate-500">{item.label}</div>
                   <div className={`text-lg font-semibold ${
-                    item.error ? 'text-rose-700' : item.warn ? 'text-amber-700' : 'text-slate-800'
+                    item.error ? 'text-rose-700' : item.warn ? 'text-amber-700' : item.info ? 'text-slate-600' : 'text-slate-800'
                   }`}>{item.value}</div>
+                  {item.info && item.value > 0 && (
+                    <div className="text-[10px] text-slate-400 mt-0.5">允许</div>
+                  )}
                 </div>
               ))}
             </div>

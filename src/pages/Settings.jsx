@@ -679,7 +679,6 @@ function Settings() {
                               preflightResult.negative_stock_count > 0 && `负库存 ${preflightResult.negative_stock_count}`,
                               preflightResult.transactions_missing_product_id_count > 0 && `缺productId ${preflightResult.transactions_missing_product_id_count}`,
                               preflightResult.transactions_orphan_product_id_count > 0 && `孤立productId ${preflightResult.transactions_orphan_product_id_count}`,
-                              preflightResult.duplicate_sku_count > 0 && `重复SKU ${preflightResult.duplicate_sku_count}`,
                             ].filter(Boolean).join(' · ')}
                           </span>
                         </div>

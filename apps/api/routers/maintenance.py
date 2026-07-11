@@ -360,16 +360,16 @@ def preflight_check(user=Depends(get_current_user)):
             else:
                 warnings.append("transactions 表缺少 product_id 列")
 
-            # 重复 SKU
+            # 同货号多库存条目（Step 10-30C: 允许，非异常）
+            # 同一货号可在不同品牌/规格/库存分类/库位下并存
             dupes = conn.execute(
                 "SELECT sku, COUNT(*) as cnt FROM products GROUP BY sku HAVING cnt > 1"
             ).fetchall()
             duplicate_sku_count = len(dupes)
             if duplicate_sku_count > 0:
-                duped_skus = ", ".join(row["sku"] for row in dupes[:5])
-                if len(dupes) > 5:
-                    duped_skus += f" 等 {len(dupes)} 个 SKU"
-                errors.append(f"存在 {duplicate_sku_count} 个重复的 SKU：{duped_skus}")
+                warnings.append(
+                    f"同货号多库存条目：{duplicate_sku_count} 组（允许，同一货号可在不同库位、库存分类下并存）"
+                )
 
             conn.close()
         except sqlite3.Error as e:
@@ -1744,19 +1744,25 @@ def go_live_checklist(user=Depends(get_current_user)):
     ]
 
     # ── 6. 整体评估 ──
+    # Step 10-30C: 仅负库存、缺失SKU、孤立事务为严重异常。
+    # 同货号多库存条目（duplicate_sku_count）为正常业务现象，不视为异常。
+    # 低库存（low_stock_count）为业务预警，不是数据损坏。
     all_warnings = warnings + risk_warnings
-    if negative_stock_count > 0 or duplicate_sku_count > 0:
+    if negative_stock_count > 0:
         overall_level = "error"
-        overall_message = "存在需要立即处理的数据异常（负库存或重复 SKU），请在重要操作前修正"
+        overall_message = "存在负库存产品，需要立即修正。请检查负库存产品并调整库存数量。"
+    elif missing_sku_count > 0:
+        overall_level = "error"
+        overall_message = "存在缺少 SKU 编码的产品，请补充产品货号。"
     elif not has_available_backup:
         overall_level = "warning"
         overall_message = "尚未检测到可用备份，正式操作前请先创建数据库备份"
-    elif missing_sku_count > 0 or data_may_be_test_data:
+    elif data_may_be_test_data:
         overall_level = "warning"
         overall_message = "系统数据尚有需要关注的事项，请在重要操作前检查确认"
     else:
         overall_level = "ok"
-        overall_message = "系统状态正常，可以开始正式录入产品"
+        overall_message = "维护检查通过。当前未发现阻塞性数据异常。"
 
     return GoLiveChecklistResponse(
         success=True,

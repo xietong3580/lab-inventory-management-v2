@@ -1497,8 +1497,7 @@ function Products() {
                       {/* 异常项 */}
                       {(preflightResult.negative_stock_count > 0 ||
                         preflightResult.transactions_missing_product_id_count > 0 ||
-                        preflightResult.transactions_orphan_product_id_count > 0 ||
-                        preflightResult.duplicate_sku_count > 0) && (
+                        preflightResult.transactions_orphan_product_id_count > 0) && (
                         <div className="flex gap-2 mt-1">
                           <span className="text-slate-500 shrink-0">异常：</span>
                           <span className="text-rose-700">
@@ -1506,7 +1505,6 @@ function Products() {
                               preflightResult.negative_stock_count > 0 && `负库存 ${preflightResult.negative_stock_count}`,
                               preflightResult.transactions_missing_product_id_count > 0 && `缺productId ${preflightResult.transactions_missing_product_id_count}`,
                               preflightResult.transactions_orphan_product_id_count > 0 && `孤立productId ${preflightResult.transactions_orphan_product_id_count}`,
-                              preflightResult.duplicate_sku_count > 0 && `重复SKU ${preflightResult.duplicate_sku_count}`,
                             ].filter(Boolean).join(' · ')}
                           </span>
                         </div>
