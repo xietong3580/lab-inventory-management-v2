@@ -125,11 +125,13 @@ def migrate_transactions():
 
 
 def migrate_products_sku_nonunique():
-    """Step 10-27C: 安全移除 products.sku UNIQUE 约束
+    """Step 10-27C / 10-27C-fix: 安全移除 products.sku 所有唯一约束和唯一索引
 
-    SQLite 不支持 ALTER TABLE DROP CONSTRAINT，通过安全重建表实现。
-    对空表和已有数据表均安全：使用事务 + 完整列映射 + 数据保全。
-    幂等：如果 sku 已无 UNIQUE 约束则跳过。
+    检测两种形式的唯一约束：
+    1. CREATE TABLE 中 sku 列带有 UNIQUE → 重建 products 表（原 10-27C 逻辑）
+    2. 独立的 CREATE UNIQUE INDEX ON products(sku) → DROP + 重建普通索引
+
+    对空表和已有数据表均安全。幂等。
     """
     import sqlite3
     import os
@@ -140,7 +142,7 @@ def migrate_products_sku_nonunique():
 
     conn = sqlite3.connect(db_path)
 
-    # 幂等检查：读取 CREATE TABLE SQL
+    # ── 检查 1：CREATE TABLE SQL 中 sku 是否仍有 UNIQUE ──
     cursor = conn.execute(
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='products'"
     )
@@ -150,53 +152,101 @@ def migrate_products_sku_nonunique():
         return
 
     create_sql = row[0]
-    if ('"sku"' not in create_sql and 'sku' not in create_sql) or 'UNIQUE' not in create_sql:
+    table_has_sku_unique = (
+        '"sku"' in create_sql or 'sku' in create_sql
+    ) and 'UNIQUE' in create_sql
+
+    if table_has_sku_unique:
+        # ── 路径 A：重建表（原 10-27C 逻辑）──────
+        cursor = conn.execute("PRAGMA table_info('products')")
+        columns = [(r[1], r[2]) for r in cursor.fetchall()]
+        if not columns:
+            conn.close()
+            return
+
+        try:
+            conn.execute("BEGIN TRANSACTION")
+            col_defs = []
+            for col_name, col_type in columns:
+                if col_name == 'sku':
+                    col_defs.append(f'"{col_name}" {col_type} NOT NULL')
+                elif col_name == 'id':
+                    col_defs.append(f'"{col_name}" {col_type} PRIMARY KEY')
+                else:
+                    col_defs.append(f'"{col_name}" {col_type}')
+
+            conn.execute(
+                f"CREATE TABLE products_new ({', '.join(col_defs)})"
+            )
+            col_names = [c[0] for c in columns]
+            conn.execute(
+                f"INSERT INTO products_new ({', '.join(col_names)}) "
+                f"SELECT {', '.join(col_names)} FROM products"
+            )
+            conn.execute("DROP TABLE products")
+            conn.execute("ALTER TABLE products_new RENAME TO products")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS ix_products_sku ON products (sku)"
+            )
+            conn.execute("COMMIT")
+            print("  [迁移] products.sku UNIQUE 约束已通过重建表安全移除")
+        except sqlite3.Error as e:
+            conn.execute("ROLLBACK")
+            print(f"  [迁移] products.sku UNIQUE 约束移除失败（已回滚）: {e}")
+            raise
+        finally:
+            conn.close()
+        return
+
+    # ── 检查 2：PRAGMA index_list 中是否有 sku 唯一索引 ──
+    # Step 10-27C-fix: 独立 UNIQUE INDEX 不会被 CREATE TABLE SQL 检测到
+    cursor = conn.execute("PRAGMA index_list('products')")
+    indexes = [(r[1], r[2]) for r in cursor.fetchall()]  # (name, unique)
+
+    sku_unique_indexes = []
+    for idx_name, idx_unique in indexes:
+        if idx_unique == 0:
+            continue
+        # 检查该索引的列
+        idx_cols = conn.execute(
+            f"PRAGMA index_info('{idx_name}')"
+        ).fetchall()
+        col_names = [c[2] for c in idx_cols]  # index_info returns (rank, cid, name)
+        if col_names == ['sku']:
+            sku_unique_indexes.append(idx_name)
+
+    if not sku_unique_indexes:
         conn.close()
         return
 
-    cursor = conn.execute("PRAGMA table_info('products')")
-    columns = [(r[1], r[2]) for r in cursor.fetchall()]
+    # ── 路径 B：DROP 唯一索引 + 重建普通索引 ──
+    removed = []
+    skipped = []
+    for idx_name in sku_unique_indexes:
+        if idx_name.startswith('sqlite_autoindex_'):
+            # 自动索引由列 UNIQUE 约束产生，应走路径 A 但 CREATE TABLE 未检测到？
+            # 保守处理：标记跳过，不强制操作
+            skipped.append(idx_name)
+        else:
+            try:
+                conn.execute(f"DROP INDEX {idx_name}")
+                removed.append(idx_name)
+            except sqlite3.Error as e:
+                print(f"  [迁移] DROP INDEX {idx_name} 失败: {e}")
+                skipped.append(idx_name)
 
-    if not columns:
-        conn.close()
-        return
-
-    try:
-        conn.execute("BEGIN TRANSACTION")
-
-        col_defs = []
-        for col_name, col_type in columns:
-            if col_name == 'sku':
-                col_defs.append(f'"{col_name}" {col_type} NOT NULL')
-            elif col_name == 'id':
-                col_defs.append(f'"{col_name}" {col_type} PRIMARY KEY')
-            else:
-                col_defs.append(f'"{col_name}" {col_type}')
-
-        conn.execute(
-            f"CREATE TABLE products_new ({', '.join(col_defs)})"
-        )
-
-        col_names = [c[0] for c in columns]
-        conn.execute(
-            f"INSERT INTO products_new ({', '.join(col_names)}) "
-            f"SELECT {', '.join(col_names)} FROM products"
-        )
-
-        conn.execute("DROP TABLE products")
-        conn.execute("ALTER TABLE products_new RENAME TO products")
+    # 重建普通非唯一索引
+    if removed:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS ix_products_sku ON products (sku)"
         )
 
-        conn.execute("COMMIT")
-        print("  [迁移] products.sku UNIQUE 约束已安全移除")
-    except sqlite3.Error as e:
-        conn.execute("ROLLBACK")
-        print(f"  [迁移] products.sku UNIQUE 约束移除失败（已回滚）: {e}")
-        raise
-    finally:
-        conn.close()
+    if removed:
+        print(f"  [迁移] 已移除 sku 唯一索引: {', '.join(removed)}，已重建普通索引 ix_products_sku")
+    if skipped:
+        print(f"  [迁移] 跳过的索引（需人工检查）: {', '.join(skipped)}")
+
+    conn.close()
 
 
 # 模型定义
