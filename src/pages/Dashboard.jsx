@@ -9,6 +9,7 @@ import {
   actionTypeMap
 } from '../utils/auditLogHelpers';
 import { calculateUrgency, getRecentDates, extractDatePart } from '../utils/inventoryHelpers';
+import { getTrendInterpretation } from '../utils/dashboardHelpers';
 import InventoryTrendChart from '../components/dashboard/InventoryTrendChart';
 import TransactionCompareChart from '../components/dashboard/TransactionCompareChart';
 import RiskDistributionChart from '../components/dashboard/RiskDistributionChart';
@@ -1036,14 +1037,12 @@ function Dashboard() {
                   <div className="text-xs text-slate-500 mt-1">笔 · 平均每日</div>
                 </div>
               </div>
-              {timeRange !== 'all' && (
-                <div className="mt-4 md:mt-5 pt-3 md:pt-4 border-t border-slate-100">
-                  <div className="text-xs text-slate-600">
-                    <span className="font-medium">趋势解读：</span>
-                    当前时间范围内入库总量 {dashboardData.transactionSummary.totalInCount >= dashboardData.transactionSummary.totalOutCount ? '大于' : '小于'} 出库总量，整体库存呈现{dashboardData.transactionSummary.netChange >= 0 ? '净增长' : '净减少'}趋势。
-                  </div>
+              <div className="mt-4 md:mt-5 pt-3 md:pt-4 border-t border-slate-100">
+                <div className="text-xs text-slate-600">
+                  <span className="font-medium">趋势解读：</span>
+                  {getTrendInterpretation(dashboardData.transactionSummary)}
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
