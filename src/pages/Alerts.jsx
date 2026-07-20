@@ -128,11 +128,17 @@ function Alerts() {
       }));
   }, [productsData.productsWithStatus]); // 依赖产品数据变化
 
-  // 统计计算
-  const totalAlerts = dynamicAlerts.length;
-  const highUrgencyCount = dynamicAlerts.filter(a => a.urgency === 'high').length;
-  const mediumUrgencyCount = dynamicAlerts.filter(a => a.urgency === 'medium').length;
-  const lowUrgencyCount = dynamicAlerts.filter(a => a.urgency === 'low').length;
+  // 从当前低库存产品中动态提取真实库存分类（去重、去空、排序）
+  const categoryOptions = useMemo(() => {
+    const categories = new Set();
+    dynamicAlerts.forEach(alert => {
+      const cat = alert.category;
+      if (cat && typeof cat === 'string' && cat.trim()) {
+        categories.add(cat.trim());
+      }
+    });
+    return Array.from(categories).sort();
+  }, [dynamicAlerts]);
 
   // 筛选数据
   const filteredAlerts = dynamicAlerts.filter(alert => {
@@ -140,6 +146,12 @@ function Alerts() {
     if (selectedCategory !== 'all' && alert.category !== selectedCategory) return false;
     return true;
   });
+
+  // 统计计算（基于当前筛选后的 filteredAlerts，随筛选条件联动）
+  const totalAlerts = filteredAlerts.length;
+  const highUrgencyCount = filteredAlerts.filter(a => a.urgency === 'high').length;
+  const mediumUrgencyCount = filteredAlerts.filter(a => a.urgency === 'medium').length;
+  const lowUrgencyCount = filteredAlerts.filter(a => a.urgency === 'low').length;
 
   // 当筛选条件变化时重置分页
   useEffect(() => {
@@ -222,6 +234,11 @@ function Alerts() {
         </div>
       </div>
 
+      {/* 统计提示 */}
+      <p className="text-xs text-slate-400 mb-6 -mt-4">
+        当前统计基于下方筛选条件实时计算
+      </p>
+
       {/* 筛选区域 */}
       <div className="bg-white border border-slate-200 rounded-lg p-4 mb-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -246,9 +263,9 @@ function Alerts() {
               className="px-4 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
             >
               <option value="all">全部分类</option>
-              <option value="耗材">耗材</option>
-              <option value="试剂">试剂</option>
-              <option value="设备">设备</option>
+              {categoryOptions.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
             </select>
 
             {/* 操作按钮 */}
