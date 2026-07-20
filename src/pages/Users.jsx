@@ -578,15 +578,22 @@ function Users() {
                       </td>
                       <td className="px-3 py-3 md:px-4 md:py-4 whitespace-nowrap">
                         <div className="flex items-center gap-1.5 flex-nowrap">
-                          {/* 编辑 */}
-                          <button
-                            onClick={canWrite ? () => openEditModal(user) : undefined}
-                            disabled={!canWrite}
-                            title={!canWrite ? adminOnlyTitle : ''}
-                            className={`px-2 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors whitespace-nowrap shrink-0 ${disabledBtnClass}`}
-                          >
-                            编辑
-                          </button>
+                          {/* 编辑 — 当前登录账号不允许通过用户管理页编辑自己 */}
+                          {(() => {
+                            const isSelf = currentUser && user.id === currentUser.id;
+                            const canEdit = canWrite && !isSelf;
+                            const editTitle = !canWrite ? adminOnlyTitle : isSelf ? '当前账号信息请通过个人设置修改' : '';
+                            return (
+                              <button
+                                onClick={canEdit ? () => openEditModal(user) : undefined}
+                                disabled={!canEdit}
+                                title={editTitle}
+                                className={`px-2 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors whitespace-nowrap shrink-0 ${!canEdit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              >
+                                编辑
+                              </button>
+                            );
+                          })()}
                           {/* 启用 / 停用 — Step 10-20B：前端自停用与最后管理员停用防护 */}
                           {(() => {
                             const t = canToggleUserStatus(user);
@@ -601,15 +608,22 @@ function Users() {
                               </button>
                             );
                           })()}
-                          {/* 重置密码 */}
-                          <button
-                            onClick={canWrite ? () => openPwdModal(user) : undefined}
-                            disabled={!canWrite}
-                            title={!canWrite ? adminOnlyTitle : ''}
-                            className={`px-2 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors whitespace-nowrap shrink-0 ${disabledBtnClass}`}
-                          >
-                            重置密码
-                          </button>
+                          {/* 重置密码 — 当前登录账号应通过修改密码功能更新自己密码 */}
+                          {(() => {
+                            const isSelf = currentUser && user.id === currentUser.id;
+                            const canResetPwd = canWrite && !isSelf;
+                            const pwdTitle = !canWrite ? adminOnlyTitle : isSelf ? '请通过修改密码功能更新当前账号密码' : '';
+                            return (
+                              <button
+                                onClick={canResetPwd ? () => openPwdModal(user) : undefined}
+                                disabled={!canResetPwd}
+                                title={pwdTitle}
+                                className={`px-2 py-1.5 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200 transition-colors whitespace-nowrap shrink-0 ${!canResetPwd ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              >
+                                重置密码
+                              </button>
+                            );
+                          })()}
                           {/* 删除 — 仅对已停用且可删除的用户显示 */}
                           {(() => {
                             const d = canDeleteUser(user);
