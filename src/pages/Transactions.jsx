@@ -730,7 +730,9 @@ function Transactions() {
           <div className="py-12 text-center">
             <div className="text-slate-500 mb-2">暂无数据</div>
             <div className="text-sm text-slate-500 max-w-md mx-auto">
-              点击"新增记录"按钮添加第一条出入库记录。
+              {canWrite
+                ? '点击"新增记录"按钮添加第一条出入库记录。'
+                : '当前暂无可查看的出入库记录。'}
             </div>
           </div>
         ) : filteredRecords.length === 0 ? (

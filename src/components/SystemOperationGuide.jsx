@@ -148,7 +148,7 @@ export default function SystemOperationGuide({ embedded = false }) {
                 在搜索框输入产品名称或 SKU 编码，按回车键搜索。也可使用品牌、库存分类、库位等下拉筛选。
               </StepItem>
               <StepItem number={3} title="查看详情">
-                表格中显示产品的 SKU、名称、分类、库存、最低库存、状态和库位。低库存产品以橙色标识，正常产品以绿色标识。
+                表格中显示产品的 SKU、名称、分类、库存、最低库存、状态和库位。低库存产品以橙色标识，正常产品以中性样式显示。
               </StepItem>
             </div>
           </div>
