@@ -11,7 +11,8 @@ from datetime import datetime
 
 # 数据库文件路径
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'inventory.db')}"
+DB_PATH = os.path.join(BASE_DIR, 'inventory.db')
+DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 # 创建引擎和会话
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
@@ -29,6 +30,14 @@ def get_db():
 
 def init_db():
     """初始化数据库，创建所有表"""
+    # 生产环境保护：数据库文件必须已存在，禁止自动创建空数据库
+    if os.getenv("INVENTORY_ENV", "").strip().lower() == "production":
+        if not os.path.exists(DB_PATH):
+            raise RuntimeError(
+                f"Production database not found: {DB_PATH}. "
+                "When INVENTORY_ENV=production, the database file must already exist. "
+                "Create the database file or check the deployment before starting the application."
+            )
     Base.metadata.create_all(bind=engine)
     print(f"数据库已初始化: {DATABASE_URL}")
     migrate_users()
