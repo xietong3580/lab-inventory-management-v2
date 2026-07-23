@@ -3,6 +3,8 @@
 基于 FastAPI + SQLite 的最小数据底座起步版
 """
 
+import os
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -20,9 +22,28 @@ app = FastAPI(
 )
 
 # 配置 CORS（允许前端访问）
+# 从 INVENTORY_CORS_ORIGINS 读取逗号分隔的来源列表：
+#   - 未设置环境变量（None）：使用本地开发默认值（兼容现有启动方式）
+#   - 设置为空字符串：不开放任何跨域来源（生产同源部署推荐）
+#   - 设置为具体值：按逗号分隔、去空格、排除空项
+_cors_origins_env = os.getenv("INVENTORY_CORS_ORIGINS")
+if _cors_origins_env is None:
+    _allow_origins = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:5174",
+        "http://localhost:5175",
+    ]
+else:
+    _allow_origins = [
+        o.strip()
+        for o in _cors_origins_env.split(",")
+        if o.strip()
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:5174", "http://localhost:5175"],  # Vite 默认端口及可能端口
+    allow_origins=_allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -58,8 +79,6 @@ async def health_check():
     return {"status": "healthy", "service": "inventory-api"}
 
 if __name__ == "__main__":
-    import os
-
     uvicorn.run(
         "main:app",
         host="127.0.0.1",

@@ -3,6 +3,7 @@
 """
 
 import os
+import warnings
 import bcrypt
 from datetime import datetime, timedelta
 from typing import Optional
@@ -14,10 +15,42 @@ from sqlalchemy.orm import Session
 
 from database import get_db, User
 
+# =============================================================================
 # JWT 配置
-# 生产环境必须通过环境变量 INVENTORY_JWT_SECRET_KEY 配置密钥
-# 以下默认值仅用于本地开发，不得用于生产
-SECRET_KEY = os.getenv("INVENTORY_JWT_SECRET_KEY", "inventory-v2-development-secret-change-in-production")
+# =============================================================================
+# 环境：
+#   INVENTORY_ENV          — "development"（默认）或 "production"
+#   INVENTORY_JWT_SECRET_KEY — JWT 签名密钥
+#
+# 规则：
+#   production + 密钥缺失  → 拒绝启动（RuntimeError）
+#   非 production + 密钥缺失 → 使用开发默认值，并输出 RuntimeWarning
+#   非 production + 密钥已设 → 使用环境变量中的密钥
+# =============================================================================
+
+_ENV = os.getenv("INVENTORY_ENV", "development").strip().lower()
+_SECRET_KEY = os.getenv("INVENTORY_JWT_SECRET_KEY")
+
+if _ENV == "production":
+    if not _SECRET_KEY:
+        raise RuntimeError(
+            "INVENTORY_JWT_SECRET_KEY is required when INVENTORY_ENV=production. "
+            "Set a strong random key via environment variable."
+        )
+    SECRET_KEY = _SECRET_KEY
+else:
+    if _SECRET_KEY:
+        SECRET_KEY = _SECRET_KEY
+    else:
+        SECRET_KEY = "inventory-v2-development-secret-change-in-production"
+        warnings.warn(
+            "Using default JWT development secret. "
+            "This is NOT safe for production. "
+            "Set INVENTORY_JWT_SECRET_KEY to a strong random value, "
+            "or set INVENTORY_ENV=production to enforce this requirement.",
+            RuntimeWarning,
+        )
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 480  # 8 小时
 
