@@ -413,11 +413,6 @@ function Dashboard() {
             loading: false,
             error: '审计日志加载失败，使用降级数据'
           }));
-          setDashboardStatsData(prev => ({
-            ...prev,
-            loading: false,
-            error: '仪表盘统计数据加载失败，使用降级数据'
-          }));
         }
       }
     };
