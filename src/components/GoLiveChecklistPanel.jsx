@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { getGoLiveChecklist } from '../services/backupService';
 import { formatBytes } from '../services/backupService';
 
-export default function GoLiveChecklistPanel({ canWrite }) {
+export default function GoLiveChecklistPanel() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -84,7 +84,7 @@ export default function GoLiveChecklistPanel({ canWrite }) {
 
   if (!data) return null;
 
-  const { database_status: db, backup_status: bk, entry_readiness: entry, recommended_steps: steps, warnings, overall_level, overall_message } = data;
+  const { database_status: db, backup_status: bk, entry_readiness: entry, recommended_steps: steps, overall_level, overall_message } = data;
 
   const riskItems = [
     '不要在未创建备份时清空数据，操作不可逆',

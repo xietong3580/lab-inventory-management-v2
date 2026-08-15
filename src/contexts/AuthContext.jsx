@@ -20,7 +20,6 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true); // 初始为 true，用于页面刷新恢复登录态
 
   const navigate = useNavigate();
-  const location = useLocation();
 
   // 页面刷新后恢复登录态
   useEffect(() => {

@@ -569,10 +569,6 @@ describe('searchProducts - scoring priority', () => {
 // ── searchProducts 参与分面候选项计算 ──
 describe('searchProducts - participates in facet computation', () => {
   it('should reduce facet counts when keyword is active', () => {
-    const noSearch = computeFacetOptions(MOCK_PRODUCTS, 'brand', {
-      keyword: '', categories: [], status: 'all', minStock: null, maxStock: null,
-      locations: [], brands: [], verificationFilter: 'all',
-    });
     const withSearch = computeFacetOptions(MOCK_PRODUCTS, 'brand', {
       keyword: '安捷伦', categories: [], status: 'all', minStock: null, maxStock: null,
       locations: [], brands: [], verificationFilter: 'all',

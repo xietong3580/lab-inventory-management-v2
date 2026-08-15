@@ -11,7 +11,7 @@ const ROLE_DISPLAY = {
 };
 
 function Users() {
-  const { canWrite, adminOnlyTitle, isAdmin } = usePermission();
+  const { canWrite, adminOnlyTitle } = usePermission();
   const { currentUser } = useAuth();
 
   // ==== 数据状态 ====

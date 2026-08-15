@@ -67,9 +67,6 @@ const MultiSelectFilter = memo(function MultiSelectFilter({
     return options.filter((opt) => String(opt).toLowerCase().includes(q));
   }, [options, search]);
 
-  // 是否全选
-  const allSelected = draft.length === options.length && options.length > 0;
-
   // 按钮显示文字
   const buttonLabel = useMemo(() => {
     if (selectedValues.length === 0) return placeholder || `全部${label}`;

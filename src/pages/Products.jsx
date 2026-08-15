@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { productService as dataProductService } from '../services/dataService';
-import { getProductsWithCalculatedStatus, calculateProductStatus, updateProduct, addProduct, deleteProduct } from '../services/productService';
+import { getProductsWithCalculatedStatus, calculateProductStatus, updateProduct, addProduct } from '../services/productService';
 import { getLedgerTypeConfig, formatLedgerTime } from '../utils/inventoryHistoryHelpers';
 import { filterProducts, hasActiveFilters, calculateVerificationStatus, computeFacetOptions } from '../utils/productFilterHelpers';
 import { exportProductsToCSV } from '../utils/exportHelpers';
@@ -11,7 +11,6 @@ import {
   INVENTORY_CATEGORIES,
   getLocationOptionsByCategory,
   getDefaultLocationByCategory,
-  buildCategoryOptions,
 } from '../constants/inventoryLocations';
 
 // 产品状态标签组件

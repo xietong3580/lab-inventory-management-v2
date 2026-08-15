@@ -232,7 +232,7 @@ function Transactions() {
     });
 
     return filtered;
-  }, [transactionRecords, selectedTimeRange, dateRange, selectedType, selectedStatus, searchTerm]);
+  }, [transactionRecords, selectedTimeRange, dateRange, selectedType, selectedStatus, searchTerm, products]);
 
   // 当筛选条件变化时重置分页
   useEffect(() => {

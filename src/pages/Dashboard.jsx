@@ -202,7 +202,7 @@ function TransactionTrendChart({ data }) {
 }
 
 // 低库存概览增强组件
-function LowStockOverview({ lowStockCount, lowStockPercentage, top3Products, totalProducts }) {
+function LowStockOverview({ lowStockCount, lowStockPercentage, top3Products }) {
   return (
     <div className="space-y-3 md:space-y-4">
       {/* 概览卡片 */}
@@ -699,7 +699,6 @@ function Dashboard() {
   const dynamicDashboardStats = STAT_CARD_TEMPLATES.map(stat => {
     const {
       totalProducts,
-      totalInventory,
       lowStockCount,
       normalStockCount,
       recentDaysTransactionsCount,
@@ -1060,7 +1059,6 @@ function Dashboard() {
               lowStockCount={dashboardData.lowStockCount}
               lowStockPercentage={dashboardData.lowStockPercentage}
               top3Products={dashboardData.top3LowStockProducts}
-              totalProducts={dashboardData.totalProducts}
             />
           </div>
         </div>

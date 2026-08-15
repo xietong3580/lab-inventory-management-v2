@@ -30,10 +30,9 @@ const calculateQuantityChange = (entry) => {
 /**
  * 将交易记录转换为台账条目
  * @param {Object} transaction - 交易记录对象
- * @param {string} productId - 产品ID（用于匹配审计日志）
  * @returns {Object|null} 台账条目或null（如果无法转换）
  */
-const transactionToLedgerEntry = (transaction, productId) => {
+const transactionToLedgerEntry = (transaction) => {
   if (!transaction || !transaction.date) return null;
 
   // 从交易记录中提取信息
@@ -94,7 +93,7 @@ const auditLogToLedgerEntry = (auditLog) => {
       entry.notes = `新增产品「${productName}」，初始库存 ${entry.quantity} ${entry.unit}`;
       break;
 
-    case 'PRODUCT_UPDATE':
+    case 'PRODUCT_UPDATE': {
       // 检查是否有库存变动
       const stockChange = details?.changedFields?.currentStock;
       if (stockChange) {
@@ -111,6 +110,7 @@ const auditLogToLedgerEntry = (auditLog) => {
         return null;
       }
       break;
+    }
 
     case 'TRANSACTION_ADD':
       entry.type = details?.transaction?.type === '入库' ? '入库' : '出库';
@@ -147,83 +147,6 @@ const auditLogToLedgerEntry = (auditLog) => {
 };
 
 /**
- * 计算台账条目的库存变动和变更后库存（正向推导，从最早到最新）
- * @param {Array} entries - 台账条目数组
- * @returns {Array} 补充了库存信息的台账条目数组（按时间倒序排列，最新在前）
- */
-const calculateStockChain = (entries) => {
-  if (!entries || entries.length === 0) {
-    return [];
-  }
-
-  // 1. 按时间正序排列（从最早到最新）
-  const sortedEntries = [...entries].sort((a, b) =>
-    new Date(a.timestamp) - new Date(b.timestamp)
-  );
-
-  const result = [];
-  let previousStock = null; // 上一个事件后的库存
-
-  for (let i = 0; i < sortedEntries.length; i++) {
-    const entry = sortedEntries[i];
-    const entryCopy = { ...entry };
-    const quantityChange = calculateQuantityChange(entry);
-
-    // 确定变更前库存
-    let beforeStock = null;
-    let afterStock = null;
-
-    // 情况1：审计日志中已有明确的库存值（最高优先级）
-    if (entry.oldStock !== undefined && entry.newStock !== undefined) {
-      beforeStock = Number(entry.oldStock);
-      afterStock = Number(entry.newStock);
-    }
-    // 情况2：这是第一条记录
-    else if (i === 0) {
-      // 如果是产品新增，变更前库存为0，变更后库存为初始库存
-      if (entry.type === '产品新增') {
-        beforeStock = 0;
-        afterStock = Number(entry.quantity) || 0;
-      } else {
-        // 其他类型的第一条记录，假设变更前库存为0
-        beforeStock = 0;
-        afterStock = beforeStock + quantityChange;
-      }
-    }
-    // 情况3：有上一条记录的库存信息
-    else if (previousStock !== null) {
-      beforeStock = previousStock;
-      afterStock = beforeStock + quantityChange;
-    }
-    // 情况4：无法确定
-    else {
-      beforeStock = null;
-      afterStock = null;
-    }
-
-    // 记录结果
-    entryCopy.oldStock = beforeStock;
-    entryCopy.newStock = afterStock;
-    entryCopy.stockChange = quantityChange;
-
-    // 添加变动方向标识
-    if (quantityChange > 0) {
-      entryCopy.changeDirection = 'increase';
-    } else if (quantityChange < 0) {
-      entryCopy.changeDirection = 'decrease';
-    } else {
-      entryCopy.changeDirection = 'none';
-    }
-
-    result.push(entryCopy);
-    previousStock = afterStock;
-  }
-
-  // 返回倒序排列（最新在前）
-  return result.reverse();
-};
-
-/**
  * 获取产品的库存台账历史
  * @param {Array} transactions - 所有交易记录数组
  * @param {Array} auditLogs - 所有审计日志数组
@@ -250,7 +173,7 @@ export const getProductInventoryHistory = (transactions, auditLogs, productId, p
 
   // 3. 转换为台账条目
   const transactionEntries = productTransactions
-    .map(tx => transactionToLedgerEntry(tx, productId))
+    .map(tx => transactionToLedgerEntry(tx))
     .filter(entry => entry !== null);
 
   const auditLogEntries = productAuditLogs
