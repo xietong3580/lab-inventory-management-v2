@@ -51,11 +51,11 @@ function Login() {
       <div className="w-full max-w-md">
         {/* 品牌展示区 */}
         <div className="text-center mb-10">
-          {/* Logo 占位 */}
-          <div className="w-16 h-16 bg-slate-200 rounded-xl mx-auto mb-4 flex items-center justify-center">
-            <div className="text-2xl font-bold text-slate-600">P</div>
-          </div>
-          <h1 className="text-2xl font-semibold text-slate-800">PRONOVATION</h1>
+                   <img
+            src="/pronovation-logo.png"
+            alt="PRONOVATION 普诺实验商城"
+            className="w-64 max-w-full h-auto mx-auto mb-4"
+          />
           <p className="text-slate-600 mt-1">普诺实验商城 · 库存管理系统</p>
           <div className="text-sm text-slate-500 mt-3">V2.0 新版后台</div>
         </div>
