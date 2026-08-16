@@ -24,6 +24,7 @@ function Login() {
       ...prev,
       [name]: value,
     }));
+
     // 用户重新输入时清除错误
     if (error) setError('');
   };
@@ -44,20 +45,23 @@ function Login() {
     }
   };
 
-  const isFormValid = formData.username.trim() !== '' && formData.password.trim() !== '';
+  const isFormValid =
+    formData.username.trim() !== '' && formData.password.trim() !== '';
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* 品牌展示区 */}
         <div className="text-center mb-10">
-                   <img
+          <img
             src="/pronovation-logo.png"
             alt="PRONOVATION 普诺实验商城"
             className="w-64 max-w-full h-auto mx-auto mb-4"
           />
-          <p className="text-slate-600 mt-1">普诺实验商城 · 库存管理系统</p>
-          <div className="text-sm text-slate-500 mt-3">V2.0 新版后台</div>
+          <p className="text-slate-600 mt-1">
+            普诺实验商城 · 库存管理系统
+          </p>
+          <div className="text-sm text-slate-500 mt-3">V2.0 正式版</div>
         </div>
 
         {/* 登录表单卡片 */}
@@ -157,15 +161,15 @@ function Login() {
           <div className="mt-8 pt-6 border-t border-slate-100">
             <p className="text-sm text-slate-500 text-center">
               首次使用？请联系系统管理员获取账户。
-              <br />
-              此为独立新版系统，不影响现有旧版库存系统。
             </p>
           </div>
         </div>
 
         {/* 页脚 */}
         <div className="mt-8 text-center text-sm text-slate-500">
-          <p>© 2026 PRONOVATION 普诺实验商城. 库存自动化管理系统 V2</p>
+          <p>
+            © 2026 PRONOVATION 普诺实验商城 · 库存自动化管理系统 V2
+          </p>
           <p className="mt-1">仅供内部使用，请妥善保管账户信息。</p>
         </div>
       </div>
