@@ -7,6 +7,7 @@ import { exportProductsToCSV } from '../utils/exportHelpers';
 import { runPreflightCheck, createMaintenanceBackup } from '../services/backupService';
 import { usePermission } from '../hooks/usePermission';
 import MultiSelectFilter from '../components/common/MultiSelectFilter';
+import Pagination from '../components/common/Pagination';
 import {
   INVENTORY_CATEGORIES,
   getLocationOptionsByCategory,
@@ -1360,63 +1361,11 @@ function Products() {
               <div className="w-full md:w-auto text-sm text-slate-600 text-center md:text-left">
                 显示第 {startIndex + 1} - {Math.min(endIndex, filteredProducts.length)} 条，共 {filteredProducts.length} 条记录
               </div>
-              <div className="w-full md:w-auto flex justify-center flex-wrap items-center gap-2 whitespace-nowrap">
-                <button
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className={`px-3 py-1.5 rounded border text-sm ${
-                    currentPage === 1
-                      ? 'border-slate-200 text-slate-400 cursor-not-allowed'
-                      : 'border-slate-300 text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  上一页
-                </button>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    const pageNum = i + 1;
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`px-3 py-1.5 rounded border text-sm ${
-                          currentPage === pageNum
-                            ? 'bg-slate-700 text-white'
-                            : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                  {totalPages > 5 && (
-                    <>
-                      <span className="text-slate-400">...</span>
-                      <button
-                        onClick={() => setCurrentPage(totalPages)}
-                        className={`px-3 py-1.5 rounded border text-sm ${
-                          currentPage === totalPages
-                            ? 'bg-slate-700 text-white'
-                            : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        {totalPages}
-                      </button>
-                    </>
-                  )}
-                </div>
-                <button
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className={`px-3 py-1.5 rounded border text-sm ${
-                    currentPage === totalPages
-                      ? 'border-slate-200 text-slate-400 cursor-not-allowed'
-                      : 'border-slate-300 text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  下一页
-                </button>
-              </div>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
             </div>
           </>
         )}
