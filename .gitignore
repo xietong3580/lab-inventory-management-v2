@@ -41,6 +41,10 @@ apps/api/backups/
 *.backup.sqlite
 inventory-backup-*.db
 
+# Product images (real uploads must not be committed)
+apps/api/uploads/product-images/*
+!apps/api/uploads/product-images/.gitkeep
+
 # Local-only CSV import samples; never commit real legacy inventory exports
 .local-import-samples/
 private-import-samples/

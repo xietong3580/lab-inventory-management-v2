@@ -51,6 +51,9 @@ class ProductResponse(ProductBase):
     id: str  # 格式: prod-000001
     status: str  # 正常/低库存
     lastUpdated: str
+    # 产品主图（不返回服务器路径）
+    hasImage: bool = False
+    imageUpdatedAt: str = ""
 
     class Config:
         from_attributes = True

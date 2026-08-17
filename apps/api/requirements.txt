@@ -6,3 +6,6 @@ python-multipart==0.0.6
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
+# 图片校验与安全处理（校验真实图片内容、EXIF 修正、统一转 WebP）
+# Pillow 12.3.0 为官方当前稳定版，要求 Python >=3.10，兼容本地 Python 3.10 与生产 Python 3.11
+Pillow==12.3.0

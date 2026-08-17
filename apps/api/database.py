@@ -9,9 +9,14 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 
-# 数据库文件路径
+# 数据库文件路径（可通过 INVENTORY_DB_PATH 环境变量覆盖，用于测试隔离）
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, 'inventory.db')
+
+def get_db_path():
+    """返回数据库文件绝对路径（环境变量可覆盖，测试使用临时数据库）"""
+    return os.environ.get("INVENTORY_DB_PATH") or os.path.join(BASE_DIR, 'inventory.db')
+
+DB_PATH = get_db_path()
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 # 创建引擎和会话
@@ -45,13 +50,14 @@ def init_db():
     migrate_transactions()
     migrate_products_sku_nonunique()
     migrate_performance_indexes()
+    migrate_products_image()
 
 def migrate_users():
     """迁移 users 表：检查并逐列添加缺失字段（安全迁移，不删除数据）"""
     import sqlite3
     import os
 
-    db_path = os.path.join(BASE_DIR, 'inventory.db')
+    db_path = get_db_path()
     conn = sqlite3.connect(db_path)
     cursor = conn.execute("PRAGMA table_info(users)")
     existing_columns = {row[1] for row in cursor.fetchall()}
@@ -77,7 +83,7 @@ def migrate_products():
     import sqlite3
     import os
 
-    db_path = os.path.join(BASE_DIR, 'inventory.db')
+    db_path = get_db_path()
     if not os.path.exists(db_path):
         return
 
@@ -105,6 +111,39 @@ def migrate_products():
     conn.close()
 
 
+def migrate_products_image(db_path=None):
+    """迁移 products 表：安全添加产品主图字段（image_path, image_updated_at）
+
+    - 字段允许 NULL，现有产品迁移后默认 NULL（未上传图片）
+    - 幂等：先检查列是否存在，不存在才 ALTER TABLE ADD COLUMN，已存在安全跳过
+    - 不重建表、不删除/复制数据、不修改现有字段
+    """
+    import sqlite3
+
+    path = db_path or get_db_path()
+    if not os.path.exists(path):
+        return
+
+    conn = sqlite3.connect(path)
+    try:
+        cursor = conn.execute("PRAGMA table_info(products)")
+        existing_columns = {row[1] for row in cursor.fetchall()}
+
+        new_columns = [
+            ("image_path", "VARCHAR(255)"),
+            ("image_updated_at", "VARCHAR(50)"),
+        ]
+
+        for col_name, col_type in new_columns:
+            if col_name not in existing_columns:
+                conn.execute(f"ALTER TABLE products ADD COLUMN {col_name} {col_type}")
+                print(f"  [迁移] products 表已添加列: {col_name} ({col_type})")
+
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def migrate_transactions():
     """迁移 transactions 表：安全添加 product_id 字段（Step 10-4D）
     使用 ALTER TABLE ADD COLUMN，不删表不丢数据。
@@ -112,7 +151,7 @@ def migrate_transactions():
     import sqlite3
     import os
 
-    db_path = os.path.join(BASE_DIR, 'inventory.db')
+    db_path = get_db_path()
     if not os.path.exists(db_path):
         return
 
@@ -146,7 +185,7 @@ def migrate_products_sku_nonunique():
     import sqlite3
     import os
 
-    db_path = os.path.join(BASE_DIR, 'inventory.db')
+    db_path = get_db_path()
     if not os.path.exists(db_path):
         return
 
@@ -268,7 +307,7 @@ def migrate_performance_indexes():
     import sqlite3
     import os
 
-    db_path = os.path.join(BASE_DIR, 'inventory.db')
+    db_path = get_db_path()
     if not os.path.exists(db_path):
         return
 
@@ -333,6 +372,10 @@ class Product(Base):
     purchase_price = Column(Float, nullable=True)
     sale_price = Column(Float, nullable=True)
 
+    # 产品主图字段（Step 11：可空，未上传时为 NULL）
+    image_path = Column(String(255), nullable=True)       # 相对文件名（不含目录）
+    image_updated_at = Column(String(50), nullable=True)  # ISO 时间戳，用于缓存版本
+
     # 额外字段
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
@@ -360,6 +403,9 @@ class Product(Base):
             # P1 价格字段（Step 10-6C）
             "purchasePrice": self.purchase_price,
             "salePrice": self.sale_price,
+            # 产品主图（不返回服务器绝对路径，只返回布尔标识和缓存版本）
+            "hasImage": bool(self.image_path),
+            "imageUpdatedAt": self.image_updated_at or "",
         }
 
 class Transaction(Base):

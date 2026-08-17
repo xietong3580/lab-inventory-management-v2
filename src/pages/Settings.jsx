@@ -667,11 +667,26 @@ function Settings() {
                         <span className="text-slate-500">审计日志：</span>
                         <span>{preflightResult.audit_logs_count}</span>
                       </div>
+                      {/* 产品图片状态 */}
+                      <div className="flex gap-2">
+                        <span className="text-slate-500 shrink-0">图片目录：</span>
+                        <span className={preflightResult.image_dir_writable ? 'text-emerald-700' : 'text-rose-700'}>
+                          {preflightResult.image_dir_writable ? '可写' : '不可写'}
+                        </span>
+                        <span className="text-slate-400 mx-1">|</span>
+                        <span className="text-slate-500">引用图片：</span>
+                        <span>{preflightResult.image_referenced_count}</span>
+                        <span className="text-slate-400 mx-1">|</span>
+                        <span className="text-slate-500">文件数：</span>
+                        <span>{preflightResult.image_files_count}</span>
+                      </div>
                       {/* 异常项 */}
                       {(preflightResult.negative_stock_count > 0 ||
                         preflightResult.transactions_missing_product_id_count > 0 ||
                         preflightResult.transactions_orphan_product_id_count > 0 ||
-                        preflightResult.duplicate_sku_count > 0) && (
+                        preflightResult.duplicate_sku_count > 0 ||
+                        preflightResult.image_missing_count > 0 ||
+                        preflightResult.image_orphan_count > 0) && (
                         <div className="flex gap-2 mt-1">
                           <span className="text-slate-500 shrink-0">异常项：</span>
                           <span className="text-rose-700">
@@ -679,6 +694,8 @@ function Settings() {
                               preflightResult.negative_stock_count > 0 && `负库存 ${preflightResult.negative_stock_count}`,
                               preflightResult.transactions_missing_product_id_count > 0 && `缺productId ${preflightResult.transactions_missing_product_id_count}`,
                               preflightResult.transactions_orphan_product_id_count > 0 && `孤立productId ${preflightResult.transactions_orphan_product_id_count}`,
+                              preflightResult.image_missing_count > 0 && `图片缺失 ${preflightResult.image_missing_count}`,
+                              preflightResult.image_orphan_count > 0 && `孤立图片 ${preflightResult.image_orphan_count}`,
                             ].filter(Boolean).join(' · ')}
                           </span>
                         </div>
@@ -734,12 +751,24 @@ function Settings() {
                 {/* 维护备份结果 */}
                 {maintBackupResult && (
                   <div className={`mt-3 p-3 rounded-md border text-sm ${
-                    maintBackupResult.success
+                    maintBackupResult.image_backup_failed
+                      ? 'bg-amber-50 border-amber-200'
+                      : maintBackupResult.success
                       ? 'bg-emerald-50 border-emerald-200'
                       : 'bg-rose-50 border-rose-200'
                   }`}>
-                    <div className={`font-medium mb-1 ${maintBackupResult.success ? 'text-emerald-800' : 'text-rose-800'}`}>
-                      {maintBackupResult.success ? '✅ 备份成功' : '❌ 备份失败'}
+                    <div className={`font-medium mb-1 ${
+                      maintBackupResult.image_backup_failed
+                        ? 'text-amber-800'
+                        : maintBackupResult.success
+                        ? 'text-emerald-800'
+                        : 'text-rose-800'
+                    }`}>
+                      {maintBackupResult.image_backup_failed
+                        ? '⚠️ 部分成功，需要处理'
+                        : maintBackupResult.success
+                        ? '✅ 备份成功'
+                        : '❌ 备份失败'}
                     </div>
                     {maintBackupResult.success ? (
                       <div className="space-y-1 text-slate-700">
@@ -754,6 +783,16 @@ function Settings() {
                         <div className="flex gap-2">
                           <span className="text-slate-500 shrink-0">时间：</span>
                           <span>{new Date(maintBackupResult.created_at).toLocaleString('zh-CN')}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <span className="text-slate-500 shrink-0">图片备份：</span>
+                          <span className={maintBackupResult.image_backup_failed ? 'text-amber-700' : ''}>
+                            {maintBackupResult.image_backup_failed
+                              ? '备份失败（数据库已备份，图片未备份）'
+                              : maintBackupResult.image_backup_filename
+                              ? `${maintBackupResult.image_backup_filename}（${maintBackupResult.image_count} 张，${formatBytes(maintBackupResult.image_backup_size_bytes)}）`
+                              : '当前无图片'}
+                          </span>
                         </div>
                       </div>
                     ) : (
@@ -1079,12 +1118,24 @@ function Settings() {
                 {/* 备份结果 */}
                 {backupResult && (
                   <div className={`mt-3 p-3 rounded-md border text-sm ${
-                    backupResult.success
+                    backupResult.image_backup_failed
+                      ? 'bg-amber-50 border-amber-200'
+                      : backupResult.success
                       ? 'bg-emerald-50 border-emerald-200'
                       : 'bg-rose-50 border-rose-200'
                   }`}>
-                    <div className={`font-medium mb-1 ${backupResult.success ? 'text-emerald-800' : 'text-rose-800'}`}>
-                      {backupResult.success ? '✅ 备份成功' : '❌ 备份失败'}
+                    <div className={`font-medium mb-1 ${
+                      backupResult.image_backup_failed
+                        ? 'text-amber-800'
+                        : backupResult.success
+                        ? 'text-emerald-800'
+                        : 'text-rose-800'
+                    }`}>
+                      {backupResult.image_backup_failed
+                        ? '⚠️ 部分成功，需要处理'
+                        : backupResult.success
+                        ? '✅ 备份成功'
+                        : '❌ 备份失败'}
                     </div>
                     {backupResult.success ? (
                       <div className="space-y-1 text-slate-700">
@@ -1104,6 +1155,16 @@ function Settings() {
                           <span className="text-slate-500 shrink-0">校验：</span>
                           <span className={backupResult.integrity_check === 'ok' ? 'text-emerald-700 font-medium' : 'text-rose-700'}>
                             {backupResult.integrity_check === 'ok' ? '通过' : backupResult.integrity_check}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <span className="text-slate-500 shrink-0">图片备份：</span>
+                          <span className={backupResult.image_backup_failed ? 'text-amber-700' : ''}>
+                            {backupResult.image_backup_failed
+                              ? '备份失败（数据库已备份，图片未备份）'
+                              : backupResult.image_backup_filename
+                              ? `${backupResult.image_backup_filename}（${backupResult.image_count} 张，${formatBytes(backupResult.image_backup_size_bytes)}）`
+                              : '当前无图片'}
                           </span>
                         </div>
                       </div>

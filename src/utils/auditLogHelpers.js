@@ -18,6 +18,10 @@ export const actionTypeMap = {
   USER_DELETE: { label: '删除用户', color: 'bg-rose-50 text-rose-600' },
   BACKUP_CREATE: { label: '创建备份', color: 'bg-slate-50 text-slate-600' },
   BUSINESS_DATA_CLEAR: { label: '清空当前业务数据', color: 'bg-rose-50 text-rose-600' },
+  // 产品主图操作
+  PRODUCT_IMAGE_UPLOAD: { label: '上传产品图片', color: 'bg-slate-50 text-slate-600' },
+  PRODUCT_IMAGE_REPLACE: { label: '替换产品图片', color: 'bg-slate-100 text-slate-600' },
+  PRODUCT_IMAGE_DELETE: { label: '删除产品图片', color: 'bg-rose-50 text-rose-600' },
 };
 
 /**
@@ -119,6 +123,13 @@ export const generateAuditSummary = (log, compact = false) => {
       return compact ? `创建数据库备份` : `创建数据库备份${productName ? `「${productName}」` : ''}`;
     case 'BUSINESS_DATA_CLEAR':
       return `清空当前业务数据（操作人: ${log.operator || ''}）`;
+    // 产品主图操作
+    case 'PRODUCT_IMAGE_UPLOAD':
+      return compact ? `上传产品图片` : `上传产品图片「${productName || '未知产品'}」`;
+    case 'PRODUCT_IMAGE_REPLACE':
+      return compact ? `替换产品图片` : `替换产品图片「${productName || '未知产品'}」`;
+    case 'PRODUCT_IMAGE_DELETE':
+      return compact ? `删除产品图片` : `删除产品图片「${productName || '未知产品'}」`;
     default:
       return `${actionLabel}操作`;
   }

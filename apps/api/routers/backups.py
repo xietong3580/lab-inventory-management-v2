@@ -15,14 +15,15 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from database import BASE_DIR, get_db, AuditLog
+from database import get_db, get_db_path, AuditLog
 from auth import require_admin
+import image_store
 
 router = APIRouter()
 
 # 路径常量
-DB_PATH = Path(BASE_DIR) / "inventory.db"
-BACKUP_DIR = Path(BASE_DIR) / "backups"
+DB_PATH = Path(get_db_path())
+BACKUP_DIR = Path(get_db_path()).parent / "backups"
 
 
 class BackupResponse(BaseModel):
@@ -33,6 +34,12 @@ class BackupResponse(BaseModel):
     created_at: str
     integrity_check: str
     message: str
+    # 产品图片配套备份信息
+    image_backup_filename: str = ""
+    image_count: int = 0
+    image_backup_size_bytes: int = 0
+    # 图片备份是否失败（数据库备份成功但图片备份失败时为 True）
+    image_backup_failed: bool = False
 
 
 class BackupItem(BaseModel):
@@ -208,19 +215,56 @@ def manual_backup(admin=Depends(require_admin), db: Session = Depends(get_db)):
     # 相对路径（相对于 BASE_DIR）
     relative_path = f"backups/{filename}"
 
-    # Step 10-20D：审计日志
+    # 5.5 产品图片配套备份（与数据库备份同一时间戳）
+    # 图片备份失败不影响已成功的数据库备份，也不影响原图片。
+    image_backup_filename = ""
+    image_count = 0
+    image_backup_size_bytes = 0
+    image_backup_failed = False
+    try:
+        image_backup = image_store.create_images_backup(timestamp)
+        image_backup_filename = image_backup["filename"]
+        image_count = image_backup["count"]
+        image_backup_size_bytes = image_backup["size_bytes"]
+    except image_store.ImageBackupError:
+        image_backup_failed = True
+
+    # Step 10-20D：审计日志（明确记录数据库备份成功、图片备份失败）
     operator = admin.display_name or admin.username
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if image_backup_failed:
+        audit_details = (
+            f"数据库备份已创建：{filename}，大小: {final_size:,} 字节；"
+            f"产品图片备份失败"
+        )
+    else:
+        image_desc = (
+            f"图片备份: {image_backup_filename}（{image_count} 张）"
+            if image_backup_filename
+            else "图片备份: 无图片"
+        )
+        audit_details = (
+            f"创建数据库备份：{filename}，大小: {final_size:,} 字节；{image_desc}"
+        )
     audit_log = AuditLog(
         action_type="BACKUP_CREATE",
         product_name=f"数据库备份: {filename}",
         product_id="",
         operator=operator,
         timestamp=now_str,
-        details=f"创建数据库备份：{filename}，大小: {final_size:,} 字节",
+        details=audit_details,
     )
     db.add(audit_log)
     db.commit()
+
+    if image_backup_failed:
+        message = f"数据库备份已创建：{filename}（{final_size:,} 字节），但产品图片备份失败"
+    else:
+        message = f"备份成功：{filename}（{final_size:,} 字节）"
+        if image_backup_filename:
+            message += f"；图片备份: {image_backup_filename}（{image_count} 张，{image_backup_size_bytes:,} 字节）"
+        else:
+            message += "；当前无图片"
 
     return BackupResponse(
         success=True,
@@ -229,7 +273,11 @@ def manual_backup(admin=Depends(require_admin), db: Session = Depends(get_db)):
         size_bytes=final_size,
         created_at=created_at,
         integrity_check="ok",
-        message=f"备份成功：{filename}（{final_size:,} 字节）",
+        message=message,
+        image_backup_filename=image_backup_filename,
+        image_count=image_count,
+        image_backup_size_bytes=image_backup_size_bytes,
+        image_backup_failed=image_backup_failed,
     )
 
 

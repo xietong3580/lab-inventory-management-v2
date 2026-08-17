@@ -10,6 +10,7 @@
 """
 
 import json
+import os
 import re
 import sqlite3
 from datetime import datetime
@@ -19,15 +20,16 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
-from database import BASE_DIR, get_db, AuditLog
+from database import get_db, get_db_path, AuditLog
 from auth import get_current_user, require_admin
 from sqlalchemy.orm import Session
+import image_store
 
 router = APIRouter()
 
 # ── 路径常量 ──────────────────────────────────────────────
-DB_PATH = Path(BASE_DIR) / "inventory.db"
-BACKUP_DIR = Path(BASE_DIR) / "backups"
+DB_PATH = Path(get_db_path())
+BACKUP_DIR = Path(get_db_path()).parent / "backups"
 
 
 # ═══════════════════════════════════════════════════════════
@@ -49,6 +51,13 @@ class PreflightResponse(BaseModel):
     status: str  # "ok" | "warning" | "error"
     warnings: List[str]
     errors: List[str]
+    # 产品图片检查（只读）
+    image_dir_exists: bool = False
+    image_dir_writable: bool = False
+    image_referenced_count: int = 0
+    image_files_count: int = 0
+    image_missing_count: int = 0
+    image_orphan_count: int = 0
 
 
 class MaintenanceBackupResponse(BaseModel):
@@ -58,6 +67,12 @@ class MaintenanceBackupResponse(BaseModel):
     size_bytes: int
     created_at: str
     message: str
+    # 产品图片配套备份信息
+    image_backup_filename: str = ""
+    image_count: int = 0
+    image_backup_size_bytes: int = 0
+    # 图片备份是否失败（数据库备份成功但图片备份失败时为 True）
+    image_backup_failed: bool = False
 
 
 class ResetPreviewItem(BaseModel):
@@ -375,6 +390,70 @@ def preflight_check(user=Depends(get_current_user)):
         except sqlite3.Error as e:
             errors.append(f"数据库查询异常：{e}")
 
+    # ── 3.5 产品图片检查（只读，不创建目录、不写任何文件） ──
+    image_dir_exists = False
+    image_dir_writable = False
+    image_referenced_count = 0
+    image_files_count = 0
+    image_missing_count = 0
+    image_orphan_count = 0
+
+    upload_dir = image_store.get_upload_dir()
+    image_dir_exists = upload_dir.exists() and upload_dir.is_dir()
+    if image_dir_exists:
+        # 仅检查权限，不创建目录、不写测试文件
+        image_dir_writable = os.access(upload_dir, os.W_OK)
+        if not image_dir_writable:
+            errors.append("产品图片目录不可写，图片上传/备份功能将无法使用")
+    else:
+        # 目录不存在：只读检查不得创建目录或测试文件
+        image_dir_exists = False
+        image_dir_writable = False
+        # 仅当系统尚无任何图片引用时，给出信息提示（不制造业务数据异常）
+        if database_readable:
+            try:
+                with sqlite3.connect(str(DB_PATH)) as conn:
+                    ref_cnt = 0
+                    if _column_exists(conn, "products", "image_path"):
+                        ref_cnt = conn.execute(
+                            "SELECT COUNT(*) FROM products WHERE image_path IS NOT NULL AND image_path != ''"
+                        ).fetchone()[0]
+                    if ref_cnt == 0:
+                        warnings.append(
+                            "产品图片目录尚未创建（当前无图片引用），正式部署时请提前创建目录"
+                        )
+            except Exception as e:
+                errors.append(f"图片目录状态检查异常：{e}")
+
+    # 图片引用与实际文件统计（未上传图片的正常产品不计为异常）
+    if database_readable:
+        try:
+            with sqlite3.connect(str(DB_PATH)) as conn:
+                if _column_exists(conn, "products", "image_path"):
+                    rows = conn.execute(
+                        "SELECT image_path FROM products WHERE image_path IS NOT NULL AND image_path != ''"
+                    ).fetchall()
+                    # 引用图片的产品行数（不同产品可引用同一文件，故用行数而非去重后数量）
+                    image_referenced_count = len(rows)
+                    # 用于缺失/孤立比较的是「不同文件名集合」
+                    referenced_names = {r[0] for r in rows}
+
+                    actual_names = set(image_store.list_image_files())
+                    image_files_count = len(actual_names)
+                    image_missing_count = len(referenced_names - actual_names)
+                    image_orphan_count = len(actual_names - referenced_names)
+
+                    if image_missing_count > 0:
+                        warnings.append(
+                            f"存在 {image_missing_count} 个产品图片在数据库中引用但文件缺失"
+                        )
+                    if image_orphan_count > 0:
+                        warnings.append(
+                            f"存在 {image_orphan_count} 个孤立图片文件（数据库未引用，可后续清理）"
+                        )
+        except Exception as e:
+            errors.append(f"图片引用统计异常：{e}")
+
     # ── 4. 判断整体状态 ──
     if errors:
         overall_status = "error"
@@ -398,6 +477,12 @@ def preflight_check(user=Depends(get_current_user)):
         status=overall_status,
         warnings=warnings,
         errors=errors,
+        image_dir_exists=image_dir_exists,
+        image_dir_writable=image_dir_writable,
+        image_referenced_count=image_referenced_count,
+        image_files_count=image_files_count,
+        image_missing_count=image_missing_count,
+        image_orphan_count=image_orphan_count,
     )
 
 
@@ -446,19 +531,58 @@ def create_backup(admin=Depends(require_admin), db: Session = Depends(get_db)):
     # ── 5. 确认备份文件大小 ──
     size_bytes = backup_path.stat().st_size
 
-    # Step 10-20D：审计日志
+    # ── 5.5 产品图片配套备份（与数据库备份同一时间戳，可明确配对） ──
+    # 图片备份失败不影响已成功的数据库备份，也不影响原图片。
+    image_backup_filename = ""
+    image_count = 0
+    image_backup_size_bytes = 0
+    image_backup_failed = False
+    try:
+        image_backup = image_store.create_images_backup(timestamp)
+        image_backup_filename = image_backup["filename"]
+        image_count = image_backup["count"]
+        image_backup_size_bytes = image_backup["size_bytes"]
+    except image_store.ImageBackupError:
+        image_backup_failed = True
+
+    # Step 10-20D：审计日志（明确记录数据库备份成功、图片备份失败）
     operator = admin.display_name or admin.username
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if image_backup_failed:
+        image_desc = "图片备份: 失败"
+        audit_details = (
+            f"数据库备份已创建：{filename}，大小: {size_bytes:,} 字节；"
+            f"产品图片备份失败"
+        )
+    elif image_backup_filename:
+        image_desc = f"图片备份: {image_backup_filename}（{image_count} 张）"
+        audit_details = (
+            f"创建数据库备份：{filename}，大小: {size_bytes:,} 字节；{image_desc}"
+        )
+    else:
+        image_desc = "图片备份: 无图片"
+        audit_details = (
+            f"创建数据库备份：{filename}，大小: {size_bytes:,} 字节；{image_desc}"
+        )
     audit_log = AuditLog(
         action_type="BACKUP_CREATE",
         product_name=f"数据库备份: {filename}",
         product_id="",
         operator=operator,
         timestamp=now_str,
-        details=f"创建数据库备份：{filename}，大小: {size_bytes:,} 字节",
+        details=audit_details,
     )
     db.add(audit_log)
     db.commit()
+
+    if image_backup_failed:
+        message = f"数据库备份已创建：{filename}（{size_bytes:,} 字节），但产品图片备份失败"
+    else:
+        message = f"备份成功：{filename}（{size_bytes:,} 字节）"
+        if image_backup_filename:
+            message += f"；图片备份: {image_backup_filename}（{image_count} 张，{image_backup_size_bytes:,} 字节）"
+        else:
+            message += "；当前无图片"
 
     return MaintenanceBackupResponse(
         success=True,
@@ -466,7 +590,11 @@ def create_backup(admin=Depends(require_admin), db: Session = Depends(get_db)):
         path=str(backup_path),
         size_bytes=size_bytes,
         created_at=created_at,
-        message=f"备份成功：{filename}（{size_bytes:,} 字节）",
+        message=message,
+        image_backup_filename=image_backup_filename,
+        image_count=image_count,
+        image_backup_size_bytes=image_backup_size_bytes,
+        image_backup_failed=image_backup_failed,
     )
 
 

@@ -9,6 +9,7 @@ from datetime import datetime
 from database import get_db, Product, User, Transaction, AuditLog
 from schemas import ProductCreate, ProductUpdate, ProductResponse
 from auth import get_current_user, require_admin
+import image_store
 
 router = APIRouter()
 
@@ -249,6 +250,10 @@ def delete_product(product_id: str, db: Session = Depends(get_db), current_user:
             detail="该产品已有出入库记录，不能直接删除。请保留产品档案以保证库存台账和审计记录完整。",
         )
 
+    # 仅暂存当前图片相对文件名，不提前删除文件。
+    # 只有数据库删除与事务提交真正成功后，才清理对应图片文件。
+    image_path_to_clean = product.image_path
+
     # 记录删除前产品信息（用于审计日志）
     operator = current_user.display_name or current_user.username
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -272,5 +277,14 @@ def delete_product(product_id: str, db: Session = Depends(get_db), current_user:
 
     db.delete(product)
     db.commit()
+
+    # 产品数据库删除已成功提交，此时才安全清理主图。
+    # 图片不存在或清理失败都不回滚已完成的产品删除，仅留下可由维护预检发现的孤立文件。
+    if image_path_to_clean:
+        try:
+            image_store.delete_image(image_path_to_clean)
+        except (image_store.ImageValidationError, OSError) as e:
+            # 记录安全警告，不暴露服务器绝对路径，不影响已完成的业务删除
+            print(f"[警告] 删除产品 {product_id} 后清理图片失败（图片引用: {image_path_to_clean}）: {e}")
 
     return {"message": "产品已删除", "id": product_id}

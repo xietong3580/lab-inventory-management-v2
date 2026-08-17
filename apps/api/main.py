@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 from database import init_db
-from routers import products, transactions, audit_logs, dashboard, users, auth, backups, imports, maintenance
+from routers import products, transactions, audit_logs, dashboard, users, auth, backups, imports, maintenance, product_images
 
 # 创建 FastAPI 应用
 app = FastAPI(
@@ -54,6 +54,7 @@ init_db()
 
 # 注册路由
 app.include_router(products.router, prefix="/api/products", tags=["产品管理"])
+app.include_router(product_images.router, prefix="/api/products", tags=["产品图片"])
 app.include_router(transactions.router, prefix="/api/transactions", tags=["交易记录"])
 app.include_router(audit_logs.router, prefix="/api/audit-logs", tags=["审计日志"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["仪表盘"])

@@ -8,6 +8,10 @@ import { runPreflightCheck, createMaintenanceBackup } from '../services/backupSe
 import { usePermission } from '../hooks/usePermission';
 import MultiSelectFilter from '../components/common/MultiSelectFilter';
 import Pagination from '../components/common/Pagination';
+import ProductImage from '../components/common/ProductImage';
+import ProductImagePreview from '../components/common/ProductImagePreview';
+import { uploadProductImage, deleteProductImage } from '../services/productImageService';
+import { validateImageFile, formatImageHint, buildProductImageUploadErrorText } from '../utils/imageValidation';
 import {
   INVENTORY_CATEGORIES,
   getLocationOptionsByCategory,
@@ -162,6 +166,38 @@ function Products() {
   // 模态框和表单相关状态
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null); // null 表示新增，非null表示编辑
+
+  // 产品主图相关状态
+  const [previewProduct, setPreviewProduct] = useState(null); // 大图预览产品
+  const [imageFile, setImageFile] = useState(null); // 新增模式待上传图片
+  const [imagePreviewUrl, setImagePreviewUrl] = useState(null); // 本地预览 objectURL
+  const [imageError, setImageError] = useState('');
+  const [isImageUploading, setIsImageUploading] = useState(false);
+  const [showImageDeleteConfirm, setShowImageDeleteConfirm] = useState(false); // 图片删除确认弹窗
+  const imagePreviewUrlRef = useRef(null); // 用于卸载时安全释放 objectURL
+  // 同步当前预览 URL 到 ref，供卸载 cleanup 使用
+  useEffect(() => {
+    imagePreviewUrlRef.current = imagePreviewUrl;
+  }, [imagePreviewUrl]);
+  // 卸载/路由切换时释放本地预览 objectURL，避免内存泄漏
+  useEffect(() => () => {
+    if (imagePreviewUrlRef.current) {
+      URL.revokeObjectURL(imagePreviewUrlRef.current);
+      imagePreviewUrlRef.current = null;
+    }
+  }, []);
+
+  // Escape 关闭图片删除确认弹窗（删除进行中不响应）
+  useEffect(() => {
+    if (!showImageDeleteConfirm) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape' && !isImageUploading) {
+        setShowImageDeleteConfirm(false);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showImageDeleteConfirm, isImageUploading]);
 
   // 台账弹窗相关状态
   const [ledgerModalOpen, setLedgerModalOpen] = useState(false);
@@ -476,6 +512,14 @@ function Products() {
         salePrice: ''
       });
     }
+    // 重置图片选择状态
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    setImageFile(null);
+    setImagePreviewUrl(null);
+    setImageError('');
+    setIsImageUploading(false);
+    setShowImageDeleteConfirm(false);
+
     setIsModalOpen(true);
     // Step 10-6D：清空验证状态
     setSkuError(null);
@@ -488,13 +532,115 @@ function Products() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingProduct(null);
+    // 释放图片本地预览 objectURL
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    setImageFile(null);
+    setImagePreviewUrl(null);
+    setImageError('');
+    setIsImageUploading(false);
+    setShowImageDeleteConfirm(false); // 关闭编辑窗口时重置图片删除确认弹窗，避免悬挂
+  };
+
+  // 图片文件选择（新增模式暂存；编辑模式立即替换）
+  const handleImageFileChange = (e) => {
+    // 图片正在上传/替换/删除时禁止再次选择
+    if (isImageUploading) {
+      e.target.value = '';
+      return;
+    }
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      // 无效文件：清空之前待上传的旧文件，显示当前无效文件错误
+      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+      setImageFile(null);
+      setImagePreviewUrl(null);
+      setImageError(validation.reason);
+      e.target.value = '';
+      return;
+    }
+    setImageError('');
+    if (editingProduct) {
+      // 编辑模式：立即替换（不改变服务器当前图片，失败仅提示）
+      e.target.value = '';
+      handleReplaceImage(file);
+    } else {
+      // 新增模式：暂存待保存后上传；清空 input 以便重新选择同一文件
+      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+      setImageFile(file);
+      setImagePreviewUrl(URL.createObjectURL(file));
+      e.target.value = '';
+    }
+  };
+
+  // 编辑模式：替换图片（立即上传）
+  const handleReplaceImage = async (file) => {
+    if (!editingProduct || !file) return;
+    setIsImageUploading(true);
+    setImageError('');
+    try {
+      const result = await uploadProductImage(editingProduct.id, file);
+      applyImageState(editingProduct.id, result.image_updated_at);
+      setActionMessage({ type: 'success', text: '图片已更新' });
+      setTimeout(() => setActionMessage(null), 3000);
+    } catch (err) {
+      setImageError(err.message || '图片上传失败');
+    } finally {
+      setIsImageUploading(false);
+    }
+  };
+
+  // 编辑模式：打开图片删除确认弹窗（不立即删除）
+  const handleOpenImageDeleteConfirm = () => {
+    if (!editingProduct) return;
+    if (isImageUploading) return; // 正在处理中禁止打开
+    setImageError('');
+    setShowImageDeleteConfirm(true);
+  };
+
+  // 取消删除图片：仅关闭弹窗，不调用 API，不改变状态
+  const handleCancelImageDelete = () => {
+    if (isImageUploading) return; // 删除进行中禁止关闭
+    setShowImageDeleteConfirm(false);
+  };
+
+  // 确认删除图片：调用现有删除逻辑
+  const handleConfirmRemoveImage = async () => {
+    if (!editingProduct) return;
+    if (isImageUploading) return; // 防重复点击
+    setIsImageUploading(true);
+    setImageError('');
+    try {
+      await deleteProductImage(editingProduct.id);
+      applyImageState(editingProduct.id, '');
+      setShowImageDeleteConfirm(false); // 成功后关闭确认弹窗
+      setActionMessage({ type: 'success', text: '图片已删除' });
+      setTimeout(() => setActionMessage(null), 3000);
+    } catch (err) {
+      // 失败：保留产品记录，显示原有安全错误提示（弹窗保持打开以便重试/取消）
+      setImageError(err.message || '图片删除失败');
+    } finally {
+      setIsImageUploading(false);
+    }
+  };
+
+  // 同步更新产品图片状态（产品列表 + 编辑中的产品），保持分页与筛选不变
+  const applyImageState = (productId, imageUpdatedAt) => {
+    const hasImage = !!imageUpdatedAt;
+    setAllProducts(prev => prev.map(p =>
+      p.id === productId ? { ...p, hasImage, imageUpdatedAt: imageUpdatedAt || '' } : p
+    ));
+    setEditingProduct(prev =>
+      prev && prev.id === productId ? { ...prev, hasImage, imageUpdatedAt: imageUpdatedAt || '' } : prev
+    );
   };
 
   // 表单提交（keepModalOpen 用于"保存并继续新增"）
   const handleFormSubmit = async (e, keepModalOpen = false) => {
     if (e && e.preventDefault) e.preventDefault();
 
-    if (!canWrite || isSaving) return; // viewer 不可提交，防重复提交
+    if (!canWrite || isSaving || isImageUploading) return; // viewer 不可提交，防重复提交；图片处理中禁止提交
 
     // 轻量必填校验
     if (!formData.name.trim()) {
@@ -571,39 +717,78 @@ function Products() {
         // 根据库存数量自动计算状态
         newProduct.status = calculateProductStatus(newProduct);
         setAllProducts([...allProducts, newProduct]);
-      }
 
-      // 保存成功
-      setIsSaving(false);
+        // 产品创建成功后上传主图（图片上传失败不视为产品创建失败，不重复创建产品）
+        let imageUploadFailed = false;
+        let imageUploadErrorText = '';
+        if (imageFile) {
+          try {
+            const imgResult = await uploadProductImage(newProduct.id, imageFile);
+            setAllProducts(prev => prev.map(p =>
+              p.id === newProduct.id
+                ? { ...p, hasImage: true, imageUpdatedAt: imgResult.image_updated_at || '' }
+                : p
+            ));
+          } catch (imgErr) {
+            imageUploadFailed = true;
+            imageUploadErrorText = imgErr.message || '未知错误';
+          }
+        }
 
-      if (keepModalOpen && !editingProduct) {
-        // Step 10-6D：保存并继续新增 — 保留分类/单位/库位/最低库存，重置其余字段
-        setFormData(prev => ({
-          name: '',
-          sku: '',
-          category: prev.category,
-          currentStock: 0,
-          minStock: prev.minStock,
-          unit: prev.unit,
-          location: prev.location,
-          brand: '',
-          specification: '',
-          supplier: '',
-          notes: '',
-          purchasePrice: '',
-          salePrice: ''
-        }));
-        setSkuError(null);
-        setNameWarning(null);
-        setNameSpecWarning(null);
-        setSaveError(null);
-        setActionMessage({ type: 'success', text: '产品已添加，可继续录入下一产品' });
-        setTimeout(() => setActionMessage(null), 3000);
-      } else {
-        handleCloseModal();
-        setActionMessage({ type: 'success', text: editingProduct ? '产品已更新' : '产品已添加' });
-        // 3 秒后自动清除成功提示
-        setTimeout(() => setActionMessage(null), 3000);
+        // 保存成功
+        setIsSaving(false);
+
+        if (keepModalOpen && !editingProduct) {
+          // Step 10-6D：保存并继续新增 — 保留分类/单位/库位/最低库存，重置其余字段
+          setFormData(prev => ({
+            name: '',
+            sku: '',
+            category: prev.category,
+            currentStock: 0,
+            minStock: prev.minStock,
+            unit: prev.unit,
+            location: prev.location,
+            brand: '',
+            specification: '',
+            supplier: '',
+            notes: '',
+            purchasePrice: '',
+            salePrice: ''
+          }));
+          setSkuError(null);
+          setNameWarning(null);
+          setNameSpecWarning(null);
+          setSaveError(null);
+          // 重置图片选择状态
+          if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+          setImageFile(null);
+          setImagePreviewUrl(null);
+          setImageError('');
+          if (imageUploadFailed) {
+            // 图片失败提示优先于"继续录入"成功提示，不被覆盖
+            setActionMessage({
+              type: 'error',
+              text: buildProductImageUploadErrorText(imageUploadErrorText),
+            });
+            setTimeout(() => setActionMessage(null), 4000);
+          } else {
+            setActionMessage({ type: 'success', text: '产品已添加，可继续录入下一产品' });
+            setTimeout(() => setActionMessage(null), 3000);
+          }
+        } else {
+          handleCloseModal();
+          if (imageUploadFailed) {
+            // 图片失败提示优先于"产品添加成功"，不被覆盖
+            setActionMessage({
+              type: 'error',
+              text: buildProductImageUploadErrorText(imageUploadErrorText),
+            });
+            setTimeout(() => setActionMessage(null), 4000);
+          } else {
+            setActionMessage({ type: 'success', text: editingProduct ? '产品已更新' : '产品已添加' });
+            setTimeout(() => setActionMessage(null), 3000);
+          }
+        }
       }
     } catch (error) {
       console.error('保存产品失败:', error);
@@ -1289,7 +1474,14 @@ function Products() {
                         <div className="text-sm font-medium text-slate-800 truncate" title={product.sku}>{product.sku}</div>
                       </td>
                       <td className="px-2 py-2 lg:px-3 lg:py-3">
-                        <div className="text-sm font-medium text-slate-800 line-clamp-2 leading-snug" title={product.name}>{product.name}</div>
+                        <div className="flex items-center gap-2.5">
+                          <ProductImage
+                            product={product}
+                            onClick={() => setPreviewProduct(product)}
+                            className="w-12 h-12 rounded-md flex-shrink-0"
+                          />
+                          <div className="text-sm font-medium text-slate-800 line-clamp-2 leading-snug min-w-0" title={product.name}>{product.name}</div>
+                        </div>
                       </td>
                       <td className="px-2 py-2 lg:px-3 lg:py-3">
                         <div className="text-xs text-slate-700 truncate" title={product.category}>{product.category}</div>
@@ -1877,6 +2069,67 @@ function Products() {
                   </div>
                 </div>
 
+                {/* 产品主图（上传/替换/删除） */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    产品主图
+                  </label>
+                  <p className="text-xs text-slate-400 mb-2">{formatImageHint()}</p>
+
+                  {/* 编辑模式：显示当前图片 */}
+                  {editingProduct && (
+                    <div className="flex items-center gap-3 mb-3">
+                      <ProductImage
+                        product={editingProduct}
+                        onClick={() => setPreviewProduct(editingProduct)}
+                        className="w-16 h-16 rounded-md flex-shrink-0"
+                      />
+                      <div className="text-xs text-slate-500">
+                        {editingProduct.hasImage ? '当前图片，可替换或删除' : '暂无图片'}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 新增模式：本地预览 */}
+                  {!editingProduct && imagePreviewUrl && (
+                    <div className="flex items-center gap-3 mb-3">
+                      <img
+                        src={imagePreviewUrl}
+                        alt="图片预览"
+                        className="w-16 h-16 object-contain rounded-md border border-slate-200 bg-slate-50"
+                      />
+                      <div className="text-xs text-slate-500 truncate">{imageFile?.name || ''}</div>
+                    </div>
+                  )}
+
+                  {imageError && (
+                    <p className="text-xs text-rose-600 mb-2">{imageError}</p>
+                  )}
+
+                  {/* 仅管理员显示写控件：上传/替换/删除 */}
+                  {canWrite && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <input
+                        type="file"
+                        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                        onChange={handleImageFileChange}
+                        disabled={isImageUploading}
+                        className="text-sm text-slate-600 file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border file:border-slate-300 file:bg-slate-50 file:text-slate-700 file:text-sm file:font-medium hover:file:bg-slate-100"
+                      />
+                      {editingProduct && editingProduct.hasImage && (
+                        <button
+                          type="button"
+                          onClick={handleOpenImageDeleteConfirm}
+                          disabled={isImageUploading}
+                          className={`px-3 py-1.5 text-sm border border-rose-200 text-rose-600 rounded-md hover:bg-rose-50 transition-colors ${isImageUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          {isImageUploading ? '处理中...' : '删除图片'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
               </div>
 
               {/* Step 10-9A：正式录入核对提示区 */}
@@ -1937,10 +2190,10 @@ function Products() {
                   <button
                     type="button"
                     onClick={(e) => handleFormSubmit(e, true)}
-                    disabled={isSaving || !!skuError}
-                    title={skuError ? '请先解决 SKU 重复问题' : ''}
+                    disabled={isSaving || isImageUploading || !!skuError}
+                    title={skuError ? '请先解决 SKU 重复问题' : (isImageUploading ? '图片处理中，请稍候' : '')}
                     className={`px-4 py-2 border rounded-md transition-colors font-medium ${
-                      isSaving || skuError
+                      isSaving || isImageUploading || skuError
                         ? 'border-slate-200 text-slate-400 cursor-not-allowed'
                         : 'border-slate-400 text-slate-700 hover:bg-slate-100'
                     }`}
@@ -1950,10 +2203,10 @@ function Products() {
                 )}
                 <button
                   type="submit"
-                  disabled={isSaving || !!skuError}
-                  title={skuError ? '请先解决 SKU 重复问题' : ''}
+                  disabled={isSaving || isImageUploading || !!skuError}
+                  title={skuError ? '请先解决 SKU 重复问题' : (isImageUploading ? '图片处理中，请稍候' : '')}
                   className={`px-4 py-2 rounded-md transition-colors font-medium ${
-                    isSaving || skuError
+                    isSaving || isImageUploading || skuError
                       ? 'bg-slate-400 text-white cursor-not-allowed'
                       : 'bg-slate-700 text-white hover:bg-slate-800'
                   }`}
@@ -2226,6 +2479,60 @@ function Products() {
           </div>
         </div>
       )}
+
+      {/* 删除产品主图确认弹窗 */}
+      {showImageDeleteConfirm && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+          onClick={handleCancelImageDelete}
+        >
+          <div
+            className="bg-white rounded-lg shadow-lg w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-slate-200">
+              <h2 className="text-lg font-semibold text-slate-800">确认删除产品主图</h2>
+            </div>
+            <div className="p-6 space-y-3">
+              <p className="text-sm text-slate-700 leading-relaxed">
+                确认删除该产品的主图吗？产品记录和库存数据不会受到影响。
+              </p>
+              {/* 删除错误 */}
+              {imageError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-md">
+                  <div className="text-sm text-rose-700 leading-relaxed">{imageError}</div>
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+              <button
+                onClick={handleCancelImageDelete}
+                disabled={isImageUploading}
+                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition-colors font-medium"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleConfirmRemoveImage}
+                disabled={isImageUploading}
+                className={`px-4 py-2 text-white rounded-md transition-colors font-medium ${
+                  isImageUploading
+                    ? 'bg-rose-300 cursor-wait'
+                    : 'bg-rose-600 hover:bg-rose-700'
+                }`}
+              >
+                {isImageUploading ? '删除中...' : '确认删除'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 产品大图预览弹窗 */}
+      <ProductImagePreview
+        product={previewProduct}
+        onClose={() => setPreviewProduct(null)}
+      />
     </div>
   );
 }

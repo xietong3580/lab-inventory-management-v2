@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "check:api-config": "node scripts/check-api-config.cjs",
-    "test": "node --test src/utils/productFilterHelpers.test.js src/utils/paginationHelpers.test.js",
+    "test": "node --test src/utils/productFilterHelpers.test.js src/utils/paginationHelpers.test.js src/utils/imageValidation.test.js",
+    "test:backend": "python apps/api/tests/test_product_images.py",
     "check:product-filters": "node --test src/utils/productFilterHelpers.test.js",
     "preview": "vite preview"
   },
