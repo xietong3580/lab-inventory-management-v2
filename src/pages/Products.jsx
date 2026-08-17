@@ -694,6 +694,12 @@ function Products() {
           setAllProducts(allProducts.map(p =>
             p.id === editingProduct.id ? updatedProduct : p
           ));
+
+          // 编辑成功收尾：结束保存状态、关闭弹窗、提示成功（上传成功的图片继续保留并立即显示）
+          setIsSaving(false);
+          handleCloseModal();
+          setActionMessage({ type: 'success', text: '产品已更新' });
+          setTimeout(() => setActionMessage(null), 3000);
         }
       } else {
         // 添加新产品
