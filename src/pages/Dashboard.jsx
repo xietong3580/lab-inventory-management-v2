@@ -385,7 +385,7 @@ function Dashboard() {
         // 并行获取交易记录和审计日志
         const [transactions, auditLogs] = await Promise.all([
           transactionService.getTransactions(),
-          auditLogService.getAuditLogs()
+          auditLogService.getAllAuditLogs()
         ]);
 
         if (isMounted) {

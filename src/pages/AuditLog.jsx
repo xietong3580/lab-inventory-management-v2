@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { auditLogService } from '../services/dataService';
 import { usePermission } from '../hooks/usePermission';
 import {
@@ -8,109 +8,196 @@ import {
   getActionConfig,
   actionTypeMap
 } from '../utils/auditLogHelpers';
-import { filterAuditLogs, hasActiveFilters } from '../utils/auditLogFilterHelpers';
+import { hasActiveFilters } from '../utils/auditLogFilterHelpers';
 import { exportAuditLogsToCSV } from '../utils/exportHelpers';
 import Pagination from '../components/common/Pagination';
+
+// 每页条数（服务端分页）
+const PAGE_SIZE = 20;
+// 产品名称/操作人输入防抖延迟（毫秒）
+const DEBOUNCE_MS = 400;
 
 function AuditLog() {
   const { canWrite, adminOnlyTitle } = usePermission();
 
-  // 审计日志数据状态
-  const [auditLogs, setAuditLogs] = useState([]);
+  // 当前页数据（直接使用服务端返回的当前页 items）
+  const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  // 筛选状态
+
+  // 导出状态
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(null);
+
+  // 筛选状态（原始输入值）
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedActionType, setSelectedActionType] = useState('');
   const [selectedTimeRange, setSelectedTimeRange] = useState('all');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [operatorSearch, setOperatorSearch] = useState('');
-  // 分页状态
+
+  // 防抖后的输入值（真正参与服务端筛选请求）
+  const [debouncedSearchKeyword, setDebouncedSearchKeyword] = useState('');
+  const [debouncedOperatorSearch, setDebouncedOperatorSearch] = useState('');
+
+  // 分页与刷新
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // 用于丢弃较慢的旧请求结果（防止旧响应覆盖新筛选结果）
+  const requestSeqRef = useRef(0);
 
   // 处理日期范围变化
   const handleDateChange = (field, value) => {
     setDateRange((prev) => ({ ...prev, [field]: value }));
   };
 
-  // 导出当前筛选结果为 CSV
-  const handleExport = () => {
-    if (filteredLogs.length === 0) {
-      alert('没有可导出的数据，请先调整筛选条件或等待数据加载。');
-      return;
-    }
-
-    // 准备导出数据
-    const exportData = filteredLogs.map(log => {
-      const actionConfig = getActionConfig(log.actionType);
-      const displayTime = formatAuditTime(log.timestamp, 'compact');
-      const displayOperator = getDisplayOperator(log.operator);
-      const summaryText = generateAuditSummary(log, true);
-
-      return {
-        time: displayTime,
-        actionType: actionConfig.label,
-        productName: log.productName || '',
-        operator: displayOperator,
-        summary: summaryText
-      };
-    });
-
-    exportAuditLogsToCSV(exportData, 'audit-log-export');
+  // 清空所有筛选条件
+  const clearFilters = () => {
+    setSearchKeyword('');
+    setSelectedActionType('');
+    setSelectedTimeRange('all');
+    setDateRange({ start: '', end: '' });
+    setOperatorSearch('');
   };
 
-  // 加载审计日志数据
+  // 产品名称输入防抖
   useEffect(() => {
-    const loadAuditLogs = async () => {
+    const timer = setTimeout(() => setDebouncedSearchKeyword(searchKeyword), DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchKeyword]);
+
+  // 操作人输入防抖
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedOperatorSearch(operatorSearch), DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [operatorSearch]);
+
+  // 筛选条件变化时回到第 1 页
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    debouncedSearchKeyword,
+    debouncedOperatorSearch,
+    selectedActionType,
+    selectedTimeRange,
+    dateRange.start,
+    dateRange.end
+  ]);
+
+  // 页码越界安全处理：totalPages 缩小后，把当前页收敛回合法范围
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  // 加载当前页审计日志（进入页面 + 筛选变化 + 翻页 + 点击刷新）
+  useEffect(() => {
+    const seq = ++requestSeqRef.current;
+    let cancelled = false;
+
+    const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        const logs = await auditLogService.getAuditLogs();
-        // 确保按时间倒序排列（最新在前）
-        const sortedLogs = [...logs].sort((a, b) => {
-          if (!a.timestamp || !b.timestamp) return 0;
-          try {
-            return new Date(b.timestamp) - new Date(a.timestamp);
-          } catch {
-            return 0;
-          }
+        const result = await auditLogService.getAuditLogs({
+          page: currentPage,
+          pageSize: PAGE_SIZE,
+          actionType: selectedActionType,
+          productName: debouncedSearchKeyword,
+          operator: debouncedOperatorSearch,
+          timeRange: selectedTimeRange,
+          startDate: dateRange.start,
+          endDate: dateRange.end
         });
-        setAuditLogs(sortedLogs);
-      } catch (error) {
-        console.error('加载审计日志失败:', error);
-        setError(`数据加载失败: ${error.message}`);
-        // 降级使用空数组，页面仍可正常显示
-        setAuditLogs([]);
+        // 丢弃已过期请求的结果，避免慢的旧响应覆盖新的筛选结果
+        if (cancelled || seq !== requestSeqRef.current) return;
+        setItems(result.items);
+        setTotal(result.total);
+        setTotalPages(result.totalPages);
+      } catch (e) {
+        if (cancelled || seq !== requestSeqRef.current) return;
+        console.error('加载审计日志失败:', e);
+        setError(`数据加载失败: ${e.message}`);
+        setItems([]);
+        setTotal(0);
+        setTotalPages(0);
       } finally {
-        setLoading(false);
+        if (!cancelled && seq === requestSeqRef.current) {
+          setLoading(false);
+        }
       }
     };
-    loadAuditLogs();
-  }, []);
 
-  // 筛选后的日志
-  const filteredLogs = useMemo(() => {
-    return filterAuditLogs(
-      auditLogs,
-      selectedTimeRange,
-      dateRange,
-      selectedActionType,
-      searchKeyword,
-      operatorSearch
-    );
-  }, [auditLogs, selectedTimeRange, dateRange, selectedActionType, searchKeyword, operatorSearch]);
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    currentPage,
+    refreshKey,
+    selectedActionType,
+    debouncedSearchKeyword,
+    debouncedOperatorSearch,
+    selectedTimeRange,
+    dateRange.start,
+    dateRange.end
+  ]);
 
-  // 当筛选条件变化时重置分页
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchKeyword, selectedActionType, selectedTimeRange, dateRange, operatorSearch]);
+  // 导出当前筛选结果（服务端全量筛选后导出，不局限于当前页）
+  const handleExport = async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const allLogs = await auditLogService.getAllAuditLogs({
+        actionType: selectedActionType,
+        productName: debouncedSearchKeyword,
+        operator: debouncedOperatorSearch,
+        timeRange: selectedTimeRange,
+        startDate: dateRange.start,
+        endDate: dateRange.end
+      });
 
-  // 分页计算
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const displayedLogs = filteredLogs.slice(startIndex, endIndex);
-  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+      if (allLogs.length === 0) {
+        alert('没有可导出的数据，请先调整筛选条件或等待数据加载。');
+        return;
+      }
+
+      const exportData = allLogs.map((log) => {
+        const actionConfig = getActionConfig(log.actionType);
+        const displayTime = formatAuditTime(log.timestamp, 'compact');
+        const displayOperator = getDisplayOperator(log.operator);
+        const summaryText = generateAuditSummary(log, true);
+
+        return {
+          time: displayTime,
+          actionType: actionConfig.label,
+          productName: log.productName || '',
+          operator: displayOperator,
+          summary: summaryText
+        };
+      });
+
+      exportAuditLogsToCSV(exportData, 'audit-log-export');
+    } catch (e) {
+      console.error('导出审计日志失败:', e);
+      setExportError(`导出失败: ${e.message}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleRefresh = () => setRefreshKey((k) => k + 1);
+
+  const activeFilters = { searchKeyword, selectedActionType, selectedTimeRange, dateRange, operatorSearch };
+  const hasFilters = hasActiveFilters(activeFilters);
+
+  // 分页区间展示（基于服务端当前页 items）
+  const startIndex = total > 0 ? (currentPage - 1) * PAGE_SIZE + 1 : 0;
+  const endIndex = startIndex > 0 ? startIndex + items.length - 1 : 0;
 
   return (
     <div className="p-6">
@@ -122,22 +209,36 @@ function AuditLog() {
         </p>
       </div>
 
-      {/* 操作栏：导出按钮 */}
+      {/* 操作栏：刷新 + 导出按钮 */}
       <div className="mb-6 bg-white border border-slate-200 rounded-lg p-4">
         <div className="flex flex-col md:flex-row md:items-center justify-start md:justify-end gap-4">
           <button
-            onClick={handleExport}
-            disabled={!canWrite || filteredLogs.length === 0}
-            title={!canWrite ? adminOnlyTitle : ''}
+            onClick={handleRefresh}
+            disabled={loading}
             className={`px-4 py-2 border rounded-md transition-colors font-medium ${
-              !canWrite || filteredLogs.length === 0
+              loading
                 ? 'border-slate-200 text-slate-400 cursor-not-allowed'
                 : 'border-slate-300 text-slate-700 hover:bg-slate-50'
             }`}
           >
-            导出 CSV
+            刷新
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={!canWrite || exporting || total === 0}
+            title={!canWrite ? adminOnlyTitle : ''}
+            className={`px-4 py-2 border rounded-md transition-colors font-medium ${
+              !canWrite || exporting || total === 0
+                ? 'border-slate-200 text-slate-400 cursor-not-allowed'
+                : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            {exporting ? '导出中...' : '导出 CSV'}
           </button>
         </div>
+        {exportError && (
+          <div className="mt-2 text-sm text-rose-600">{exportError}</div>
+        )}
       </div>
 
       {/* 筛选工具栏 */}
@@ -196,17 +297,11 @@ function AuditLog() {
 
             {/* 清空筛选按钮（仅在存在筛选条件时显示） */}
             <div className="flex items-end">
-              {hasActiveFilters({ searchKeyword, selectedActionType, selectedTimeRange, dateRange, operatorSearch }) && (
+              {hasFilters && (
                 <button
                   type="button"
                   className="px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 transition-colors w-full"
-                  onClick={() => {
-                    setSearchKeyword('');
-                    setSelectedActionType('');
-                    setSelectedTimeRange('all');
-                    setDateRange({ start: '', end: '' });
-                    setOperatorSearch('');
-                  }}
+                  onClick={clearFilters}
                 >
                   清空筛选
                 </button>
@@ -281,7 +376,7 @@ function AuditLog() {
         <div className="px-6 py-4 border-b border-slate-100">
           <h2 className="text-lg font-semibold text-slate-800">操作日志</h2>
           <p className="text-sm text-slate-500 mt-1">
-            筛选结果：{filteredLogs.length} 条{filteredLogs.length !== auditLogs.length && `（共 ${auditLogs.length} 条）`}
+            筛选结果：{total} 条
           </p>
         </div>
 
@@ -299,11 +394,15 @@ function AuditLog() {
             <div className="py-12 text-center">
               <div className="text-slate-600 mb-2">数据加载异常</div>
               <div className="text-sm text-slate-600 max-w-md mx-auto mb-4">{error}</div>
-              <div className="text-sm text-slate-500 max-w-md mx-auto">
-                系统已自动降级使用空数据，页面功能可能受限。
-              </div>
+              <button
+                type="button"
+                className="px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 transition-colors"
+                onClick={handleRefresh}
+              >
+                重试
+              </button>
             </div>
-          ) : auditLogs.length === 0 ? (
+          ) : total === 0 && !hasFilters ? (
             // 系统暂无日志
             <div className="py-12 text-center">
               <div className="text-slate-500 mb-2">暂无数据</div>
@@ -311,7 +410,7 @@ function AuditLog() {
                 执行新增产品、编辑产品、出入库等操作后，这里会显示详细的操作日志记录。
               </div>
             </div>
-          ) : filteredLogs.length === 0 ? (
+          ) : total === 0 && hasFilters ? (
             // 筛选无结果
             <div className="py-12 text-center">
               <div className="text-slate-500 mb-2">未找到匹配的记录</div>
@@ -325,21 +424,13 @@ function AuditLog() {
                 <p>• 调整快捷时间范围或自定义日期</p>
                 <p>• 清空筛选条件以查看全部记录</p>
               </div>
-              {hasActiveFilters({ searchKeyword, selectedActionType, selectedTimeRange, dateRange, operatorSearch }) && (
-                <button
-                  type="button"
-                  className="mt-6 px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 transition-colors"
-                  onClick={() => {
-                    setSearchKeyword('');
-                    setSelectedActionType('');
-                    setSelectedTimeRange('all');
-                    setDateRange({ start: '', end: '' });
-                    setOperatorSearch('');
-                  }}
-                >
-                  清空筛选
-                </button>
-              )}
+              <button
+                type="button"
+                className="mt-6 px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 transition-colors"
+                onClick={clearFilters}
+              >
+                清空筛选
+              </button>
             </div>
           ) : (<>
             <div className="hidden md:block">
@@ -355,7 +446,7 @@ function AuditLog() {
 
               {/* 日志行列表 */}
               <div className="space-y-3">
-                {displayedLogs.map((log) => {
+                {items.map((log) => {
                   const actionConfig = getActionConfig(log.actionType);
                   const displayTime = formatAuditTime(log.timestamp, 'compact');
                   const displayOperator = getDisplayOperator(log.operator);
@@ -410,7 +501,7 @@ function AuditLog() {
 
             <div className="block md:hidden space-y-3">
               {/* 移动端卡片视图 (md以下) */}
-              {displayedLogs.map((log) => {
+              {items.map((log) => {
                 const actionConfig = getActionConfig(log.actionType);
                 const displayTime = formatAuditTime(log.timestamp, 'compact');
                 const displayOperator = getDisplayOperator(log.operator);
@@ -458,10 +549,10 @@ function AuditLog() {
             </div>
 
             {/* 分页控制 */}
-            {filteredLogs.length > 0 && (
+            {total > 0 && (
               <div className="px-4 py-3 md:px-6 md:py-4 border-t border-slate-200 flex flex-col md:flex-row items-center md:items-center justify-center md:justify-between gap-4 md:gap-0">
                 <div className="w-full md:w-auto text-sm text-slate-600 text-center md:text-left">
-                  显示第 {startIndex + 1} - {Math.min(endIndex, filteredLogs.length)} 条，共 {filteredLogs.length} 条记录
+                  显示第 {startIndex} - {endIndex} 条，共 {total} 条记录
                 </div>
                 <Pagination
                   currentPage={currentPage}

@@ -3,6 +3,15 @@
  * 支持 mock/localStorage 和 API 两种数据源模式切换
  */
 
+import { filterAuditLogs } from '../utils/auditLogFilterHelpers';
+import {
+  buildAuditLogQuery,
+  normalizeAuditLogPage,
+  DEFAULT_PAGE_SIZE,
+  EXPORT_PAGE_SIZE,
+  MAX_EXPORT_PAGES
+} from '../utils/auditLogPagination';
+
 // 数据源模式配置
 const DATA_SOURCE_MODE = {
   MOCK: 'mock',
@@ -227,16 +236,6 @@ const normalizeAuditLog = (auditLog) => {
   }
 
   return normalized;
-};
-
-/**
- * 规范化审计日志列表
- * @param {Array} auditLogs - API返回的审计日志列表
- * @returns {Array} 规范化后的审计日志列表
- */
-const normalizeAuditLogList = (auditLogs) => {
-  if (!Array.isArray(auditLogs)) return [];
-  return auditLogs.map(normalizeAuditLog);
 };
 
 /**
@@ -678,26 +677,86 @@ export const transactionService = {
 /**
  * 审计日志相关数据服务
  */
+
+/**
+ * Mock 模式：获取并筛序全部审计日志（复用前端原有筛选语义）。
+ * 仅用于 mock/localStorage 模式，API 模式下筛选在服务端完成。
+ * @param {Object} params - 筛选参数（与 getAuditLogs 一致）
+ * @returns {Promise<Array>} 筛选后的日志数组（时间倒序）
+ */
+async function getMockAuditLogs(params = {}) {
+  const { getAuditLogs } = await import('./productService.js');
+  const all = getAuditLogs();
+  return filterAuditLogs(
+    all,
+    params.timeRange || 'all',
+    { start: params.startDate || '', end: params.endDate || '' },
+    params.actionType || '',
+    params.productName || '',
+    params.operator || ''
+  );
+}
+
 export const auditLogService = {
   /**
-   * 获取所有审计日志
-   * @returns {Promise<Array>} 审计日志列表
+   * 获取审计日志（服务端分页 + 筛选）
+   * @param {Object} params - {
+   *   page, pageSize, actionType, productName, operator, timeRange, startDate, endDate
+   * }
+   * @returns {Promise<Object>} { items, total, page, pageSize, totalPages }
    */
-  async getAuditLogs() {
+  async getAuditLogs(params = {}) {
     if (currentMode === DATA_SOURCE_MODE.MOCK) {
-      const { getAuditLogs } = await import('./productService.js');
-      return getAuditLogs();
-    } else {
-      try {
-        const data = await apiRequest('/audit-logs/');
-        // 规范化字段名，确保与前端期望的字段名一致
-        return normalizeAuditLogList(data);
-      } catch (error) {
-        console.error('[dataService] 获取审计日志失败:', error);
-        // API 模式下不降级到 mock，抛出错误让页面展示 error 状态
-        throw error;
-      }
+      const filtered = await getMockAuditLogs(params);
+      const page = Number(params.page) || 1;
+      const pageSize = Number(params.pageSize) || DEFAULT_PAGE_SIZE;
+      const total = filtered.length;
+      const totalPages = total > 0 ? Math.ceil(total / pageSize) : 0;
+      const start = (page - 1) * pageSize;
+      return {
+        items: filtered.slice(start, start + pageSize),
+        total,
+        page,
+        pageSize,
+        totalPages
+      };
     }
+
+    try {
+      const queryString = buildAuditLogQuery(params);
+      const data = await apiRequest(`/audit-logs/?${queryString}`);
+      // 规范化字段名与分页结构，确保与前端期望一致
+      return normalizeAuditLogPage(data, normalizeAuditLog);
+    } catch (error) {
+      console.error('[dataService] 获取审计日志失败:', error);
+      // API 模式下不降级到 mock，抛出错误让页面展示 error 状态
+      throw error;
+    }
+  },
+
+  /**
+   * 获取全部当前筛选结果（用于 CSV 导出与 Dashboard 统计）。
+   * 按受控 page_size 逐批读取并汇总，禁止依赖无限大 limit，带安全上限避免无限循环。
+   * @param {Object} params - 筛选参数（与 getAuditLogs 一致，忽略 page）
+   * @returns {Promise<Array>} 全量筛选后的日志数组
+   */
+  async getAllAuditLogs(params = {}) {
+    if (currentMode === DATA_SOURCE_MODE.MOCK) {
+      return getMockAuditLogs(params);
+    }
+
+    const all = [];
+    let page = 1;
+    while (page <= MAX_EXPORT_PAGES) {
+      const result = await this.getAuditLogs({ ...params, page, pageSize: EXPORT_PAGE_SIZE });
+      all.push(...result.items);
+      // 正常结束：读到空页，或已读满所有页
+      if (result.items.length === 0 || page >= result.totalPages) {
+        break;
+      }
+      page += 1;
+    }
+    return all;
   }
 };
 
